@@ -45,9 +45,14 @@ export function SiteHeader({ me }: { me: Me | null }) {
           {me ? (
             <>
               {me.role === "employer" ? (
-                <Button asChild variant="ghost" size="sm">
-                  <Link to="/employer">Dashboard</Link>
-                </Button>
+                <>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/employer">Dashboard</Link>
+                  </Button>
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/employer/account">Account</Link>
+                  </Button>
+                </>
               ) : (
                 <>
                   <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">

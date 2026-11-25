@@ -368,6 +368,18 @@
         },
         "required": ["type", "title", "status", "code"]
       },
+      "AccountChanges": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "Olive Owner"
+          }
+        },
+        "required": ["name"]
+      },
       "FullProfile": {
         "type": "object",
         "properties": {
@@ -2377,6 +2389,63 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Change your name",
+        "description": "The name a salon's team and the people you invite see. A job seeker's name follows their profile: change it with PUT /v1/me/profile instead.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AccountChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Your name comes from your job seeker profile",
             "content": {
               "application/problem+json": {
                 "schema": {

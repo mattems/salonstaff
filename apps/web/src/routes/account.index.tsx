@@ -11,17 +11,6 @@ import {
   seekerProfileSchema,
   WEEKDAYS,
 } from "@salonstaff/shared";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@salonstaff/ui/components/alert-dialog";
 import { Button } from "@salonstaff/ui/components/button";
 import {
   Card,
@@ -32,10 +21,11 @@ import {
 } from "@salonstaff/ui/components/card";
 import { Input } from "@salonstaff/ui/components/input";
 import { Progress } from "@salonstaff/ui/components/progress";
-import { createFileRoute, useNavigate, useRouter } from "@tanstack/react-router";
+import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
 import { AppLink } from "@/components/app-link";
+import { DeleteAccountButton } from "@/components/delete-account";
 import {
   CheckboxField,
   CheckboxGroup,
@@ -52,7 +42,7 @@ import {
   useAction,
 } from "@/components/form";
 import { Notice, PageHeader } from "@/components/page";
-import { api, errorMessage, type FullProfile, multipart, orNull, unwrap } from "@/lib/api";
+import { api, type FullProfile, multipart, orNull, unwrap } from "@/lib/api";
 import { formatMonth } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 import { forgetMe, safeNext } from "@/lib/session";
@@ -792,47 +782,12 @@ function Education({ full }: { full: Full }) {
 // ---------------------------------------------------------------------------
 
 function DeleteAccount() {
-  const navigate = useNavigate();
-  const router = useRouter();
-  const [pending, setPending] = useState(false);
-  async function remove() {
-    setPending(true);
-    try {
-      unwrap(await api.DELETE("/v1/me"));
-      forgetMe();
-      toast.success("Your account has been deleted");
-      await navigate({ to: "/" });
-      await router.invalidate();
-    } catch (error) {
-      toast.error(errorMessage(error));
-      setPending(false);
-    }
-  }
   return (
     <SectionCard
       title="Delete your account"
       description="Deletes your account, profile, photos, applications and checks, and signs you out everywhere. This can't be undone."
     >
-      <AlertDialog>
-        <AlertDialogTrigger asChild>
-          <Button variant="destructive">Delete my account</Button>
-        </AlertDialogTrigger>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Everything goes: your profile, photos, applications and verification. Salons you
-              applied to lose your details. This can't be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Keep my account</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" disabled={pending} onClick={remove}>
-              Delete everything
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <DeleteAccountButton warning="Everything goes: your profile, photos, applications and verification. Salons you applied to lose your details. This can't be undone." />
     </SectionCard>
   );
 }

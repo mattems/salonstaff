@@ -138,6 +138,33 @@ export function seeker(db: Db, userId: string) {
     profile: () => profileRow(),
     fullProfile: () => fullProfileOf(db, userId),
 
+    /**
+     * Changes the account's name: what a salon's team and invite emails show. A job seeker's name
+     * follows their profile instead, so they change it there.
+     */
+    async rename(name: string, actor: Actor): Promise<User> {
+      return db.transaction(async (tx) => {
+        const [before] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
+        if (!before) throw new ApiError("unauthenticated", { hint: "Sign in again." });
+        if (await profileRow(tx)) {
+          throw new ApiError("conflict", {
+            detail: "Your name comes from your job seeker profile",
+            hint: "Change your first and last name with PUT /v1/me/profile.",
+          });
+        }
+        if (before.name === name) return before;
+        const [row] = await tx.update(users).set({ name }).where(eq(users.id, userId)).returning();
+        await recordAudit(tx, actor, {
+          action: "user.renamed",
+          targetType: "user",
+          targetId: userId,
+          before: { name: before.name },
+          after: { name },
+        });
+        return row as User;
+      });
+    },
+
     /** Creates or replaces the basics. The account's name follows the profile's. */
     async saveProfile(input: SeekerProfileInput, actor: Actor): Promise<SeekerProfile> {
       const values = profileValues(input);
