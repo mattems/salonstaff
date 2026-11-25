@@ -218,7 +218,8 @@ function listingRow(input: ListingInput, slug: string, suburbSlug: string) {
     instagram: input.instagram ?? null,
     abn: input.abn ?? null,
     about: input.about ?? null,
-    abnStatus: (input.abn ? "pending" : "not_started") as VerificationStatus,
+    // Not queued for staff: nobody owns the listing yet, and a claim checks the ABN (D-04, D-09).
+    abnStatus: "not_started" as VerificationStatus,
     source: "directory" as const,
   };
 }

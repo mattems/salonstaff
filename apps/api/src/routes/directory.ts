@@ -15,6 +15,7 @@ import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
+import { NearQuery, nearFrom } from "../lib/near";
 import { appUrl, sendEmail } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
@@ -51,7 +52,7 @@ directoryRoutes.openapi(
     path: "/v1/salons",
     summary: "Search the salon directory",
     description:
-      "Salons with live jobs first, then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job.",
+      "Salons with live jobs first, then the nearest (when searching near a point), then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job. Near me: `lat` and `lng` (or `near` with a postcode) and `km`; salons are placed at their suburb's centre.",
     tags: TAGS,
     request: {
       query: z.object({
@@ -62,6 +63,7 @@ directoryRoutes.openapi(
           .regex(/^[a-z0-9-]{1,80}$/)
           .optional(),
         hiring: z.enum(["true", "false"]).optional(),
+        ...NearQuery,
         page: PageQuery,
       }),
     },
@@ -74,6 +76,7 @@ directoryRoutes.openapi(
       state: query.state,
       suburbSlug: query.suburb,
       hiring: query.hiring === "true",
+      near: await nearFrom(c, query),
       page: query.page,
       pageSize: SALONS_PAGE_SIZE,
     });
@@ -187,7 +190,7 @@ directoryRoutes.openapi(
         {
           kind: "salon" as const,
           salon: {
-            ...directorySalonJson(c.env, { salon, liveJobs: jobs.length }),
+            ...directorySalonJson(c.env, { salon, liveJobs: jobs.length, distanceKm: null }),
             postcode: salon.postcode,
             website: salon.website,
             instagram: salon.instagram,

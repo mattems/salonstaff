@@ -18,6 +18,8 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 - No table imports outside `packages/db`. Scopes: `publicSite`, `seeker(db, userId)`, `salonScope(db, salonId)`,
   `claims`, `checks`, `backOffice` (behind `requireStaff` only), `housekeeping` (the cron only).
 - Migrations: `bun db:generate -- --name <name>`; forward only, expand then contract.
+- `latitude`/`longitude` on salons and jobs are set by the database (trigger `set_coordinates`, D-10) from
+  `localities`/`postcodes`; never write them from code.
 
 ## Auth (`packages/auth`)
 - Only this package imports Better Auth. No passwords. Rate limits come from the API's Cloudflare bindings.

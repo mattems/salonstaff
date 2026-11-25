@@ -20,6 +20,7 @@ import { Fragment } from "react";
 import type { Schemas } from "@/lib/api";
 import { ago, employmentLabel } from "@/lib/format";
 import { AppLink } from "./app-link";
+import { distanceText } from "./near-me";
 
 export type Crumb = { name: string; path: string };
 
@@ -48,7 +49,10 @@ export function Breadcrumbs({ crumbs }: { crumbs: Crumb[] }) {
   );
 }
 
-export function JobCard({ job, action }: { job: Schemas["JobSummary"]; action?: React.ReactNode }) {
+/** A job, and how far away it is when the search was near a point. */
+type ListedJob = Schemas["JobSummary"] & { distanceKm?: number | null };
+
+export function JobCard({ job, action }: { job: ListedJob; action?: React.ReactNode }) {
   return (
     <Card size="sm">
       <CardHeader>
@@ -62,6 +66,7 @@ export function JobCard({ job, action }: { job: Schemas["JobSummary"]; action?: 
             {job.salon.name}
           </AppLink>{" "}
           · {job.suburb} {job.state}
+          {distanceText(job.distanceKm) && ` · ${distanceText(job.distanceKm)}`}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-wrap items-center gap-2 text-sm">
@@ -78,7 +83,7 @@ export function JobCard({ job, action }: { job: Schemas["JobSummary"]; action?: 
   );
 }
 
-export function JobList({ jobs }: { jobs: Schemas["JobSummary"][] }) {
+export function JobList({ jobs }: { jobs: ListedJob[] }) {
   return (
     <div className="grid gap-3">
       {jobs.map((job) => (
@@ -99,19 +104,19 @@ export function SalonCard({ salon }: { salon: Schemas["DirectorySalon"] }) {
         </CardTitle>
         <CardDescription>
           {salon.suburb} {salon.state}
+          {distanceText(salon.distanceKm) && ` · ${distanceText(salon.distanceKm)}`}
         </CardDescription>
       </CardHeader>
-      <CardContent className="flex flex-wrap items-center gap-2 text-sm">
-        {salon.liveJobs > 0 ? (
-          <Badge variant="secondary">
-            Hiring: {salon.liveJobs} job{salon.liveJobs === 1 ? "" : "s"}
-          </Badge>
-        ) : (
-          <span className="text-muted-foreground">No jobs right now</span>
-        )}
-        {salon.verified && <Badge variant="outline">Verified business</Badge>}
-        {!salon.claimed && <span className="text-muted-foreground">Unclaimed listing</span>}
-      </CardContent>
+      {(salon.liveJobs > 0 || salon.verified) && (
+        <CardContent className="flex flex-wrap items-center gap-2 text-sm">
+          {salon.liveJobs > 0 && (
+            <Badge variant="secondary">
+              Hiring: {salon.liveJobs} job{salon.liveJobs === 1 ? "" : "s"}
+            </Badge>
+          )}
+          {salon.verified && <Badge variant="outline">Verified business</Badge>}
+        </CardContent>
+      )}
     </Card>
   );
 }

@@ -248,7 +248,8 @@ export function salonsFor(db: Db) {
               state: input.state,
               postcode: input.postcode,
               abn,
-              abnStatus: abn ? "pending" : "not_started",
+              // Not queued for staff: nobody owns the listing yet, and a claim checks the ABN (D-09).
+              abnStatus: "not_started",
               email: input.email?.trim().toLowerCase() || null,
               phone: input.phone || null,
               website: input.website || null,

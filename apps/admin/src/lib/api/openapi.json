@@ -753,7 +753,7 @@
       "JobSearch": {
         "allOf": [
           {
-            "$ref": "#/components/schemas/JobList"
+            "$ref": "#/components/schemas/JobResultList"
           },
           {
             "type": "object",
@@ -763,6 +763,23 @@
               }
             },
             "required": ["facets"]
+          }
+        ]
+      },
+      "JobResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "distanceKm": {
+                "type": ["number", "null"],
+                "description": "Kilometres from the point searched near (between suburb centres), or null."
+              }
+            },
+            "required": ["distanceKm"]
           }
         ]
       },
@@ -824,13 +841,13 @@
         "required": ["roles", "states"],
         "description": "Live jobs per role and per state, given the other filters."
       },
-      "JobList": {
+      "JobResultList": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/JobSummary"
+              "$ref": "#/components/schemas/JobResult"
             }
           },
           "page": {
@@ -947,6 +964,30 @@
           }
         },
         "required": ["name", "path"]
+      },
+      "JobList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          }
+        },
+        "required": ["items", "page", "pageSize", "total", "pageCount"]
       },
       "JobAd": {
         "type": "object",
@@ -1743,9 +1784,13 @@
               },
               "liveJobs": {
                 "type": "integer"
+              },
+              "distanceKm": {
+                "type": ["number", "null"],
+                "description": "Kilometres from the point searched near (between suburb centres), or null."
               }
             },
-            "required": ["suburbSlug", "about", "liveJobs"]
+            "required": ["suburbSlug", "about", "liveJobs", "distanceKm"]
           }
         ]
       },

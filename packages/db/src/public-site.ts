@@ -4,15 +4,17 @@
  */
 import {
   type AuState,
+  boundingBox,
   type EmploymentType,
   type JobRole,
   jobPath,
+  type LatLng,
   salonPath,
 } from "@salonstaff/shared";
-import { and, asc, count, desc, eq, ilike, max, ne, or, type SQL, sql } from "drizzle-orm";
+import { and, asc, between, count, desc, eq, ilike, max, ne, or, type SQL, sql } from "drizzle-orm";
 import type { Db } from "./index";
 import { contains } from "./like";
-import { jobs, salons, slugRedirects } from "./schema";
+import { jobs, postcodes, salons, slugRedirects } from "./schema";
 import {
   isLive,
   type JobWithSalon,
@@ -24,8 +26,14 @@ import {
   visibleSalon,
 } from "./visibility";
 
+/** Within `km` of a point (D-10). Places are at their suburb's centre. */
+export interface Near extends LatLng {
+  km: number;
+}
+
 export interface JobSearch {
   q?: string | undefined;
+  near?: Near | undefined;
   role?: JobRole | undefined;
   state?: AuState | undefined;
   suburbSlug?: string | undefined;
@@ -36,6 +44,7 @@ export interface JobSearch {
 
 export interface SalonSearch {
   q?: string | undefined;
+  near?: Near | undefined;
   state?: AuState | undefined;
   suburbSlug?: string | undefined;
   /** Only salons with a live job. */
@@ -47,6 +56,8 @@ export interface SalonSearch {
 export interface DirectoryEntry {
   salon: Salon;
   liveJobs: number;
+  /** How far away it is, when the search was near a point. */
+  distanceKm: number | null;
 }
 
 export interface Place {
@@ -64,8 +75,29 @@ export interface SitemapData {
   salonPlaces: { state: AuState; suburbSlug: string; lastmod: Date }[];
 }
 
+type Located = typeof jobs | typeof salons;
+
+/** Kilometres from the search's point to a job's or salon's (the haversine formula, as `distanceKm`). */
+function distanceFrom(table: Located, near: LatLng): SQL<number> {
+  return sql<number>`(12742 * asin(least(1, sqrt(
+    power(sin(radians(${table.latitude} - ${near.latitude}) / 2), 2)
+    + cos(radians(${near.latitude})) * cos(radians(${table.latitude}))
+      * power(sin(radians(${table.longitude} - ${near.longitude}) / 2), 2)))))`;
+}
+
+/** Within the radius: a box the location index can use, then the exact distance. */
+function within(table: Located, near: Near): SQL {
+  const box = boundingBox(near, near.km);
+  return and(
+    between(table.latitude, box.south, box.north),
+    between(table.longitude, box.west, box.east),
+    sql`${distanceFrom(table, near)} <= ${near.km}`,
+  ) as SQL;
+}
+
 function jobConditions(search: Omit<JobSearch, "page" | "pageSize">): SQL {
   const conditions: (SQL | undefined)[] = [liveJob()];
+  if (search.near) conditions.push(within(jobs, search.near));
   if (search.role) conditions.push(eq(jobs.role, search.role));
   if (search.state) conditions.push(eq(jobs.state, search.state));
   if (search.suburbSlug) conditions.push(eq(jobs.suburbSlug, search.suburbSlug));
@@ -87,16 +119,22 @@ function jobConditions(search: Omit<JobSearch, "page" | "pageSize">): SQL {
 
 export function publicSite(db: Db) {
   return {
-    /** Live jobs, featured first, then the newest. */
-    async jobs(search: JobSearch): Promise<PageOf<JobWithSalon>> {
+    /** Live jobs, featured first, then the nearest (when near a point), then the newest. */
+    async jobs(search: JobSearch): Promise<PageOf<JobWithSalon & { distanceKm: number | null }>> {
       const where = jobConditions(search);
+      const distance = search.near ? distanceFrom(jobs, search.near) : sql<null>`null`;
       const [items, [total]] = await Promise.all([
         db
-          .select({ job: jobs, salon: salons })
+          .select({ job: jobs, salon: salons, distanceKm: distance })
           .from(jobs)
           .innerJoin(salons, eq(salons.id, jobs.salonId))
           .where(where)
-          .orderBy(desc(jobs.featured), desc(jobs.publishedAt), desc(jobs.id))
+          .orderBy(
+            desc(jobs.featured),
+            ...(search.near ? [asc(distance)] : []),
+            desc(jobs.publishedAt),
+            desc(jobs.id),
+          )
           .limit(search.pageSize)
           .offset((search.page - 1) * search.pageSize),
         db
@@ -187,6 +225,15 @@ export function publicSite(db: Db) {
       return salon?.suburb ?? null;
     },
 
+    /** The centre of a postcode's area, for searching near it. Null for a postcode with no area (PO boxes). */
+    async postcodeCentre(postcode: string): Promise<LatLng | null> {
+      const [row] = await db
+        .select({ latitude: postcodes.latitude, longitude: postcodes.longitude })
+        .from(postcodes)
+        .where(eq(postcodes.postcode, postcode));
+      return row ?? null;
+    },
+
     /** Where an old address now lives (for a 301), or null. */
     async redirect(path: string): Promise<string | null> {
       const [row] = await db.select().from(slugRedirects).where(eq(slugRedirects.path, path));
@@ -201,9 +248,10 @@ export function publicSite(db: Db) {
       return now === path ? null : now;
     },
 
-    /** The directory: salons with live jobs first, then by name. */
+    /** The directory: salons with live jobs first, then the nearest (when near a point), then by name. */
     async salons(search: SalonSearch): Promise<PageOf<DirectoryEntry>> {
       const conditions: (SQL | undefined)[] = [visibleSalon()];
+      if (search.near) conditions.push(within(salons, search.near));
       if (search.state) conditions.push(eq(salons.state, search.state));
       if (search.suburbSlug) conditions.push(eq(salons.suburbSlug, search.suburbSlug));
       if (search.hiring) conditions.push(sql`${liveJobCount()} > 0`);
@@ -218,12 +266,18 @@ export function publicSite(db: Db) {
         );
       }
       const where = and(...conditions);
+      const distance = search.near ? distanceFrom(salons, search.near) : sql<null>`null`;
       const [rows, [total]] = await Promise.all([
         db
-          .select({ salon: salons, liveJobs: liveJobCount() })
+          .select({ salon: salons, liveJobs: liveJobCount(), distanceKm: distance })
           .from(salons)
           .where(where)
-          .orderBy(sql`${liveJobCount()} desc`, asc(salons.name), asc(salons.id))
+          .orderBy(
+            sql`${liveJobCount()} desc`,
+            ...(search.near ? [asc(distance)] : []),
+            asc(salons.name),
+            asc(salons.id),
+          )
           .limit(search.pageSize)
           .offset((search.page - 1) * search.pageSize),
         db.select({ n: count() }).from(salons).where(where),

@@ -19,6 +19,7 @@ import {
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { userActor } from "../lib/actor";
+import { NearQuery, nearFrom, roundedKm } from "../lib/near";
 import { appUrl, notify } from "../lib/notify";
 import { orNull, problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
@@ -30,11 +31,13 @@ import {
   errors,
   JobDetailSchema,
   JobPageSchema,
+  JobResultSchema,
   JobRoleSchema,
   JobSummarySchema,
   json,
   jsonBody,
   PageQuery,
+  pageOf,
   pathParam,
   RedirectSchema,
   ViewerSchema,
@@ -70,7 +73,7 @@ jobsRoutes.openapi(
     path: "/v1/jobs",
     summary: "Search live jobs",
     description:
-      "Live jobs, featured first, then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`).",
+      "Live jobs, featured first, then the nearest (when searching near a point), then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`). Near me: `lat` and `lng` (or `near` with a postcode) and `km`; jobs are placed at their suburb's centre.",
     tags: TAGS,
     request: {
       query: z.object({
@@ -83,12 +86,15 @@ jobsRoutes.openapi(
           .optional()
           .openapi({ example: "surry-hills" }),
         type: EmploymentTypeSchema.optional(),
+        ...NearQuery,
         page: PageQuery,
       }),
     },
     responses: {
       200: json(
-        JobPageSchema.extend({ facets: FacetsSchema }).openapi("JobSearch"),
+        pageOf(JobResultSchema, "JobResultList")
+          .extend({ facets: FacetsSchema })
+          .openapi("JobSearch"),
         "A page of jobs",
       ),
       400: errors[400],
@@ -103,12 +109,17 @@ jobsRoutes.openapi(
       state: query.state,
       suburbSlug: query.suburb,
       type: query.type,
+      near: await nearFrom(c, query),
     };
     const [page, facets] = await Promise.all([
       site.jobs({ ...search, page: query.page, pageSize: JOBS_PAGE_SIZE }),
       site.facets(search),
     ]);
-    return c.json({ ...pageJson(page, (row) => jobSummaryJson(c.env, row)), facets }, 200);
+    const item = (row: (typeof page.items)[number]) => ({
+      ...jobSummaryJson(c.env, row),
+      distanceKm: roundedKm(row.distanceKm),
+    });
+    return c.json({ ...pageJson(page, item), facets }, 200);
   },
 );
 

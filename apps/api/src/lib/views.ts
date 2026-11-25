@@ -27,6 +27,7 @@ import {
   salonPath,
 } from "@salonstaff/shared";
 import type { Env } from "../env";
+import { roundedKm } from "./near";
 import { mediaUrl } from "./storage";
 
 const iso = (date: Date | null | undefined) => (date ? date.toISOString() : null);
@@ -220,11 +221,12 @@ export const mySalonJson = (env: Env, salon: Salon) => ({
   entitlement: entitlementJson(salon),
 });
 
-export const directorySalonJson = (env: Env, { salon, liveJobs }: DirectoryEntry) => ({
+export const directorySalonJson = (env: Env, { salon, liveJobs, distanceKm }: DirectoryEntry) => ({
   ...salonSummaryJson(env, salon),
   suburbSlug: salon.suburbSlug,
   about: salon.about,
   liveJobs,
+  distanceKm: roundedKm(distanceKm),
 });
 
 export function applicantJson(env: Env, row: Applicant) {

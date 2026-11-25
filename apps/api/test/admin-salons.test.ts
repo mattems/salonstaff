@@ -274,7 +274,8 @@ describe("the directory", () => {
       source: "directory",
       ownerId: null,
       instagram: "faderoom",
-      abnStatus: "pending",
+      // An imported ABN isn't queued for staff; a claim checks it.
+      abnStatus: "not_started",
       address: "1 Smith St, Fitzroy",
     });
 

@@ -109,7 +109,7 @@ console.log(`
 Overture release ${release}, minimum confidence ${minConfidence}
   ${n(places.length)} hair and beauty places
   ${n(toImport.length)} ready to import in ${files.length} file(s) (${n(withEmail)} with an email, ${n(withAbn)} with an ABN)
-  ${n(toReview.length)} to check by hand (review.csv: the address and map pin disagree)
+  ${n(toReview.length)} to check by hand (review.csv: the suburb or postcode is uncertain)
   ${n(dropped.length)} left out (dropped.csv)
   ABNs: ${abnSummary}
 

@@ -3233,8 +3233,12 @@ export interface components {
       /** @description Send the person here. */
       url: string;
     };
-    JobSearch: components["schemas"]["JobList"] & {
+    JobSearch: components["schemas"]["JobResultList"] & {
       facets: components["schemas"]["JobFacets"];
+    };
+    JobResult: components["schemas"]["JobSummary"] & {
+      /** @description Kilometres from the point searched near (between suburb centres), or null. */
+      distanceKm: number | null;
     };
     /** @description Live jobs per role and per state, given the other filters. */
     JobFacets: {
@@ -3271,8 +3275,8 @@ export interface components {
         count: number;
       }[];
     };
-    JobList: {
-      items: components["schemas"]["JobSummary"][];
+    JobResultList: {
+      items: components["schemas"]["JobResult"][];
       page: number;
       pageSize: number;
       total: number;
@@ -3325,6 +3329,13 @@ export interface components {
     Breadcrumb: {
       name: string;
       path: string;
+    };
+    JobList: {
+      items: components["schemas"]["JobSummary"][];
+      page: number;
+      pageSize: number;
+      total: number;
+      pageCount: number;
     };
     JobAd: {
       /** @enum {string} */
@@ -3652,6 +3663,8 @@ export interface components {
       suburbSlug: string;
       about: string | null;
       liveJobs: number;
+      /** @description Kilometres from the point searched near (between suburb centres), or null. */
+      distanceKm: number | null;
     };
     SalonsPath:
       | components["schemas"]["SalonsLanding"]

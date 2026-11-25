@@ -15,6 +15,10 @@ audit rules apply and the script never touches the database. Sources:
 
 Places whose published postcode disagrees with the map pin go to a review file instead of being imported.
 
+Imported ABNs are not queued for staff to check (`abn_status` stays `not_started`): nobody owns the listing
+yet, unclaimed listings never show as verified, and a claim checks the ABN against the listing and the ABR
+(D-04). Queuing them would have meant about 11,500 manual checks.
+
 **Why.** Matt wanted every hair and beauty business in Australia without scraping (D-04 rules out Google
 Maps and Seek). Overture is free, permissive and has emails for about half the salons, which lets most
 claims use the email link. OpenStreetMap was left out: it adds little and its ODbL licence is share-alike.

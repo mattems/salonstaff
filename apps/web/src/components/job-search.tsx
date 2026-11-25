@@ -1,7 +1,7 @@
 /**
  * The job search form. Role, state and suburb alone go to their landing page
  * (`/jobs/colourist/nsw/surry-hills`), the address search engines know; a keyword, an employment
- * type or a suburb without a state searches `/jobs?…`.
+ * type, a suburb without a state, or near me searches `/jobs?…`.
  */
 
 import type { AuState, EmploymentType, JobRole } from "@salonstaff/shared";
@@ -17,8 +17,9 @@ import { Input } from "@salonstaff/ui/components/input";
 import { useNavigate } from "@tanstack/react-router";
 import type { FormEvent } from "react";
 import { selectClass } from "./form";
+import { isNear, NearMeFields, type NearValues, nearFromForm, nearParams } from "./near-me";
 
-export interface JobSearchValues {
+export interface JobSearchValues extends NearValues {
   q?: string | undefined;
   role?: JobRole | undefined;
   state?: AuState | undefined;
@@ -31,8 +32,12 @@ export interface JobSearchValues {
 
 /** Where a search goes. */
 export function searchHref(values: JobSearchValues): string {
-  const { q, role, state, type, suburb } = values;
-  if (!q && !type && (!suburb || state))
+  const { q, role, type } = values;
+  const near = isNear(values);
+  // Near me takes the place of a suburb and state.
+  const state = near ? undefined : values.state;
+  const suburb = near ? undefined : values.suburb;
+  if (!q && !type && !near && (!suburb || state))
     return jobsLandingPath({ role, state, suburbSlug: suburb });
   const params = new URLSearchParams();
   if (q) params.set("q", q);
@@ -40,6 +45,7 @@ export function searchHref(values: JobSearchValues): string {
   if (state) params.set("state", state);
   if (suburb) params.set("suburb", suburb);
   if (type) params.set("type", type);
+  for (const [key, value] of Object.entries(nearParams(values))) if (value) params.set(key, value);
   return `/jobs?${params}`;
 }
 
@@ -66,71 +72,71 @@ export function JobSearch({
         state: text("state") as AuState | undefined,
         type: text("type") as EmploymentType | undefined,
         suburb: suburb ? slugify(suburb) || undefined : undefined,
+        ...nearFromForm(form),
       }),
     });
   }
   return (
     <search>
-      <form
-        action="/jobs"
-        onSubmit={onSubmit}
-        className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto_auto_auto]"
-      >
-        <Input
-          name="q"
-          placeholder="Job title, salon, suburb or postcode"
-          aria-label="Keywords"
-          defaultValue={values.q}
-        />
-        <select
-          name="role"
-          aria-label="Role"
-          className={selectClass}
-          defaultValue={values.role ?? ""}
-        >
-          <option value="">All roles</option>
-          {JOB_ROLES.map((role) => (
-            <option key={role.value} value={role.value}>
-              {role.label}
-            </option>
-          ))}
-        </select>
-        <Input
-          name="suburb"
-          placeholder="Suburb"
-          aria-label="Suburb"
-          className="sm:w-40"
-          defaultValue={values.suburbName ?? values.suburb?.replace(/-/g, " ")}
-        />
-        <select
-          name="state"
-          aria-label="State"
-          className={selectClass}
-          defaultValue={values.state ?? ""}
-        >
-          <option value="">All states</option>
-          {AU_STATES.map((state) => (
-            <option key={state.value} value={state.value}>
-              {state.value}
-            </option>
-          ))}
-        </select>
-        {showType && (
+      <form action="/jobs" onSubmit={onSubmit} className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto_auto_auto_auto]">
+          <Input
+            name="q"
+            placeholder="Job title, salon, suburb or postcode"
+            aria-label="Keywords"
+            defaultValue={values.q}
+          />
           <select
-            name="type"
-            aria-label="Employment type"
+            name="role"
+            aria-label="Role"
             className={selectClass}
-            defaultValue={values.type ?? ""}
+            defaultValue={values.role ?? ""}
           >
-            <option value="">Any type</option>
-            {EMPLOYMENT_TYPES.map((type) => (
-              <option key={type.value} value={type.value}>
-                {type.label}
+            <option value="">All roles</option>
+            {JOB_ROLES.map((role) => (
+              <option key={role.value} value={role.value}>
+                {role.label}
               </option>
             ))}
           </select>
-        )}
-        <Button type="submit">Search</Button>
+          <Input
+            name="suburb"
+            placeholder="Suburb"
+            aria-label="Suburb"
+            className="sm:w-40"
+            defaultValue={values.suburbName ?? values.suburb?.replace(/-/g, " ")}
+          />
+          <select
+            name="state"
+            aria-label="State"
+            className={selectClass}
+            defaultValue={values.state ?? ""}
+          >
+            <option value="">All states</option>
+            {AU_STATES.map((state) => (
+              <option key={state.value} value={state.value}>
+                {state.value}
+              </option>
+            ))}
+          </select>
+          {showType && (
+            <select
+              name="type"
+              aria-label="Employment type"
+              className={selectClass}
+              defaultValue={values.type ?? ""}
+            >
+              <option value="">Any type</option>
+              {EMPLOYMENT_TYPES.map((type) => (
+                <option key={type.value} value={type.value}>
+                  {type.label}
+                </option>
+              ))}
+            </select>
+          )}
+          <Button type="submit">Search</Button>
+        </div>
+        <NearMeFields values={values} />
       </form>
     </search>
   );

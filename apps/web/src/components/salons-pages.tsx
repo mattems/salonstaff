@@ -17,11 +17,29 @@ import { salonBusiness } from "@/lib/structured-data";
 import { AppLink } from "./app-link";
 import { selectClass } from "./form";
 import { Breadcrumbs, JobList, Pagination, SalonCard } from "./listing";
+import {
+  describeNear,
+  isNear,
+  NearMeFields,
+  type NearValues,
+  nearFromForm,
+  nearParams,
+  nearQuery,
+} from "./near-me";
 import { EmptyState, Page, Section } from "./page";
 
 export type SalonsLanding = Extract<Schemas["SalonsPath"], { kind: "landing" }>;
 export type SalonPage = Extract<Schemas["SalonsPath"], { kind: "salon" }>;
-export type SalonsSearch = { kind: "search"; q: string; salons: Schemas["SalonList"] };
+export interface SalonSearchValues extends NearValues {
+  q?: string | undefined;
+  /** Only salons with a live job. */
+  hiring?: boolean | undefined;
+}
+export type SalonsSearch = {
+  kind: "search";
+  values: SalonSearchValues;
+  salons: Schemas["SalonList"];
+};
 export type SalonClaimPage = { kind: "claim"; page: SalonPage };
 export type SalonsPageData = SalonsLanding | SalonPage | SalonsSearch | SalonClaimPage;
 
@@ -47,12 +65,29 @@ export async function loadClaimPage(salonPath: string): Promise<SalonClaimPage> 
   return { kind: "claim", page };
 }
 
-export async function searchSalons(q: string, page = 1): Promise<SalonsSearch> {
+/** A search's query values, for the address and the API. */
+export const salonSearchParams = (values: SalonSearchValues) => ({
+  q: values.q,
+  hiring: values.hiring ? "true" : undefined,
+  ...nearParams(values),
+});
+
+export const isSalonSearch = (values: SalonSearchValues) =>
+  Boolean(values.q || values.hiring || isNear(values));
+
+export async function searchSalons(values: SalonSearchValues, page = 1): Promise<SalonsSearch> {
   const { data, error, response } = await api.GET("/v1/salons", {
-    params: { query: { q, page } },
+    params: {
+      query: {
+        q: values.q,
+        hiring: values.hiring ? ("true" as const) : undefined,
+        ...nearQuery(values),
+        page,
+      },
+    },
   });
   if (!data) throw new ApiProblem(response.status, error);
-  return { kind: "search", q, salons: data };
+  return { kind: "search", values, salons: data };
 }
 
 export function salonsHead(data: SalonsPageData | undefined) {
@@ -109,37 +144,54 @@ export function SalonsPage({
   return <LandingView landing={data} />;
 }
 
-function SalonSearch({ q }: { q?: string }) {
+function SalonSearch({ values = {} }: { values?: SalonSearchValues }) {
   const navigate = useNavigate();
   function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const text = String(form.get("q") ?? "").trim();
+    const search: SalonSearchValues = {
+      q: String(form.get("q") ?? "").trim() || undefined,
+      hiring: form.get("hiring") === "on",
+      ...nearFromForm(form),
+    };
     const state = String(form.get("state") ?? "");
-    void navigate({
-      href: text
-        ? `/salons?q=${encodeURIComponent(text)}`
-        : salonsLandingPath({ state: (state || undefined) as never }),
-    });
+    if (!isSalonSearch(search)) {
+      void navigate({ href: salonsLandingPath({ state: (state || undefined) as never }) });
+      return;
+    }
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(salonSearchParams(search))) {
+      if (value) params.set(key, value);
+    }
+    void navigate({ href: `/salons?${params}` });
   }
   return (
     <search>
-      <form onSubmit={onSubmit} className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
-        <Input
-          name="q"
-          placeholder="Salon name, suburb or postcode"
-          aria-label="Search"
-          defaultValue={q}
-        />
-        <select name="state" aria-label="State" className={selectClass} defaultValue="">
-          <option value="">All states</option>
-          {AU_STATES.map((state) => (
-            <option key={state.value} value={state.value}>
-              {state.value}
-            </option>
-          ))}
-        </select>
-        <Button type="submit">Search</Button>
+      <form onSubmit={onSubmit} className="space-y-2">
+        <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
+          <Input
+            name="q"
+            placeholder="Salon name, suburb or postcode"
+            aria-label="Search"
+            defaultValue={values.q}
+          />
+          <select name="state" aria-label="State" className={selectClass} defaultValue="">
+            <option value="">All states</option>
+            {AU_STATES.map((state) => (
+              <option key={state.value} value={state.value}>
+                {state.value}
+              </option>
+            ))}
+          </select>
+          <Button type="submit">Search</Button>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <NearMeFields values={values} />
+          <label className="flex items-center gap-2 text-sm">
+            <input type="checkbox" name="hiring" defaultChecked={values.hiring} />
+            Hiring now
+          </label>
+        </div>
       </form>
     </search>
   );
@@ -188,17 +240,22 @@ function LandingView({ landing }: { landing: SalonsLanding }) {
 }
 
 function SearchView({ data }: { data: SalonsSearch }) {
-  const { salons } = data;
+  const { salons, values } = data;
+  const found = [
+    values.hiring ? "hiring now" : "",
+    values.q ? `for "${values.q}"` : "",
+    isNear(values) ? `${describeNear(values)}, nearest first` : "",
+  ].filter(Boolean);
   return (
     <Page width="wide" className="space-y-6">
       <div>
         <Breadcrumbs crumbs={[{ name: "Salons", path: "/salons" }]} />
         <h1 className="font-semibold text-2xl tracking-tight">Search salons</h1>
         <p className="mt-1 text-muted-foreground">
-          {salons.total} salon{salons.total === 1 ? "" : "s"} found for "{data.q}"
+          {salons.total} salon{salons.total === 1 ? "" : "s"} found {found.join(" ")}
         </p>
       </div>
-      <SalonSearch q={data.q} />
+      <SalonSearch values={values} />
       {salons.items.length > 0 ? (
         <div className="grid gap-3 sm:grid-cols-2">
           {salons.items.map((salon) => (
@@ -206,13 +263,16 @@ function SearchView({ data }: { data: SalonsSearch }) {
           ))}
         </div>
       ) : (
-        <EmptyState title="No salons match" description="Try a suburb, postcode or another name." />
+        <EmptyState
+          title="No salons match"
+          description="Try a wider distance, a suburb or postcode, or another name."
+        />
       )}
       <Pagination
         path="/salons"
         page={salons.page}
         pageCount={salons.pageCount}
-        search={{ q: data.q }}
+        search={salonSearchParams(values)}
       />
     </Page>
   );
@@ -234,10 +294,11 @@ function SalonView({ page }: { page: SalonPage }) {
               <p className="text-muted-foreground">
                 {salon.suburb} {salon.state} {salon.postcode}
               </p>
-              <div className="flex flex-wrap gap-2">
-                {salon.verified && <Badge variant="secondary">Verified business</Badge>}
-                {!salon.claimed && <Badge variant="outline">Unclaimed listing</Badge>}
-              </div>
+              {salon.verified && (
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant="secondary">Verified business</Badge>
+                </div>
+              )}
             </div>
           </header>
           {salon.about && (

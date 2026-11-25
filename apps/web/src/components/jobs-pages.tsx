@@ -22,6 +22,7 @@ import { AppLink } from "./app-link";
 import { ApplyPanel } from "./apply-panel";
 import { JobSearch, type JobSearchValues } from "./job-search";
 import { Breadcrumbs, JobList, Pagination } from "./listing";
+import { describeNear, isNear, nearParams, nearQuery } from "./near-me";
 import { EmptyState, Page, Section } from "./page";
 
 export type JobsLanding = Extract<Schemas["JobsPath"], { kind: "landing" }>;
@@ -52,8 +53,9 @@ export async function loadJobsPath(path: string, page = 1): Promise<JobsLanding 
 }
 
 export async function searchJobs(values: JobSearchValues, page = 1): Promise<JobsSearch> {
+  const { lat, lng, near, km, suburbName: _suburbName, ...filters } = values;
   const { data, error, response } = await api.GET("/v1/jobs", {
-    params: { query: { ...values, page } },
+    params: { query: { ...filters, ...nearQuery({ lat, lng, near, km }), page } },
   });
   if (!data) throw new ApiProblem(response.status, error);
   return { kind: "search", values, jobs: data };
@@ -187,6 +189,7 @@ function SearchView({ data }: { data: JobsSearch }) {
         <p className="mt-1 text-muted-foreground">
           {jobs.total} job{jobs.total === 1 ? "" : "s"} found
           {values.q ? ` for "${values.q}"` : ""}
+          {isNear(values) ? ` ${describeNear(values)}, nearest first` : ""}
         </p>
       </div>
       <JobSearch values={values} />
@@ -205,6 +208,7 @@ function SearchView({ data }: { data: JobsSearch }) {
           state: values.state,
           suburb: values.suburb,
           type: values.type as EmploymentType | undefined,
+          ...nearParams(values),
         }}
       />
     </Page>

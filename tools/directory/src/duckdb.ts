@@ -19,6 +19,7 @@ export async function duckdb<T = Record<string, unknown>>(sql: string): Promise<
   const env: Record<string, string | undefined> = { ...process.env };
   // DuckDB's agent mode changes the output; turn it off.
   delete env.AI_AGENT;
+  delete env.CLAUDECODE;
   const settings = [`SET extension_directories = [${quote(EXTENSIONS)}];`, ...proxySettings(env)];
   const proc = Bun.spawn(["duckdb", "-json", "-bail", "-c", `${settings.join("\n")}\n${sql}`], {
     env,

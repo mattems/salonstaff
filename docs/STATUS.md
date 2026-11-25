@@ -24,11 +24,17 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   directory and claims. `/api/*` forwards to the API (service binding deployed, localhost in dev).
 - `tools/directory` (D-09): a standalone script that builds the directory import CSVs from Overture Maps places,
   ABS suburbs and the ABN Bulk Extract. First run (Overture 2026-11-18.0): 44,283 salons ready (24,037 with an
-  email, 11,497 with an ABN), 1,625 to review by hand. Not imported anywhere yet.
+  email, 11,497 with an ABN), 1,626 to review by hand. `salons-01.csv` imported locally only. Imported ABNs
+  aren't queued for staff checks; a claim checks them.
+
+- Near-me search (D-10): jobs and the salon directory within 5–100km of the browser's location or a postcode,
+  nearest first, with distances; "Hiring now" on the directory. Places are at their suburb's centre (ABS),
+  set by a database trigger; `localities`/`postcodes` loaded by migration 0002.
 
 ### Known issues
 - Not yet tried for real: Google/Apple sign-in, Twilio SMS, Stripe, Stripe Identity, ABR lookup (all need keys),
   and a deploy.
+- Not yet tried on PlanetScale: migration 0003 creates a PL/pgSQL trigger function (plain Postgres; should work).
 
 ### Decided, deferred (not built)
 - Applicant trust (D-08, docs/applicant-trust.md): Turnstile, application caps, a verified Australian mobile to apply,
