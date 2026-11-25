@@ -1,5 +1,5 @@
 import type { CurrentSession } from "@salonstaff/auth";
-import { type Salon, salonScope, salonsFor } from "@salonstaff/db";
+import { type Salon, salonScope, salonsFor, salonTeam } from "@salonstaff/db";
 import { ApiError, decodeId, type IdKind } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
@@ -22,27 +22,42 @@ export async function requireSeeker(c: Context<AppEnv>): Promise<CurrentSession>
   if (session.user.role !== "seeker") {
     throw new ApiError("forbidden", {
       detail: "This is for job seeker accounts",
-      hint: "Employer accounts manage their salon under /v1/salon. Sign in with a job seeker account to do this.",
+      hint: "Employer accounts manage their salons under /v1/employer/salons. Sign in with a job seeker account to do this.",
     });
   }
   return session;
 }
 
-/** The signed-in person's salon, with the scope for it and their audit actor. */
-export async function requireSalon(c: Context<AppEnv>) {
+/**
+ * One of the signed-in person's salons (D-11), with the scope for it, their role there and their
+ * audit actor. Someone not on its team gets a 404; a manager asking for an owner's job, a 403.
+ */
+export async function requireSalon(
+  c: Context<AppEnv>,
+  salonParam: string,
+  need: "manager" | "owner" = "manager",
+) {
   const session = await requireUser(c);
   const db = await c.get("db")();
-  const salon: Salon | null = await salonsFor(db).ownedBy(session.user.id);
-  if (!salon) {
-    throw new ApiError("not_found", {
-      detail: "You don't manage a salon yet",
-      hint: "Create one with POST /v1/salon, or claim your business's listing from its page in the directory.",
+  const hint =
+    "List your salons with GET /v1/employer/salons and use an `id` from there. Create one with POST /v1/employer/salons, or claim your business's listing from its page in the directory.";
+  const salonId = idFrom("salon", salonParam, "salon you manage", hint);
+  const membership = await salonsFor(db).membership(session.user.id, salonId);
+  if (!membership) {
+    throw new ApiError("not_found", { detail: "You don't manage a salon with that ID", hint });
+  }
+  if (need === "owner" && membership.role !== "owner") {
+    throw new ApiError("forbidden", {
+      detail: "Only the salon's owners can do this",
+      hint: "Ask an owner of the salon to do it, or to make you an owner.",
     });
   }
   return {
     session,
-    salon,
-    scope: salonScope(db, salon.id),
+    salon: membership.salon as Salon,
+    role: membership.role,
+    scope: salonScope(db, salonId),
+    team: salonTeam(db, salonId),
     actor: userActor(c, session.user.id),
   };
 }

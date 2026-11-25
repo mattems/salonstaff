@@ -288,7 +288,10 @@ export const salons = pgTable(
   "salons",
   {
     id: id(),
-    /** Null for a directory listing nobody has claimed. */
+    /**
+     * Deprecated (D-11): who manages a salon is `salonMembers`. Never read or written; migration
+     * 0004 copied it there. Dropped by a later migration.
+     */
     ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     /** URL: /salons/{state}/{suburb_slug}/{slug}. Unique within a suburb. */
@@ -336,6 +339,52 @@ export const salons = pgTable(
     index("salons_abn_idx").on(table.abn),
     index("salons_directory_idx").on(table.status, table.state, table.suburbSlug),
     index("salons_location_idx").on(table.latitude, table.longitude),
+  ],
+);
+
+export type SalonRole = "owner" | "manager";
+
+/**
+ * Who manages a salon (D-11). Owners do everything; managers handle jobs and applicants. A salon
+ * with an owner is claimed; one with nobody is an unclaimed directory listing.
+ */
+export const salonMembers = pgTable(
+  "salon_members",
+  {
+    salonId: uuid("salon_id")
+      .notNull()
+      .references(() => salons.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role").$type<SalonRole>().notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.salonId, table.userId] }),
+    index("salon_members_user_idx").on(table.userId),
+  ],
+);
+
+/** An owner's emailed invitation to join a salon's team (D-11). Gone once accepted or cancelled. */
+export const salonInvites = pgTable(
+  "salon_invites",
+  {
+    id: id(),
+    salonId: uuid("salon_id")
+      .notNull()
+      .references(() => salons.id, { onDelete: "cascade" }),
+    email: text("email").notNull(),
+    role: text("role").$type<SalonRole>().notNull(),
+    /** SHA-256 of the token in the emailed link. */
+    tokenHash: text("token_hash").notNull(),
+    expiresAt: ts("expires_at").notNull(),
+    invitedBy: uuid("invited_by").references(() => users.id, { onDelete: "set null" }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("salon_invites_token_uq").on(table.tokenHash),
+    uniqueIndex("salon_invites_email_uq").on(table.salonId, table.email),
   ],
 );
 
@@ -395,6 +444,11 @@ export const jobs = pgTable(
     description: text("description").notNull(),
     requirements: text("requirements"),
     requireQualification: boolean("require_qualification").notNull().default(false),
+    /**
+     * Who on the salon's team is emailed about new applications (D-11). Null: everyone, including
+     * people who join later.
+     */
+    notifyUserIds: uuid("notify_user_ids").array(),
     /** A published job is live until `expiresAt`, then shows as closed. */
     status: text("status").$type<JobStatus>().notNull().default("draft"),
     featured: boolean("featured").notNull().default(false),

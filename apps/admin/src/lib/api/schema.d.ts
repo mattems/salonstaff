@@ -2077,8 +2077,8 @@ export interface paths {
     get?: never;
     put?: never;
     /**
-     * Detach a salon's owner
-     * @description The salon becomes an unclaimed directory listing, which anyone can claim. The owner's account stays.
+     * Detach a salon's team
+     * @description Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay.
      */
     post: {
       parameters: {
@@ -2843,7 +2843,7 @@ export interface paths {
     put?: never;
     /**
      * Approve a claim
-     * @description The claimant becomes the listing's owner, with the launch free period (and founding pricing while places last). Other open claims on it are rejected. An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.
+     * @description The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.
      */
     post: {
       parameters: {
@@ -2889,7 +2889,7 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description Already decided, or someone else manages the salon */
+        /** @description Already decided */
         409: {
           headers: {
             [name: string]: unknown;
@@ -3010,8 +3010,8 @@ export interface components {
       createdAt: string;
       profile: components["schemas"]["SeekerProfile"] | null;
       verification: components["schemas"]["Verification"];
-      /** @description The salon you manage, if any. */
-      salon: components["schemas"]["OwnSalonSummary"] | null;
+      /** @description The salons you're on the team of, in the order you joined them. */
+      salons: components["schemas"]["OwnSalonSummary"][];
     };
     SeekerProfile: {
       firstName: string;
@@ -3102,6 +3102,11 @@ export interface components {
       path: string;
       /** @enum {string} */
       status: "active" | "suspended" | "removed";
+      /**
+       * @description Your role on the salon's team.
+       * @enum {string}
+       */
+      role: "owner" | "manager";
     };
     Problem: {
       type: string;
@@ -3486,6 +3491,11 @@ export interface components {
        */
       createdAt: string;
       entitlement: components["schemas"]["Entitlement"];
+      /**
+       * @description Your role. Managers handle jobs and applicants; owners also change the salon's details, billing and team.
+       * @enum {string}
+       */
+      role: "owner" | "manager";
     };
     Entitlement: {
       /** @description Whether a job can be published right now. */
@@ -3494,6 +3504,9 @@ export interface components {
       via: "free_period" | "subscription" | "credit" | null;
       /** @enum {string|null} */
       reason: "suspended" | "needs_listing" | null;
+    };
+    MySalons: {
+      items: components["schemas"]["MySalon"][];
     };
     SalonJobs: {
       items: components["schemas"]["SalonJob"][];
@@ -3507,6 +3520,8 @@ export interface components {
       paidVia: string | null;
       applicants: number;
       newApplicants: number;
+      /** @description Who on the team is emailed about new applications. Null: everyone, including people who join later. */
+      notifyUserIds: string[] | null;
       /**
        * Format: date-time
        * @example 2026-11-25T03:00:00.000Z
@@ -3567,6 +3582,8 @@ export interface components {
        * @default false
        */
       publish: boolean;
+      /** @description Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later. */
+      notifyUserIds?: string[] | null;
     };
     JobChanges: {
       title?: string;
@@ -3611,6 +3628,8 @@ export interface components {
       requirements?: string;
       /** @default false */
       requireQualification: boolean;
+      /** @description Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later. */
+      notifyUserIds?: string[] | null;
     };
     Applicants: {
       job: components["schemas"]["SalonJob"];
@@ -3698,6 +3717,70 @@ export interface components {
     Contact: {
       email: string | null;
       phone: string | null;
+    };
+    Team: {
+      /** @description Owners first. */
+      members: components["schemas"]["TeamMember"][];
+      /** @description Sent and not yet accepted. */
+      invites: components["schemas"]["TeamInvite"][];
+    };
+    TeamMember: {
+      /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      userId: string;
+      name: string;
+      email: string | null;
+      role: components["schemas"]["SalonRole"];
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      joinedAt: string;
+      you: boolean;
+    };
+    /** @enum {string} */
+    SalonRole: "owner" | "manager";
+    TeamInvite: {
+      /** @example inv_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      email: string;
+      role: components["schemas"]["SalonRole"];
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      expiresAt: string;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    NewInvite: {
+      /** Format: email */
+      email: string;
+      role: components["schemas"]["SalonRole"];
+    };
+    InviteCancelled: {
+      /** @enum {boolean} */
+      cancelled: true;
+    };
+    RoleChange: {
+      role: components["schemas"]["SalonRole"];
+    };
+    MemberRemoved: {
+      /** @enum {boolean} */
+      removed: true;
+    };
+    InvitePreview: {
+      salon: {
+        name: string;
+        suburb: string;
+        state: string;
+      };
+      role: components["schemas"]["SalonRole"];
+      invitedBy: string | null;
+      email: string;
+      expiresAt: string;
     };
     SalonList: {
       items: components["schemas"]["DirectorySalon"][];
@@ -3979,6 +4062,8 @@ export interface components {
         /** @enum {string} */
         source: "owner" | "directory";
         path: string;
+        /** @enum {string} */
+        role: "owner" | "manager";
       }[];
       flags: components["schemas"]["AdminFlag"][];
       active_sessions: number;
@@ -4060,6 +4145,7 @@ export interface components {
         /** @enum {string|null} */
         reason: "suspended" | "needs_listing" | null;
       };
+      /** @description Its longest-standing owner. */
       owner: {
         id: string;
         name: string;
@@ -4067,6 +4153,15 @@ export interface components {
         phone: string | null;
         banned_at: string | null;
       } | null;
+      /** @description Everyone who manages it (D-11), owners first. */
+      team: {
+        id: string;
+        name: string;
+        email: string | null;
+        /** @enum {string} */
+        role: "owner" | "manager";
+        joined_at: string;
+      }[];
       jobs: {
         id: string;
         title: string;

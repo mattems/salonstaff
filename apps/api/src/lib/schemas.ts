@@ -49,6 +49,11 @@ export const errors = {
 export const pathParam = (name: string, example: string) =>
   z.string().openapi({ param: { name, in: "path" }, example });
 
+/** The `{salonId}` in an employer route (D-11). */
+export const SalonParams = z.object({
+  salonId: pathParam("salonId", "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"),
+});
+
 export const Deleted = z.object({ deleted: z.literal(true) }).openapi("Deleted");
 
 export const UrlResponse = z
@@ -189,6 +194,7 @@ export const OwnSalonSummarySchema = z
     name: z.string(),
     path: z.string(),
     status: z.enum(["active", "suspended", "removed"]),
+    role: z.enum(["owner", "manager"]).openapi({ description: "Your role on the salon's team." }),
   })
   .openapi("OwnSalonSummary");
 
@@ -205,8 +211,8 @@ export const MeSchema = z
     createdAt: Timestamp,
     profile: orNull(SeekerProfileSchema),
     verification: VerificationSchema,
-    salon: orNull(OwnSalonSummarySchema).openapi({
-      description: "The salon you manage, if any.",
+    salons: z.array(OwnSalonSummarySchema).openapi({
+      description: "The salons you're on the team of, in the order you joined them.",
     }),
   })
   .openapi("Me");
@@ -359,8 +365,42 @@ export const MySalonSchema = z
     claimedAt: Timestamp.nullable(),
     createdAt: Timestamp,
     entitlement: EntitlementSchema,
+    role: z.enum(["owner", "manager"]).openapi({
+      description:
+        "Your role. Managers handle jobs and applicants; owners also change the salon's details, billing and team.",
+    }),
   })
   .openapi("MySalon");
+
+export const SalonRoleSchema = z.enum(["owner", "manager"]).openapi("SalonRole");
+
+export const TeamMemberSchema = z
+  .object({
+    userId: z.string().openapi({ example: "usr_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    name: z.string(),
+    email: z.string().nullable(),
+    role: SalonRoleSchema,
+    joinedAt: Timestamp,
+    you: z.boolean(),
+  })
+  .openapi("TeamMember");
+
+export const TeamInviteSchema = z
+  .object({
+    id: z.string().openapi({ example: "inv_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    email: z.string(),
+    role: SalonRoleSchema,
+    expiresAt: Timestamp,
+    createdAt: Timestamp,
+  })
+  .openapi("TeamInvite");
+
+export const TeamSchema = z
+  .object({
+    members: z.array(TeamMemberSchema).openapi({ description: "Owners first." }),
+    invites: z.array(TeamInviteSchema).openapi({ description: "Sent and not yet accepted." }),
+  })
+  .openapi("Team");
 
 export const SalonJobSchema = JobDetailSchema.extend({
   status: z
@@ -369,6 +409,10 @@ export const SalonJobSchema = JobDetailSchema.extend({
   paidVia: z.string().nullable(),
   applicants: z.number().int(),
   newApplicants: z.number().int(),
+  notifyUserIds: z.array(z.string()).nullable().openapi({
+    description:
+      "Who on the team is emailed about new applications. Null: everyone, including people who join later.",
+  }),
   createdAt: Timestamp,
   updatedAt: Timestamp,
 }).openapi("SalonJob");

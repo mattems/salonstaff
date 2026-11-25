@@ -317,7 +317,6 @@ describe("the directory", () => {
     const fade = rows.find((r) => r.abn === abn);
     expect(fade).toMatchObject({
       source: "directory",
-      ownerId: null,
       instagram: "faderoom",
       // An imported ABN isn't queued for staff; a claim checks it.
       abnStatus: "not_started",

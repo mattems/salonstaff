@@ -261,11 +261,11 @@ function Actions({ d }: { d: SalonDetail }) {
           )}
           {salon.owner ? (
             <ActionDialog
-              label="Detach owner"
-              title="Detach the owner"
-              description="It becomes an unclaimed directory listing anyone can claim. The owner's account stays."
+              label="Detach team"
+              title="Detach the whole team"
+              description="Takes its owners and managers off and cancels its invites: it becomes an unclaimed directory listing anyone can claim. Their accounts stay."
               run={async () => unwrap(await api.POST("/admin/v1/salons/{id}/unclaim", path))}
-              done="Owner detached"
+              done="Team detached"
             />
           ) : null}
         </Panel>
@@ -454,6 +454,7 @@ export function SalonPage() {
   if (detail.isError) return <FormError message={errorMessage(detail.error)} />;
   if (!d) return null;
   const { salon, owner } = d;
+  const owners = d.team.filter((member) => member.role === "owner").length;
 
   return (
     <>
@@ -480,7 +481,11 @@ export function SalonPage() {
       ) : null}
       {owner?.banned_at ? (
         <Alert variant="destructive">
-          <AlertTitle>The owner is banned, so this salon's jobs are hidden</AlertTitle>
+          <AlertTitle>
+            {owners > 1
+              ? "Its first owner is banned (its jobs are hidden only while all its owners are)"
+              : "The owner is banned, so this salon's jobs are hidden"}
+          </AlertTitle>
           <AlertDescription>
             <Link to="/users/$userId" params={{ userId: owner.id }} className="underline">
               Manage the owner
@@ -505,16 +510,24 @@ export function SalonPage() {
             <DetailList
               items={[
                 [
-                  "Owner",
-                  owner ? (
-                    <Link
-                      key="owner"
-                      to="/users/$userId"
-                      params={{ userId: owner.id }}
-                      className="underline underline-offset-4"
-                    >
-                      {owner.email ?? owner.phone ?? owner.name}
-                    </Link>
+                  "Team",
+                  d.team.length > 0 ? (
+                    <span key="team" className="flex flex-col gap-0.5">
+                      {d.team.map((member) => (
+                        <span key={member.id}>
+                          <Link
+                            to="/users/$userId"
+                            params={{ userId: member.id }}
+                            className="underline underline-offset-4"
+                          >
+                            {member.email ?? member.name}
+                          </Link>{" "}
+                          <span className="text-muted-foreground">
+                            {member.role === "owner" ? "owner" : "manager"}
+                          </span>
+                        </span>
+                      ))}
+                    </span>
                   ) : (
                     "Unclaimed"
                   ),

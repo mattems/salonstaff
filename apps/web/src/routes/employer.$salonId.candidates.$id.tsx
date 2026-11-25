@@ -1,19 +1,15 @@
 import { Badge } from "@salonstaff/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@salonstaff/ui/components/card";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { requireOwnSalon } from "@/components/employer";
 import { ProfileView } from "@/components/profile-view";
 import { api, unwrap } from "@/lib/api";
 import { applicationStatusLabel, formatDate } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
-export const Route = createFileRoute("/employer/candidates/$id")({
-  beforeLoad: ({ context }) => {
-    requireOwnSalon(context.me);
-  },
+export const Route = createFileRoute("/employer/$salonId/candidates/$id")({
   loader: async ({ params }) => {
-    const result = await api.GET("/v1/salon/candidates/{userId}", {
-      params: { path: { userId: params.id } },
+    const result = await api.GET("/v1/employer/salons/{salonId}/candidates/{userId}", {
+      params: { path: { salonId: params.salonId, userId: params.id } },
     });
     if (result.response.status === 404) throw notFound();
     return unwrap(result);
@@ -27,6 +23,7 @@ export const Route = createFileRoute("/employer/candidates/$id")({
 
 function Candidate() {
   const candidate = Route.useLoaderData();
+  const { salonId } = Route.useParams();
   return (
     <ProfileView
       full={candidate}
@@ -42,8 +39,8 @@ function Candidate() {
                 <li key={application.id} className="flex justify-between gap-3">
                   <span>
                     <Link
-                      to="/employer/jobs/$id"
-                      params={{ id: application.jobId }}
+                      to="/employer/$salonId/jobs/$id"
+                      params={{ salonId, id: application.jobId }}
                       className="font-medium hover:underline"
                     >
                       {application.jobTitle}

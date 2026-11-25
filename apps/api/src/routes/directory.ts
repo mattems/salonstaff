@@ -1,5 +1,5 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { claims, publicSite, type Salon } from "@salonstaff/db";
+import { claims, isClaimed, publicSite, type Salon } from "@salonstaff/db";
 import {
   ApiError,
   AU_STATES,
@@ -16,7 +16,7 @@ import type { AppEnv } from "../env";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
 import { NearQuery, nearFrom } from "../lib/near";
-import { appUrl, sendEmail } from "../lib/notify";
+import { appUrl, sendEmail, tellOwnersAboutClaim } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import {
@@ -199,7 +199,7 @@ directoryRoutes.openapi(
               : null,
           },
           jobs: jobs.map((row) => jobSummaryJson(c.env, row)),
-          claimable: salon.ownerId === null,
+          claimable: !isClaimed(salon),
           breadcrumbs: [
             ...crumbs(salon.state, salon.suburbSlug, salon.suburb),
             { name: salon.name, path: salonPath(salon) },
@@ -267,7 +267,7 @@ directoryRoutes.openapi(
     method: "post",
     path: "/v1/salons/{id}/claims",
     summary: "Claim a directory listing",
-    description: `The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with \`method: email\` we send a link to the listing's own email (it lasts ${LINK_HOURS} hours; \`sentTo\` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with \`method: review\`, staff check it. An approved claim makes the listing yours, with the free period and founding pricing of a new salon.`,
+    description: `The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with \`method: email\` we send a link to the listing's own email (it lasts ${LINK_HOURS} hours; \`sentTo\` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with \`method: review\`, staff check it. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.`,
     tags: TAGS,
     request: { params: SalonParams, ...jsonBody(StartClaimBody) },
     responses: {
@@ -275,7 +275,7 @@ directoryRoutes.openapi(
       400: errors[400],
       401: errors[401],
       404: errors[404],
-      409: problemResponse("Already claimed, the ABN doesn't match, or you already manage a salon"),
+      409: problemResponse("You already own it, or the ABN doesn't match"),
     },
   }),
   async (c) => {
@@ -327,7 +327,7 @@ directoryRoutes.openapi(
     path: "/v1/claims/verify/{token}",
     summary: "Confirm a claim from its emailed link",
     description:
-      "Sign in as the person who started the claim first. Completes the claim: the listing becomes your salon and your account an employer account.",
+      "Sign in as the person who started the claim first. Completes the claim: you become an owner of the listing and your account an employer account.",
     tags: TAGS,
     request: { params: z.object({ token: pathParam("token", "q2f…") }) },
     responses: {
@@ -355,10 +355,11 @@ directoryRoutes.openapi(
       session.user.id,
       userActor(c, session.user.id),
     );
+    tellOwnersAboutClaim(c, decision.otherOwners, decision.salon, decision.claim.contactName);
     return c.json(
       {
         claim: claimJson(decision.claim, decision.salon),
-        salon: mySalonJson(c.env, decision.salon),
+        salon: mySalonJson(c.env, decision.salon, "owner"),
       },
       200,
     );

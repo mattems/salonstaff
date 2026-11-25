@@ -1,5 +1,6 @@
 import type { Contact } from "@salonstaff/db";
 import { noticeEmail } from "@salonstaff/email";
+import { BRAND, encodeId } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { realEmail } from "./views";
@@ -59,3 +60,21 @@ function logFailure(c: Context<AppEnv>, error: unknown) {
 
 /** A link into the website. */
 export const appUrl = (c: Context<AppEnv>, path: string) => `${c.env.APP_ORIGIN}${path}`;
+
+/** Tells a claimed salon's other owners that someone else became an owner too (D-11). */
+export function tellOwnersAboutClaim(
+  c: Context<AppEnv>,
+  owners: Contact[],
+  salon: { id: string; name: string },
+  claimant: string,
+) {
+  for (const owner of owners) {
+    notify(c, owner, {
+      subject: `${claimant} is now an owner of ${salon.name}`,
+      title: `${salon.name} has a new owner`,
+      body: `${claimant} claimed ${salon.name} on ${BRAND.name} and proved they run the business, so they're now one of its owners. If that's wrong, take them off the team and contact support@salonstaff.com.au.`,
+      action: "See the team",
+      url: appUrl(c, `/employer/${encodeId("salon", salon.id)}/team`),
+    });
+  }
+}

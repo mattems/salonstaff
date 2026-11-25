@@ -1,14 +1,17 @@
 /**
  * Claiming a directory listing (D-04). ABNs are public, so a claim needs a matching ABN *and*
  * proof of control: a link sent to the listing's business email (48 hours, single use), or
- * staff approval. An approved claim gets the same launch terms as a new salon.
+ * staff approval. An approved claim makes the claimant an owner (D-11): any account can claim any
+ * number of listings, including ones that already have owners (who are told). A listing's first
+ * claim gets the same launch terms as a new salon.
  */
 import { ApiError, isValidAbn, randomToken, sha256Hex } from "@salonstaff/shared";
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import type { Db } from "./index";
 import { type AbnCheck, type Contact, launchTerms, makeEmployer } from "./salon";
-import { type ClaimStatus, salonClaims, salons, users } from "./schema";
+import { type ClaimStatus, salonClaims, salonMembers, salons, users } from "./schema";
+import { addMember, ownerContacts } from "./team";
 import { type Salon, visibleSalon } from "./visibility";
 
 export type Claim = typeof salonClaims.$inferSelect;
@@ -28,6 +31,8 @@ export interface ClaimDecision {
   salon: Salon;
   /** The claimant, to tell them. Null if their account is gone or banned. */
   contact: Contact | null;
+  /** When an approved claim joined a salon that already had owners: those owners, to tell them. */
+  otherOwners: Contact[];
 }
 
 export interface OpenClaim {
@@ -44,20 +49,22 @@ async function contactOf(tx: Executor, userId: string): Promise<Contact | null> 
   return row && !row.suspendedAt ? { email: row.email, phoneNumber: row.phoneNumber } : null;
 }
 
-async function ownsAnother(tx: Executor, userId: string, salonId: string): Promise<boolean> {
-  const rows = await tx
-    .select({ id: salons.id })
-    .from(salons)
-    .where(and(eq(salons.ownerId, userId), ne(salons.id, salonId)))
-    .limit(1);
-  return rows.length > 0;
+async function roleOn(tx: Executor, userId: string, salonId: string) {
+  const [row] = await tx
+    .select({ role: salonMembers.role })
+    .from(salonMembers)
+    .where(and(eq(salonMembers.userId, userId), eq(salonMembers.salonId, salonId)));
+  return row?.role ?? null;
 }
 
-const alreadyManages = () =>
-  new ApiError("conflict", {
-    detail: "Your account already manages a salon",
-    hint: "Use a different account to claim another business.",
-  });
+async function hasOwners(tx: Executor, salonId: string): Promise<boolean> {
+  const [row] = await tx
+    .select({ userId: salonMembers.userId })
+    .from(salonMembers)
+    .where(and(eq(salonMembers.salonId, salonId), eq(salonMembers.role, "owner")))
+    .limit(1);
+  return Boolean(row);
+}
 
 export function claims(db: Db) {
   return {
@@ -133,19 +140,13 @@ export function claims(db: Db) {
             hint: "Find the listing with GET /v1/salons.",
           });
         }
-        if (salon.ownerId) {
-          if (salon.ownerId === input.userId) {
-            throw new ApiError("conflict", {
-              detail: "You already manage this salon",
-              hint: "Manage it from GET /v1/salon.",
-            });
-          }
+        // A manager may claim to become an owner; an owner has nothing to claim.
+        if ((await roleOn(tx, input.userId, salon.id)) === "owner") {
           throw new ApiError("conflict", {
-            detail: "This business has already been claimed",
-            hint: "Contact support@salonstaff.com.au if you think that's wrong.",
+            detail: "You already own this salon",
+            hint: "Manage it under GET /v1/employer/salons.",
           });
         }
-        if (await ownsAnother(tx, input.userId, salon.id)) throw alreadyManages();
         if (salon.abn && salon.abn !== abn) {
           throw new ApiError("conflict", {
             detail: "That ABN doesn't match the one we have for this business",
@@ -281,9 +282,10 @@ export function claims(db: Db) {
     },
 
     /**
-     * Approves a claim: the claimant becomes the listing's owner (and an employer), with the
-     * free period and, if any are left, founding pricing. Other open claims on it are rejected.
-     * `decidedBy` is the staff member's ID, or `email-link`.
+     * Approves a claim: the claimant becomes an owner of the listing (and an employer). On a
+     * listing nobody had claimed, it also gets the free period and, if any are left, founding
+     * pricing, and other open claims on it are rejected. On one that already had owners, they're
+     * returned to be told. `decidedBy` is the staff member's ID, or `email-link`.
      */
     async approve(
       claimId: string,
@@ -320,28 +322,25 @@ export function claims(db: Db) {
             hint: "Reject the claim instead.",
           });
         }
-        if (salon.ownerId && salon.ownerId !== claim.userId) {
-          throw new ApiError("conflict", {
-            detail: "Someone else already manages this salon",
-            hint: "Reject the claim, or detach the current owner first.",
-          });
-        }
-        if (await ownsAnother(tx, claim.userId, salon.id)) throw alreadyManages();
+        const first = !(await hasOwners(tx, salon.id));
+        const otherOwners = first ? [] : await ownerContacts(tx, salon.id, claim.userId);
         const now = new Date();
-        const [updated] = await tx
-          .update(salons)
-          .set({
-            ownerId: claim.userId,
-            claimedAt: now,
-            abn: claim.abn,
-            abnStatus: claim.abnEntityName ? "verified" : "pending",
-            abnEntityName: claim.abnEntityName,
-            contactName: claim.contactName,
-            phone: salon.phone ?? claim.phone,
-            ...(await launchTerms(tx, salon.founding)),
-          })
-          .where(eq(salons.id, salon.id))
-          .returning();
+        // Joining a salon that's run already leaves its details and terms as its owners set them.
+        const [updated] = first
+          ? await tx
+              .update(salons)
+              .set({
+                claimedAt: now,
+                abn: claim.abn,
+                abnStatus: claim.abnEntityName ? "verified" : "pending",
+                abnEntityName: claim.abnEntityName,
+                contactName: claim.contactName,
+                phone: salon.phone ?? claim.phone,
+                ...(await launchTerms(tx, salon.founding)),
+              })
+              .where(eq(salons.id, salon.id))
+              .returning()
+          : [salon];
         const [decided] = await tx
           .update(salonClaims)
           .set({
@@ -353,23 +352,26 @@ export function claims(db: Db) {
           })
           .where(eq(salonClaims.id, claim.id))
           .returning();
-        const others = await tx
-          .update(salonClaims)
-          .set({
-            status: "rejected",
-            decidedBy,
-            decisionNote: "Claimed by another account",
-            decidedAt: now,
-            tokenHash: null,
-          })
-          .where(
-            and(
-              eq(salonClaims.salonId, salon.id),
-              ne(salonClaims.id, claim.id),
-              inArray(salonClaims.status, OPEN),
-            ),
-          )
-          .returning({ id: salonClaims.id });
+        const others = !first
+          ? []
+          : await tx
+              .update(salonClaims)
+              .set({
+                status: "rejected",
+                decidedBy,
+                decisionNote: "Claimed by another account",
+                decidedAt: now,
+                tokenHash: null,
+              })
+              .where(
+                and(
+                  eq(salonClaims.salonId, salon.id),
+                  ne(salonClaims.id, claim.id),
+                  inArray(salonClaims.status, OPEN),
+                ),
+              )
+              .returning({ id: salonClaims.id });
+        await addMember(tx, salon.id, claim.userId, "owner", actor);
         await makeEmployer(tx, claim.userId, actor);
         await recordAudit(tx, actor, {
           action: "claim.approved",
@@ -383,12 +385,13 @@ export function claims(db: Db) {
           action: "salon.claimed",
           targetType: "salon",
           targetId: salon.id,
-          after: { ownerId: claim.userId },
+          after: { ownerId: claim.userId, joinedOwners: !first },
         });
         return {
           claim: decided as Claim,
           salon: updated as Salon,
           contact: await contactOf(tx, claim.userId),
+          otherOwners,
         };
       });
     },
@@ -442,6 +445,7 @@ export function claims(db: Db) {
           claim: decided as Claim,
           salon: salon as Salon,
           contact: await contactOf(tx, claim.userId),
+          otherOwners: [],
         };
       });
     },

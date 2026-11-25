@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as EmployerRouteImport } from './routes/employer'
 import { Route as ForSalonsRouteImport } from './routes/for-salons'
+import { Route as InviteRouteImport } from './routes/invite'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SignInRouteImport } from './routes/sign-in'
@@ -27,18 +28,21 @@ import { Route as ClaimVerifyRouteImport } from './routes/claim.verify'
 import { Route as DevMockCheckoutRouteImport } from './routes/dev.mock-checkout'
 import { Route as DevMockIdentityRouteImport } from './routes/dev.mock-identity'
 import { Route as EmployerIndexRouteImport } from './routes/employer.index'
-import { Route as EmployerBillingRouteImport } from './routes/employer.billing'
+import { Route as EmployerSalonIdRouteImport } from './routes/employer.$salonId'
 import { Route as EmployerOnboardingRouteImport } from './routes/employer.onboarding'
-import { Route as EmployerSettingsRouteImport } from './routes/employer.settings'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
 import { Route as JobsSplatRouteImport } from './routes/jobs.$'
 import { Route as SalonsIndexRouteImport } from './routes/salons.index'
 import { Route as SalonsSplatRouteImport } from './routes/salons.$'
 import { Route as SitemapsNameRouteImport } from './routes/sitemaps.$name'
-import { Route as EmployerCandidatesIdRouteImport } from './routes/employer.candidates.$id'
-import { Route as EmployerJobsNewRouteImport } from './routes/employer.jobs.new'
-import { Route as EmployerJobsIdIndexRouteImport } from './routes/employer.jobs.$id.index'
-import { Route as EmployerJobsIdEditRouteImport } from './routes/employer.jobs.$id.edit'
+import { Route as EmployerSalonIdIndexRouteImport } from './routes/employer.$salonId.index'
+import { Route as EmployerSalonIdBillingRouteImport } from './routes/employer.$salonId.billing'
+import { Route as EmployerSalonIdSettingsRouteImport } from './routes/employer.$salonId.settings'
+import { Route as EmployerSalonIdTeamRouteImport } from './routes/employer.$salonId.team'
+import { Route as EmployerSalonIdCandidatesIdRouteImport } from './routes/employer.$salonId.candidates.$id'
+import { Route as EmployerSalonIdJobsNewRouteImport } from './routes/employer.$salonId.jobs.new'
+import { Route as EmployerSalonIdJobsIdIndexRouteImport } from './routes/employer.$salonId.jobs.$id.index'
+import { Route as EmployerSalonIdJobsIdEditRouteImport } from './routes/employer.$salonId.jobs.$id.edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -58,6 +62,11 @@ const EmployerRoute = EmployerRouteImport.update({
 const ForSalonsRoute = ForSalonsRouteImport.update({
   id: '/for-salons',
   path: '/for-salons',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const InviteRoute = InviteRouteImport.update({
+  id: '/invite',
+  path: '/invite',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -130,19 +139,14 @@ const EmployerIndexRoute = EmployerIndexRouteImport.update({
   path: '/',
   getParentRoute: () => EmployerRoute,
 } as any)
-const EmployerBillingRoute = EmployerBillingRouteImport.update({
-  id: '/billing',
-  path: '/billing',
+const EmployerSalonIdRoute = EmployerSalonIdRouteImport.update({
+  id: '/$salonId',
+  path: '/$salonId',
   getParentRoute: () => EmployerRoute,
 } as any)
 const EmployerOnboardingRoute = EmployerOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
-  getParentRoute: () => EmployerRoute,
-} as any)
-const EmployerSettingsRoute = EmployerSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
   getParentRoute: () => EmployerRoute,
 } as any)
 const JobsIndexRoute = JobsIndexRouteImport.update({
@@ -170,32 +174,56 @@ const SitemapsNameRoute = SitemapsNameRouteImport.update({
   path: '/sitemaps/$name',
   getParentRoute: () => rootRouteImport,
 } as any)
-const EmployerCandidatesIdRoute = EmployerCandidatesIdRouteImport.update({
-  id: '/candidates/$id',
-  path: '/candidates/$id',
-  getParentRoute: () => EmployerRoute,
+const EmployerSalonIdIndexRoute = EmployerSalonIdIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => EmployerSalonIdRoute,
 } as any)
-const EmployerJobsNewRoute = EmployerJobsNewRouteImport.update({
+const EmployerSalonIdBillingRoute = EmployerSalonIdBillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
+  getParentRoute: () => EmployerSalonIdRoute,
+} as any)
+const EmployerSalonIdSettingsRoute = EmployerSalonIdSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => EmployerSalonIdRoute,
+} as any)
+const EmployerSalonIdTeamRoute = EmployerSalonIdTeamRouteImport.update({
+  id: '/team',
+  path: '/team',
+  getParentRoute: () => EmployerSalonIdRoute,
+} as any)
+const EmployerSalonIdCandidatesIdRoute =
+  EmployerSalonIdCandidatesIdRouteImport.update({
+    id: '/candidates/$id',
+    path: '/candidates/$id',
+    getParentRoute: () => EmployerSalonIdRoute,
+  } as any)
+const EmployerSalonIdJobsNewRoute = EmployerSalonIdJobsNewRouteImport.update({
   id: '/jobs/new',
   path: '/jobs/new',
-  getParentRoute: () => EmployerRoute,
+  getParentRoute: () => EmployerSalonIdRoute,
 } as any)
-const EmployerJobsIdIndexRoute = EmployerJobsIdIndexRouteImport.update({
-  id: '/jobs/$id/',
-  path: '/jobs/$id/',
-  getParentRoute: () => EmployerRoute,
-} as any)
-const EmployerJobsIdEditRoute = EmployerJobsIdEditRouteImport.update({
-  id: '/jobs/$id/edit',
-  path: '/jobs/$id/edit',
-  getParentRoute: () => EmployerRoute,
-} as any)
+const EmployerSalonIdJobsIdIndexRoute =
+  EmployerSalonIdJobsIdIndexRouteImport.update({
+    id: '/jobs/$id/',
+    path: '/jobs/$id/',
+    getParentRoute: () => EmployerSalonIdRoute,
+  } as any)
+const EmployerSalonIdJobsIdEditRoute =
+  EmployerSalonIdJobsIdEditRouteImport.update({
+    id: '/jobs/$id/edit',
+    path: '/jobs/$id/edit',
+    getParentRoute: () => EmployerSalonIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/account': typeof AccountRouteWithChildren
   '/employer': typeof EmployerRouteWithChildren
   '/for-salons': typeof ForSalonsRoute
+  '/invite': typeof InviteRoute
   '/privacy': typeof PrivacyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
@@ -208,9 +236,8 @@ export interface FileRoutesByFullPath {
   '/claim/verify': typeof ClaimVerifyRoute
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
-  '/employer/billing': typeof EmployerBillingRoute
+  '/employer/$salonId': typeof EmployerSalonIdRouteWithChildren
   '/employer/onboarding': typeof EmployerOnboardingRoute
-  '/employer/settings': typeof EmployerSettingsRoute
   '/jobs/$': typeof JobsSplatRoute
   '/salons/$': typeof SalonsSplatRoute
   '/sitemaps/$name': typeof SitemapsNameRoute
@@ -218,14 +245,19 @@ export interface FileRoutesByFullPath {
   '/employer/': typeof EmployerIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/salons/': typeof SalonsIndexRoute
-  '/employer/candidates/$id': typeof EmployerCandidatesIdRoute
-  '/employer/jobs/new': typeof EmployerJobsNewRoute
-  '/employer/jobs/$id/edit': typeof EmployerJobsIdEditRoute
-  '/employer/jobs/$id/': typeof EmployerJobsIdIndexRoute
+  '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
+  '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
+  '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
+  '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
+  '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
+  '/employer/$salonId/jobs/$id/edit': typeof EmployerSalonIdJobsIdEditRoute
+  '/employer/$salonId/jobs/$id/': typeof EmployerSalonIdJobsIdIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/for-salons': typeof ForSalonsRoute
+  '/invite': typeof InviteRoute
   '/privacy': typeof PrivacyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
@@ -238,9 +270,7 @@ export interface FileRoutesByTo {
   '/claim/verify': typeof ClaimVerifyRoute
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
-  '/employer/billing': typeof EmployerBillingRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
-  '/employer/settings': typeof EmployerSettingsRoute
   '/jobs/$': typeof JobsSplatRoute
   '/salons/$': typeof SalonsSplatRoute
   '/sitemaps/$name': typeof SitemapsNameRoute
@@ -248,10 +278,14 @@ export interface FileRoutesByTo {
   '/employer': typeof EmployerIndexRoute
   '/jobs': typeof JobsIndexRoute
   '/salons': typeof SalonsIndexRoute
-  '/employer/candidates/$id': typeof EmployerCandidatesIdRoute
-  '/employer/jobs/new': typeof EmployerJobsNewRoute
-  '/employer/jobs/$id/edit': typeof EmployerJobsIdEditRoute
-  '/employer/jobs/$id': typeof EmployerJobsIdIndexRoute
+  '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
+  '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
+  '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/employer/$salonId': typeof EmployerSalonIdIndexRoute
+  '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
+  '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
+  '/employer/$salonId/jobs/$id/edit': typeof EmployerSalonIdJobsIdEditRoute
+  '/employer/$salonId/jobs/$id': typeof EmployerSalonIdJobsIdIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -259,6 +293,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRouteWithChildren
   '/employer': typeof EmployerRouteWithChildren
   '/for-salons': typeof ForSalonsRoute
+  '/invite': typeof InviteRoute
   '/privacy': typeof PrivacyRoute
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
@@ -271,9 +306,8 @@ export interface FileRoutesById {
   '/claim/verify': typeof ClaimVerifyRoute
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
-  '/employer/billing': typeof EmployerBillingRoute
+  '/employer/$salonId': typeof EmployerSalonIdRouteWithChildren
   '/employer/onboarding': typeof EmployerOnboardingRoute
-  '/employer/settings': typeof EmployerSettingsRoute
   '/jobs/$': typeof JobsSplatRoute
   '/salons/$': typeof SalonsSplatRoute
   '/sitemaps/$name': typeof SitemapsNameRoute
@@ -281,10 +315,14 @@ export interface FileRoutesById {
   '/employer/': typeof EmployerIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/salons/': typeof SalonsIndexRoute
-  '/employer/candidates/$id': typeof EmployerCandidatesIdRoute
-  '/employer/jobs/new': typeof EmployerJobsNewRoute
-  '/employer/jobs/$id/edit': typeof EmployerJobsIdEditRoute
-  '/employer/jobs/$id/': typeof EmployerJobsIdIndexRoute
+  '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
+  '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
+  '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
+  '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
+  '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
+  '/employer/$salonId/jobs/$id/edit': typeof EmployerSalonIdJobsIdEditRoute
+  '/employer/$salonId/jobs/$id/': typeof EmployerSalonIdJobsIdIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -293,6 +331,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/employer'
     | '/for-salons'
+    | '/invite'
     | '/privacy'
     | '/robots.txt'
     | '/sign-in'
@@ -305,9 +344,8 @@ export interface FileRouteTypes {
     | '/claim/verify'
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
-    | '/employer/billing'
+    | '/employer/$salonId'
     | '/employer/onboarding'
-    | '/employer/settings'
     | '/jobs/$'
     | '/salons/$'
     | '/sitemaps/$name'
@@ -315,14 +353,19 @@ export interface FileRouteTypes {
     | '/employer/'
     | '/jobs/'
     | '/salons/'
-    | '/employer/candidates/$id'
-    | '/employer/jobs/new'
-    | '/employer/jobs/$id/edit'
-    | '/employer/jobs/$id/'
+    | '/employer/$salonId/billing'
+    | '/employer/$salonId/settings'
+    | '/employer/$salonId/team'
+    | '/employer/$salonId/'
+    | '/employer/$salonId/candidates/$id'
+    | '/employer/$salonId/jobs/new'
+    | '/employer/$salonId/jobs/$id/edit'
+    | '/employer/$salonId/jobs/$id/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/for-salons'
+    | '/invite'
     | '/privacy'
     | '/robots.txt'
     | '/sign-in'
@@ -335,9 +378,7 @@ export interface FileRouteTypes {
     | '/claim/verify'
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
-    | '/employer/billing'
     | '/employer/onboarding'
-    | '/employer/settings'
     | '/jobs/$'
     | '/salons/$'
     | '/sitemaps/$name'
@@ -345,16 +386,21 @@ export interface FileRouteTypes {
     | '/employer'
     | '/jobs'
     | '/salons'
-    | '/employer/candidates/$id'
-    | '/employer/jobs/new'
-    | '/employer/jobs/$id/edit'
-    | '/employer/jobs/$id'
+    | '/employer/$salonId/billing'
+    | '/employer/$salonId/settings'
+    | '/employer/$salonId/team'
+    | '/employer/$salonId'
+    | '/employer/$salonId/candidates/$id'
+    | '/employer/$salonId/jobs/new'
+    | '/employer/$salonId/jobs/$id/edit'
+    | '/employer/$salonId/jobs/$id'
   id:
     | '__root__'
     | '/'
     | '/account'
     | '/employer'
     | '/for-salons'
+    | '/invite'
     | '/privacy'
     | '/robots.txt'
     | '/sign-in'
@@ -367,9 +413,8 @@ export interface FileRouteTypes {
     | '/claim/verify'
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
-    | '/employer/billing'
+    | '/employer/$salonId'
     | '/employer/onboarding'
-    | '/employer/settings'
     | '/jobs/$'
     | '/salons/$'
     | '/sitemaps/$name'
@@ -377,10 +422,14 @@ export interface FileRouteTypes {
     | '/employer/'
     | '/jobs/'
     | '/salons/'
-    | '/employer/candidates/$id'
-    | '/employer/jobs/new'
-    | '/employer/jobs/$id/edit'
-    | '/employer/jobs/$id/'
+    | '/employer/$salonId/billing'
+    | '/employer/$salonId/settings'
+    | '/employer/$salonId/team'
+    | '/employer/$salonId/'
+    | '/employer/$salonId/candidates/$id'
+    | '/employer/$salonId/jobs/new'
+    | '/employer/$salonId/jobs/$id/edit'
+    | '/employer/$salonId/jobs/$id/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -388,6 +437,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRouteWithChildren
   EmployerRoute: typeof EmployerRouteWithChildren
   ForSalonsRoute: typeof ForSalonsRoute
+  InviteRoute: typeof InviteRoute
   PrivacyRoute: typeof PrivacyRoute
   RobotsDottxtRoute: typeof RobotsDottxtRoute
   SignInRoute: typeof SignInRoute
@@ -431,6 +481,13 @@ declare module '@tanstack/react-router' {
       path: '/for-salons'
       fullPath: '/for-salons'
       preLoaderRoute: typeof ForSalonsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/invite': {
+      id: '/invite'
+      path: '/invite'
+      fullPath: '/invite'
+      preLoaderRoute: typeof InviteRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -531,11 +588,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployerIndexRouteImport
       parentRoute: typeof EmployerRoute
     }
-    '/employer/billing': {
-      id: '/employer/billing'
-      path: '/billing'
-      fullPath: '/employer/billing'
-      preLoaderRoute: typeof EmployerBillingRouteImport
+    '/employer/$salonId': {
+      id: '/employer/$salonId'
+      path: '/$salonId'
+      fullPath: '/employer/$salonId'
+      preLoaderRoute: typeof EmployerSalonIdRouteImport
       parentRoute: typeof EmployerRoute
     }
     '/employer/onboarding': {
@@ -543,13 +600,6 @@ declare module '@tanstack/react-router' {
       path: '/onboarding'
       fullPath: '/employer/onboarding'
       preLoaderRoute: typeof EmployerOnboardingRouteImport
-      parentRoute: typeof EmployerRoute
-    }
-    '/employer/settings': {
-      id: '/employer/settings'
-      path: '/settings'
-      fullPath: '/employer/settings'
-      preLoaderRoute: typeof EmployerSettingsRouteImport
       parentRoute: typeof EmployerRoute
     }
     '/jobs/': {
@@ -587,33 +637,61 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapsNameRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/employer/candidates/$id': {
-      id: '/employer/candidates/$id'
+    '/employer/$salonId/': {
+      id: '/employer/$salonId/'
+      path: '/'
+      fullPath: '/employer/$salonId/'
+      preLoaderRoute: typeof EmployerSalonIdIndexRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/$salonId/billing': {
+      id: '/employer/$salonId/billing'
+      path: '/billing'
+      fullPath: '/employer/$salonId/billing'
+      preLoaderRoute: typeof EmployerSalonIdBillingRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/$salonId/settings': {
+      id: '/employer/$salonId/settings'
+      path: '/settings'
+      fullPath: '/employer/$salonId/settings'
+      preLoaderRoute: typeof EmployerSalonIdSettingsRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/$salonId/team': {
+      id: '/employer/$salonId/team'
+      path: '/team'
+      fullPath: '/employer/$salonId/team'
+      preLoaderRoute: typeof EmployerSalonIdTeamRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/$salonId/candidates/$id': {
+      id: '/employer/$salonId/candidates/$id'
       path: '/candidates/$id'
-      fullPath: '/employer/candidates/$id'
-      preLoaderRoute: typeof EmployerCandidatesIdRouteImport
-      parentRoute: typeof EmployerRoute
+      fullPath: '/employer/$salonId/candidates/$id'
+      preLoaderRoute: typeof EmployerSalonIdCandidatesIdRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
     }
-    '/employer/jobs/new': {
-      id: '/employer/jobs/new'
+    '/employer/$salonId/jobs/new': {
+      id: '/employer/$salonId/jobs/new'
       path: '/jobs/new'
-      fullPath: '/employer/jobs/new'
-      preLoaderRoute: typeof EmployerJobsNewRouteImport
-      parentRoute: typeof EmployerRoute
+      fullPath: '/employer/$salonId/jobs/new'
+      preLoaderRoute: typeof EmployerSalonIdJobsNewRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
     }
-    '/employer/jobs/$id/': {
-      id: '/employer/jobs/$id/'
+    '/employer/$salonId/jobs/$id/': {
+      id: '/employer/$salonId/jobs/$id/'
       path: '/jobs/$id'
-      fullPath: '/employer/jobs/$id/'
-      preLoaderRoute: typeof EmployerJobsIdIndexRouteImport
-      parentRoute: typeof EmployerRoute
+      fullPath: '/employer/$salonId/jobs/$id/'
+      preLoaderRoute: typeof EmployerSalonIdJobsIdIndexRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
     }
-    '/employer/jobs/$id/edit': {
-      id: '/employer/jobs/$id/edit'
+    '/employer/$salonId/jobs/$id/edit': {
+      id: '/employer/$salonId/jobs/$id/edit'
       path: '/jobs/$id/edit'
-      fullPath: '/employer/jobs/$id/edit'
-      preLoaderRoute: typeof EmployerJobsIdEditRouteImport
-      parentRoute: typeof EmployerRoute
+      fullPath: '/employer/$salonId/jobs/$id/edit'
+      preLoaderRoute: typeof EmployerSalonIdJobsIdEditRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
     }
   }
 }
@@ -637,26 +715,42 @@ const AccountRouteChildren: AccountRouteChildren = {
 const AccountRouteWithChildren =
   AccountRoute._addFileChildren(AccountRouteChildren)
 
+interface EmployerSalonIdRouteChildren {
+  EmployerSalonIdBillingRoute: typeof EmployerSalonIdBillingRoute
+  EmployerSalonIdSettingsRoute: typeof EmployerSalonIdSettingsRoute
+  EmployerSalonIdTeamRoute: typeof EmployerSalonIdTeamRoute
+  EmployerSalonIdIndexRoute: typeof EmployerSalonIdIndexRoute
+  EmployerSalonIdCandidatesIdRoute: typeof EmployerSalonIdCandidatesIdRoute
+  EmployerSalonIdJobsNewRoute: typeof EmployerSalonIdJobsNewRoute
+  EmployerSalonIdJobsIdEditRoute: typeof EmployerSalonIdJobsIdEditRoute
+  EmployerSalonIdJobsIdIndexRoute: typeof EmployerSalonIdJobsIdIndexRoute
+}
+
+const EmployerSalonIdRouteChildren: EmployerSalonIdRouteChildren = {
+  EmployerSalonIdBillingRoute: EmployerSalonIdBillingRoute,
+  EmployerSalonIdSettingsRoute: EmployerSalonIdSettingsRoute,
+  EmployerSalonIdTeamRoute: EmployerSalonIdTeamRoute,
+  EmployerSalonIdIndexRoute: EmployerSalonIdIndexRoute,
+  EmployerSalonIdCandidatesIdRoute: EmployerSalonIdCandidatesIdRoute,
+  EmployerSalonIdJobsNewRoute: EmployerSalonIdJobsNewRoute,
+  EmployerSalonIdJobsIdEditRoute: EmployerSalonIdJobsIdEditRoute,
+  EmployerSalonIdJobsIdIndexRoute: EmployerSalonIdJobsIdIndexRoute,
+}
+
+const EmployerSalonIdRouteWithChildren = EmployerSalonIdRoute._addFileChildren(
+  EmployerSalonIdRouteChildren,
+)
+
 interface EmployerRouteChildren {
-  EmployerBillingRoute: typeof EmployerBillingRoute
+  EmployerSalonIdRoute: typeof EmployerSalonIdRouteWithChildren
   EmployerOnboardingRoute: typeof EmployerOnboardingRoute
-  EmployerSettingsRoute: typeof EmployerSettingsRoute
   EmployerIndexRoute: typeof EmployerIndexRoute
-  EmployerCandidatesIdRoute: typeof EmployerCandidatesIdRoute
-  EmployerJobsNewRoute: typeof EmployerJobsNewRoute
-  EmployerJobsIdEditRoute: typeof EmployerJobsIdEditRoute
-  EmployerJobsIdIndexRoute: typeof EmployerJobsIdIndexRoute
 }
 
 const EmployerRouteChildren: EmployerRouteChildren = {
-  EmployerBillingRoute: EmployerBillingRoute,
+  EmployerSalonIdRoute: EmployerSalonIdRouteWithChildren,
   EmployerOnboardingRoute: EmployerOnboardingRoute,
-  EmployerSettingsRoute: EmployerSettingsRoute,
   EmployerIndexRoute: EmployerIndexRoute,
-  EmployerCandidatesIdRoute: EmployerCandidatesIdRoute,
-  EmployerJobsNewRoute: EmployerJobsNewRoute,
-  EmployerJobsIdEditRoute: EmployerJobsIdEditRoute,
-  EmployerJobsIdIndexRoute: EmployerJobsIdIndexRoute,
 }
 
 const EmployerRouteWithChildren = EmployerRoute._addFileChildren(
@@ -668,6 +762,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRouteWithChildren,
   EmployerRoute: EmployerRouteWithChildren,
   ForSalonsRoute: ForSalonsRoute,
+  InviteRoute: InviteRoute,
   PrivacyRoute: PrivacyRoute,
   RobotsDottxtRoute: RobotsDottxtRoute,
   SignInRoute: SignInRoute,

@@ -31,6 +31,7 @@ import { meRoutes } from "./routes/me";
 import { mediaRoutes } from "./routes/media";
 import { root } from "./routes/root";
 import { siteRoutes } from "./routes/site";
+import { teamRoutes } from "./routes/team";
 
 export interface AppOptions extends AuthOptions {
   /** Replaces Cloudflare Access's signing keys. Used by tests to sign their own Access tokens. */
@@ -128,6 +129,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/", checksRoutes);
   app.route("/", jobsRoutes);
   app.route("/", employerRoutes);
+  app.route("/", teamRoutes);
   app.route("/", directoryRoutes);
   app.route("/", billingRoutes);
   app.route("/", siteRoutes);

@@ -29,6 +29,13 @@
       "when": 1795593760175,
       "tag": "0003_location_trigger",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795605344823,
+      "tag": "0004_salon_teams",
+      "breakpoints": true
     }
   ]
 }

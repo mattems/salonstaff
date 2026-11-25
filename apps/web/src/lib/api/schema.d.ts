@@ -52,7 +52,7 @@ export interface paths {
     };
     /**
      * Who you are
-     * @description Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salon you manage (if any).
+     * @description Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salons you manage.
      */
     get: {
       parameters: {
@@ -1778,7 +1778,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon": {
+  "/v1/employer/salons": {
     parameters: {
       query?: never;
       header?: never;
@@ -1786,8 +1786,8 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Your salon
-     * @description Its details, public `path`, launch terms and whether it can publish a job now (`entitlement`).
+     * Your salons
+     * @description Every salon you're on the team of, with your role there, in the order you joined.
      */
     get: {
       parameters: {
@@ -1798,13 +1798,13 @@ export interface paths {
       };
       requestBody?: never;
       responses: {
-        /** @description Your salon */
+        /** @description Your salons */
         200: {
           headers: {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["MySalon"];
+            "application/json": components["schemas"]["MySalons"];
           };
         };
         /** @description Not signed in */
@@ -1816,21 +1816,12 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet */
-        404: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            "application/problem+json": components["schemas"]["Problem"];
-          };
-        };
       };
     };
     put?: never;
     /**
-     * Create your salon
-     * @description Onboarding. The ABN is checksum-checked, then looked up on the Australian Business Register. If the business is already in the directory (an unclaimed listing with that ABN), claim it instead: the 409's `hint` names its claim page. New salons list jobs free for 90 days, and the first 200 keep founding pricing. Your account becomes an employer account.
+     * Add a salon
+     * @description You become its owner; an account can have any number of salons (a group's locations). The ABN is checksum-checked, then looked up on the Australian Business Register. If the business is already in the directory (an unclaimed listing with that ABN), claim it instead: the 409's `hint` names its claim page. New salons list jobs free for 90 days, and the first 200 keep founding pricing. Your account becomes an employer account.
      */
     post: {
       parameters: {
@@ -1884,7 +1875,7 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description You already manage a salon, or the business's listing should be claimed */
+        /** @description The business's listing should be claimed instead */
         409: {
           headers: {
             [name: string]: unknown;
@@ -1898,15 +1889,76 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
     /**
-     * Change your salon's details
-     * @description Send only what changes; a blank or null website, Instagram or about clears it. A new name, suburb or state gives the salon (and its jobs) a new address; the old ones redirect. A new ABN is checked again.
+     * One of your salons
+     * @description Its details, public `path`, launch terms, whether it can publish a job now (`entitlement`) and your `role`.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Your salon */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MySalon"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not one of your salons */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Change a salon's details
+     * @description Owners only. Send only what changes; a blank or null website, Instagram or about clears it. A new name, suburb or state gives the salon (and its jobs) a new address; the old ones redirect. A new ABN is checked again.
      */
     patch: {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          salonId: string;
+        };
         cookie?: never;
       };
       requestBody: {
@@ -1954,7 +2006,16 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet */
+        /** @description Only owners change a salon's details */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not one of your salons */
         404: {
           headers: {
             [name: string]: unknown;
@@ -1967,7 +2028,7 @@ export interface paths {
     };
     trace?: never;
   };
-  "/v1/salon/jobs": {
+  "/v1/employer/salons/{salonId}/jobs": {
     parameters: {
       query?: never;
       header?: never;
@@ -1975,14 +2036,16 @@ export interface paths {
       cookie?: never;
     };
     /**
-     * Your salon's jobs
+     * A salon's jobs
      * @description Newest first, drafts included, with how many people applied and how many are new.
      */
     get: {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          salonId: string;
+        };
         cookie?: never;
       };
       requestBody?: never;
@@ -2005,7 +2068,7 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet */
+        /** @description Not one of your salons */
         404: {
           headers: {
             [name: string]: unknown;
@@ -2025,7 +2088,9 @@ export interface paths {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          salonId: string;
+        };
         cookie?: never;
       };
       requestBody: {
@@ -2079,7 +2144,7 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet */
+        /** @description Not one of your salons */
         404: {
           headers: {
             [name: string]: unknown;
@@ -2096,7 +2161,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/jobs/{id}": {
+  "/v1/employer/salons/{salonId}/jobs/{id}": {
     parameters: {
       query?: never;
       header?: never;
@@ -2109,6 +2174,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           id: string;
         };
         cookie?: never;
@@ -2158,6 +2224,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           id: string;
         };
         cookie?: never;
@@ -2208,7 +2275,7 @@ export interface paths {
     };
     trace?: never;
   };
-  "/v1/salon/jobs/{id}/publish": {
+  "/v1/employer/salons/{salonId}/jobs/{id}/publish": {
     parameters: {
       query?: never;
       header?: never;
@@ -2226,6 +2293,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           id: string;
         };
         cookie?: never;
@@ -2285,7 +2353,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/jobs/{id}/close": {
+  "/v1/employer/salons/{salonId}/jobs/{id}/close": {
     parameters: {
       query?: never;
       header?: never;
@@ -2303,6 +2371,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           id: string;
         };
         cookie?: never;
@@ -2344,7 +2413,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/jobs/{id}/applicants": {
+  "/v1/employer/salons/{salonId}/jobs/{id}/applicants": {
     parameters: {
       query?: never;
       header?: never;
@@ -2360,6 +2429,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           id: string;
         };
         cookie?: never;
@@ -2403,7 +2473,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/applications/{id}": {
+  "/v1/employer/salons/{salonId}/applications/{id}": {
     parameters: {
       query?: never;
       header?: never;
@@ -2425,6 +2495,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           id: string;
         };
         cookie?: never;
@@ -2478,7 +2549,7 @@ export interface paths {
     };
     trace?: never;
   };
-  "/v1/salon/candidates/{userId}": {
+  "/v1/employer/salons/{salonId}/candidates/{userId}": {
     parameters: {
       query?: never;
       header?: never;
@@ -2494,6 +2565,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
+          salonId: string;
           userId: string;
         };
         cookie?: never;
@@ -2531,6 +2603,486 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/team": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * A salon's team
+     * @description Its owners and managers, and invites not yet accepted. Owners change the salon's details, billing and team; managers handle jobs and applicants.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The team */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Team"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/team/invites": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Invite someone to the team
+     * @description Owners only. Emails them a link that lasts 7 days; they sign in or sign up however they like and accept it. Inviting the same address again replaces the earlier invite.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["NewInvite"];
+        };
+      };
+      responses: {
+        /** @description The invite */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["TeamInvite"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Only owners invite people */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description They're already on the team */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/team/invites/{inviteId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Cancel an invite
+     * @description Owners only. The emailed link stops working.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          inviteId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Gone */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["InviteCancelled"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Only owners cancel invites */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/team/{userId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Take someone off the team, or leave
+     * @description Owners can take anyone off; anyone can take themselves off (leave). A salon's last owner can't go: make someone else an owner first.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Gone */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MemberRemoved"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Only owners take other people off */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description That would leave the salon without an owner */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /**
+     * Change someone's role
+     * @description Owners only. A salon keeps at least one owner.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["RoleChange"];
+        };
+      };
+      responses: {
+        /** @description The team */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Team"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Only owners change roles */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description That would leave the salon without an owner */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/v1/invites/{token}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * What an invite is for
+     * @description The salon and role an emailed invite link offers, to show before accepting.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          token: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The invite */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["InvitePreview"];
+          };
+        };
+        /** @description The link is invalid or has expired */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/invites/{token}/accept": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Accept an invite
+     * @description Sign in first, with any account. You join the salon's team (a manager invited as an owner becomes one) and your account becomes an employer account. The link is then used up.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          token: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The salon you joined */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MySalon"];
+          };
+        };
+        /** @description The link is invalid or has expired */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -2672,7 +3224,7 @@ export interface paths {
     put?: never;
     /**
      * Claim a directory listing
-     * @description The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with `method: email` we send a link to the listing's own email (it lasts 48 hours; `sentTo` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with `method: review`, staff check it. An approved claim makes the listing yours, with the free period and founding pricing of a new salon.
+     * @description The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with `method: email` we send a link to the listing's own email (it lasts 48 hours; `sentTo` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with `method: review`, staff check it. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.
      */
     post: {
       parameters: {
@@ -2725,7 +3277,7 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description Already claimed, the ABN doesn't match, or you already manage a salon */
+        /** @description You already own it, or the ABN doesn't match */
         409: {
           headers: {
             [name: string]: unknown;
@@ -2753,7 +3305,7 @@ export interface paths {
     put?: never;
     /**
      * Confirm a claim from its emailed link
-     * @description Sign in as the person who started the claim first. Completes the claim: the listing becomes your salon and your account an employer account.
+     * @description Sign in as the person who started the claim first. Completes the claim: you become an owner of the listing and your account an employer account.
      */
     post: {
       parameters: {
@@ -2946,7 +3498,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/billing": {
+  "/v1/employer/salons/{salonId}/billing": {
     parameters: {
       query?: never;
       header?: never;
@@ -2955,13 +3507,15 @@ export interface paths {
     };
     /**
      * Your salon's billing
-     * @description Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.
+     * @description Owners only. Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.
      */
     get: {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          salonId: string;
+        };
         cookie?: never;
       };
       requestBody?: never;
@@ -2984,7 +3538,16 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet */
+        /** @description Managers can't see billing */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not one of your salons */
         404: {
           headers: {
             [name: string]: unknown;
@@ -3003,7 +3566,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/billing/checkout": {
+  "/v1/employer/salons/{salonId}/billing/checkout": {
     parameters: {
       query?: never;
       header?: never;
@@ -3014,13 +3577,15 @@ export interface paths {
     put?: never;
     /**
      * Buy a listing or start the Salon Plan
-     * @description Returns a checkout `url` (Stripe Checkout; locally a mock page). A single listing ($49, GST included) adds one credit that publishes a job for 30 days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.
+     * @description Owners only. Returns a checkout `url` (Stripe Checkout; locally a mock page). A single listing ($49, GST included) adds one credit that publishes a job for 30 days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.
      */
     post: {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          salonId: string;
+        };
         cookie?: never;
       };
       requestBody: {
@@ -3056,7 +3621,16 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet, or billing is off */
+        /** @description Only owners buy listings */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not one of your salons, or billing is off */
         404: {
           headers: {
             [name: string]: unknown;
@@ -3082,7 +3656,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/v1/salon/billing/portal": {
+  "/v1/employer/salons/{salonId}/billing/portal": {
     parameters: {
       query?: never;
       header?: never;
@@ -3093,13 +3667,15 @@ export interface paths {
     put?: never;
     /**
      * Manage your plan and invoices
-     * @description Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.
+     * @description Owners only. Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.
      */
     post: {
       parameters: {
         query?: never;
         header?: never;
-        path?: never;
+        path: {
+          salonId: string;
+        };
         cookie?: never;
       };
       requestBody?: never;
@@ -3122,7 +3698,16 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description No salon yet, or billing is off */
+        /** @description Only owners buy listings */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not one of your salons, or billing is off */
         404: {
           headers: {
             [name: string]: unknown;
@@ -3388,8 +3973,8 @@ export interface components {
       createdAt: string;
       profile: components["schemas"]["SeekerProfile"] | null;
       verification: components["schemas"]["Verification"];
-      /** @description The salon you manage, if any. */
-      salon: components["schemas"]["OwnSalonSummary"] | null;
+      /** @description The salons you're on the team of, in the order you joined them. */
+      salons: components["schemas"]["OwnSalonSummary"][];
     };
     SeekerProfile: {
       firstName: string;
@@ -3480,6 +4065,11 @@ export interface components {
       path: string;
       /** @enum {string} */
       status: "active" | "suspended" | "removed";
+      /**
+       * @description Your role on the salon's team.
+       * @enum {string}
+       */
+      role: "owner" | "manager";
     };
     Problem: {
       type: string;
@@ -3864,6 +4454,11 @@ export interface components {
        */
       createdAt: string;
       entitlement: components["schemas"]["Entitlement"];
+      /**
+       * @description Your role. Managers handle jobs and applicants; owners also change the salon's details, billing and team.
+       * @enum {string}
+       */
+      role: "owner" | "manager";
     };
     Entitlement: {
       /** @description Whether a job can be published right now. */
@@ -3872,6 +4467,9 @@ export interface components {
       via: "free_period" | "subscription" | "credit" | null;
       /** @enum {string|null} */
       reason: "suspended" | "needs_listing" | null;
+    };
+    MySalons: {
+      items: components["schemas"]["MySalon"][];
     };
     SalonJobs: {
       items: components["schemas"]["SalonJob"][];
@@ -3885,6 +4483,8 @@ export interface components {
       paidVia: string | null;
       applicants: number;
       newApplicants: number;
+      /** @description Who on the team is emailed about new applications. Null: everyone, including people who join later. */
+      notifyUserIds: string[] | null;
       /**
        * Format: date-time
        * @example 2026-11-25T03:00:00.000Z
@@ -3945,6 +4545,8 @@ export interface components {
        * @default false
        */
       publish: boolean;
+      /** @description Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later. */
+      notifyUserIds?: string[] | null;
     };
     JobChanges: {
       title?: string;
@@ -3989,6 +4591,8 @@ export interface components {
       requirements?: string;
       /** @default false */
       requireQualification: boolean;
+      /** @description Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later. */
+      notifyUserIds?: string[] | null;
     };
     Applicants: {
       job: components["schemas"]["SalonJob"];
@@ -4076,6 +4680,70 @@ export interface components {
     Contact: {
       email: string | null;
       phone: string | null;
+    };
+    Team: {
+      /** @description Owners first. */
+      members: components["schemas"]["TeamMember"][];
+      /** @description Sent and not yet accepted. */
+      invites: components["schemas"]["TeamInvite"][];
+    };
+    TeamMember: {
+      /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      userId: string;
+      name: string;
+      email: string | null;
+      role: components["schemas"]["SalonRole"];
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      joinedAt: string;
+      you: boolean;
+    };
+    /** @enum {string} */
+    SalonRole: "owner" | "manager";
+    TeamInvite: {
+      /** @example inv_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      email: string;
+      role: components["schemas"]["SalonRole"];
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      expiresAt: string;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    NewInvite: {
+      /** Format: email */
+      email: string;
+      role: components["schemas"]["SalonRole"];
+    };
+    InviteCancelled: {
+      /** @enum {boolean} */
+      cancelled: true;
+    };
+    RoleChange: {
+      role: components["schemas"]["SalonRole"];
+    };
+    MemberRemoved: {
+      /** @enum {boolean} */
+      removed: true;
+    };
+    InvitePreview: {
+      salon: {
+        name: string;
+        suburb: string;
+        state: string;
+      };
+      role: components["schemas"]["SalonRole"];
+      invitedBy: string | null;
+      email: string;
+      expiresAt: string;
     };
     SalonList: {
       items: components["schemas"]["DirectorySalon"][];

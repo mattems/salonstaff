@@ -10,5 +10,8 @@ email or they can't reach it. A claimed listing gets the same free period and fo
 **Why.** ABNs are public, so an ABN alone doesn't prove ownership. Matt wanted "enter an ABN and we check, or we
 send an email they need to click".
 
+**Amended by D-11:** a claim makes the claimant one of the listing's owners. Accounts can claim any number
+of listings, including ones that already have owners (who are emailed); only a first claim gets the launch terms.
+
 **Data:** only import data we may use (businesses' own published details, the ABR, licensed data) — not scraped
 Google Maps or Seek data.

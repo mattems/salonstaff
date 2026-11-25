@@ -1,7 +1,7 @@
 /**
  * Salons. `salonsFor(db)` finds and creates them; `salonScope(db, salonId)` is everything one
- * salon's owner may read and change: settings, jobs, publishing, applicants and billing. A salon
- * sees only people who applied to its own jobs.
+ * salon's team may read and change: settings, jobs, publishing, applicants and billing (who on the
+ * team may do what is decided by the API, D-11). A salon sees only people who applied to its own jobs.
  */
 import {
   ApiError,
@@ -22,10 +22,20 @@ import { and, count, desc, eq, gt, inArray, isNull, type SQL, sql } from "drizzl
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, summariesFor } from "./checks";
 import type { Db } from "./index";
-import { applications, jobs, payments, salons, seekerProfiles, users } from "./schema";
+import {
+  applications,
+  jobs,
+  payments,
+  type SalonRole,
+  salonMembers,
+  salons,
+  seekerProfiles,
+  users,
+} from "./schema";
 import { type Application, type FullProfile, fullProfileOf, type SeekerProfile } from "./seeker";
 import { placeSlug, retryOnSlugClash, samePlace, writeRedirect } from "./slugs";
-import { isLive, type Job, type Salon } from "./visibility";
+import { addMember } from "./team";
+import { isLive, type Job, type Salon, unclaimed } from "./visibility";
 
 export type Payment = typeof payments.$inferSelect;
 export type PaymentKind = Payment["kind"];
@@ -57,6 +67,12 @@ export interface Candidate extends FullProfile {
   contact: Contact;
   /** Their applications to this salon's jobs. */
   applications: (Application & { jobTitle: string })[];
+}
+
+/** A salon someone is on the team of, with their role there. */
+export interface MySalon {
+  salon: Salon;
+  role: SalonRole;
 }
 
 export interface SalonJob extends Job {
@@ -95,13 +111,13 @@ const jobValues = (input: JobInput) => ({
 const notFoundJob = () =>
   new ApiError("not_found", {
     detail: "Your salon has no job with that ID",
-    hint: "List your jobs with GET /v1/salon/jobs and use an `id` from there.",
+    hint: "List your jobs with GET /v1/employer/salons/{salonId}/jobs and use an `id` from there.",
   });
 
 const notFoundApplication = () =>
   new ApiError("not_found", {
     detail: "No application with that ID for your salon's jobs",
-    hint: "List a job's applicants with GET /v1/salon/jobs/{id}/applicants.",
+    hint: "List a job's applicants with GET /v1/employer/salons/{salonId}/jobs/{id}/applicants.",
   });
 
 async function foundingSoFar(tx: Executor): Promise<number> {
@@ -142,14 +158,23 @@ export function salonsFor(db: Db) {
       return row ?? null;
     },
 
-    /** The salon a person manages (one per account). */
-    async ownedBy(userId: string): Promise<Salon | null> {
+    /** The salons a person is on the team of, in the order they joined. */
+    async ofUser(userId: string): Promise<MySalon[]> {
+      return db
+        .select({ salon: salons, role: salonMembers.role })
+        .from(salonMembers)
+        .innerJoin(salons, eq(salons.id, salonMembers.salonId))
+        .where(eq(salonMembers.userId, userId))
+        .orderBy(salonMembers.createdAt, salons.name);
+    },
+
+    /** The salon, if the person is on its team. */
+    async membership(userId: string, salonId: string): Promise<MySalon | null> {
       const [row] = await db
-        .select()
-        .from(salons)
-        .where(eq(salons.ownerId, userId))
-        .orderBy(salons.createdAt)
-        .limit(1);
+        .select({ salon: salons, role: salonMembers.role })
+        .from(salonMembers)
+        .innerJoin(salons, eq(salons.id, salonMembers.salonId))
+        .where(and(eq(salonMembers.userId, userId), eq(salonMembers.salonId, salonId)));
       return row ?? null;
     },
 
@@ -162,7 +187,7 @@ export function salonsFor(db: Db) {
           and(
             eq(salons.abn, abn.replace(/\s+/g, "")),
             eq(salons.source, "directory"),
-            isNull(salons.ownerId),
+            unclaimed(),
             eq(salons.status, "active"),
           ),
         )
@@ -170,21 +195,13 @@ export function salonsFor(db: Db) {
       return row ?? null;
     },
 
-    /** Onboarding: the person's own salon, with the free period and (if any are left) founding pricing. */
+    /**
+     * A new salon, owned by the person who makes it, with the free period and (if any are left)
+     * founding pricing. An account can make any number (D-11).
+     */
     async create(ownerId: string, input: SalonInput, abn: AbnCheck, actor: Actor): Promise<Salon> {
       return retryOnSlugClash(() =>
         db.transaction(async (tx) => {
-          const [owned] = await tx
-            .select({ id: salons.id })
-            .from(salons)
-            .where(eq(salons.ownerId, ownerId))
-            .limit(1);
-          if (owned) {
-            throw new ApiError("conflict", {
-              detail: "Your account already manages a salon",
-              hint: "Change it with PATCH /v1/salon. Use a different account for another business.",
-            });
-          }
           const place = await placeSlug(tx, "salon", {
             state: input.state,
             suburb: input.suburb,
@@ -195,7 +212,6 @@ export function salonsFor(db: Db) {
             .values({
               ...salonValues(input),
               ...place,
-              ownerId,
               abnStatus: abn.status,
               abnEntityName: abn.entityName,
               source: "owner",
@@ -210,6 +226,7 @@ export function salonsFor(db: Db) {
             targetId: salon.id,
             after: { name: salon.name, founding: salon.founding },
           });
+          await addMember(tx, salon.id, ownerId, "owner", actor);
           return salon;
         }),
       );
@@ -289,7 +306,7 @@ export function salonScope(db: Db, salonId: string) {
     if (!row) {
       throw new ApiError("not_found", {
         detail: "That salon no longer exists",
-        hint: "Create a salon with POST /v1/salon.",
+        hint: "List your salons with GET /v1/employer/salons.",
       });
     }
     return row;
@@ -383,7 +400,12 @@ export function salonScope(db: Db, salonId: string) {
       return row;
     },
 
-    async createJob(input: JobInput, actor: Actor): Promise<Job> {
+    /** `notifyUserIds`: who on the team hears about applications; null (the default) is everyone. */
+    async createJob(
+      input: JobInput,
+      actor: Actor,
+      notifyUserIds: string[] | null = null,
+    ): Promise<Job> {
       return retryOnSlugClash(() =>
         db.transaction(async (tx) => {
           const salon = await salonRow(tx);
@@ -394,7 +416,7 @@ export function salonScope(db: Db, salonId: string) {
           });
           const [row] = await tx
             .insert(jobs)
-            .values({ ...jobValues(input), ...place, salonId, status: "draft" })
+            .values({ ...jobValues(input), ...place, salonId, status: "draft", notifyUserIds })
             .returning();
           const job = row as Job;
           await recordAudit(tx, actor, {
@@ -409,7 +431,12 @@ export function salonScope(db: Db, salonId: string) {
     },
 
     /** Changes a job. A new title or place gives it a new address; the old one redirects. */
-    async updateJob(jobId: string, input: JobInput, actor: Actor): Promise<Job> {
+    async updateJob(
+      jobId: string,
+      input: JobInput,
+      actor: Actor,
+      notifyUserIds?: string[] | null,
+    ): Promise<Job> {
       return retryOnSlugClash(() =>
         db.transaction(async (tx) => {
           const salon = await salonRow(tx);
@@ -421,7 +448,10 @@ export function salonScope(db: Db, salonId: string) {
           });
           const [row] = await tx
             .update(jobs)
-            .set(jobValues(input))
+            .set({
+              ...jobValues(input),
+              ...(notifyUserIds === undefined ? {} : { notifyUserIds }),
+            })
             .where(eq(jobs.id, jobId))
             .returning();
           await recordAudit(tx, actor, {
@@ -456,7 +486,7 @@ export function salonScope(db: Db, salonId: string) {
           }
           throw new ApiError("listing_needed", {
             detail: "Your free period has ended and there's no listing credit or Salon Plan",
-            hint: "Buy a single listing or start the Salon Plan with POST /v1/salon/billing/checkout, then publish again.",
+            hint: "Buy a single listing or start the Salon Plan with POST /v1/employer/salons/{salonId}/billing/checkout, then publish again.",
           });
         }
         if (entitlement.via === "credit") {
@@ -468,7 +498,7 @@ export function salonScope(db: Db, salonId: string) {
           if (used.length === 0) {
             throw new ApiError("listing_needed", {
               detail: "No listing credits left",
-              hint: "Buy a single listing with POST /v1/salon/billing/checkout, then publish again.",
+              hint: "Buy a single listing with POST /v1/employer/salons/{salonId}/billing/checkout, then publish again.",
             });
           }
         }
@@ -686,14 +716,24 @@ export function salonScope(db: Db, salonId: string) {
       };
     },
 
-    /** Who to tell about a new application: the owner, unless banned. */
-    async ownerContact(): Promise<Contact | null> {
-      const [row] = await db
+    /**
+     * Who to tell about a new application for one of the salon's jobs: the people the job names, or
+     * everyone on the team; only those still on it, and not banned.
+     */
+    async applicationContacts(job: Pick<Job, "notifyUserIds">): Promise<Contact[]> {
+      const chosen = job.notifyUserIds;
+      if (chosen && chosen.length === 0) return [];
+      return db
         .select({ email: users.email, phoneNumber: users.phoneNumber })
-        .from(salons)
-        .innerJoin(users, eq(users.id, salons.ownerId))
-        .where(and(eq(salons.id, salonId), isNull(users.suspendedAt)));
-      return row ?? null;
+        .from(salonMembers)
+        .innerJoin(users, eq(users.id, salonMembers.userId))
+        .where(
+          and(
+            eq(salonMembers.salonId, salonId),
+            isNull(users.suspendedAt),
+            chosen ? inArray(salonMembers.userId, chosen) : undefined,
+          ),
+        );
     },
 
     // ---------- Billing ----------

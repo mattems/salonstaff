@@ -70,16 +70,12 @@
           "verification": {
             "$ref": "#/components/schemas/Verification"
           },
-          "salon": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OwnSalonSummary"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The salon you manage, if any."
+          "salons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnSalonSummary"
+            },
+            "description": "The salons you're on the team of, in the order you joined them."
           }
         },
         "required": [
@@ -91,7 +87,7 @@
           "createdAt",
           "profile",
           "verification",
-          "salon"
+          "salons"
         ]
       },
       "SeekerProfile": {
@@ -316,9 +312,14 @@
           "status": {
             "type": "string",
             "enum": ["active", "suspended", "removed"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["owner", "manager"],
+            "description": "Your role on the salon's team."
           }
         },
-        "required": ["id", "name", "path", "status"]
+        "required": ["id", "name", "path", "status", "role"]
       },
       "Problem": {
         "type": "object",
@@ -1225,6 +1226,11 @@
           },
           "entitlement": {
             "$ref": "#/components/schemas/Entitlement"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["owner", "manager"],
+            "description": "Your role. Managers handle jobs and applicants; owners also change the salon's details, billing and team."
           }
         },
         "required": [
@@ -1254,7 +1260,8 @@
           "listingCredits",
           "claimedAt",
           "createdAt",
-          "entitlement"
+          "entitlement",
+          "role"
         ]
       },
       "Entitlement": {
@@ -1274,6 +1281,18 @@
           }
         },
         "required": ["ok", "via", "reason"]
+      },
+      "MySalons": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MySalon"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "SalonJobs": {
         "type": "object",
@@ -1309,6 +1328,13 @@
               "newApplicants": {
                 "type": "integer"
               },
+              "notifyUserIds": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "string"
+                },
+                "description": "Who on the team is emailed about new applications. Null: everyone, including people who join later."
+              },
               "createdAt": {
                 "type": "string",
                 "format": "date-time",
@@ -1325,6 +1351,7 @@
               "paidVia",
               "applicants",
               "newApplicants",
+              "notifyUserIds",
               "createdAt",
               "updatedAt"
             ]
@@ -1432,6 +1459,14 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Publish straight away (uses the free period, the plan or a credit)."
+              },
+              "notifyUserIds": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "description": "Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later."
               }
             }
           }
@@ -1517,6 +1552,14 @@
           "requireQualification": {
             "type": "boolean",
             "default": false
+          },
+          "notifyUserIds": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "description": "Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later."
           }
         }
       },
@@ -1743,6 +1786,159 @@
           }
         },
         "required": ["email", "phone"]
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamMember"
+            },
+            "description": "Owners first."
+          },
+          "invites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamInvite"
+            },
+            "description": "Sent and not yet accepted."
+          }
+        },
+        "required": ["members", "invites"]
+      },
+      "TeamMember": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "you": {
+            "type": "boolean"
+          }
+        },
+        "required": ["userId", "name", "email", "role", "joinedAt", "you"]
+      },
+      "SalonRole": {
+        "type": "string",
+        "enum": ["owner", "manager"]
+      },
+      "TeamInvite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "inv_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "email", "role", "expiresAt", "createdAt"]
+      },
+      "NewInvite": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          }
+        },
+        "required": ["email", "role"]
+      },
+      "InviteCancelled": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["cancelled"]
+      },
+      "RoleChange": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          }
+        },
+        "required": ["role"]
+      },
+      "MemberRemoved": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["removed"]
+      },
+      "InvitePreview": {
+        "type": "object",
+        "properties": {
+          "salon": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "suburb": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "suburb", "state"]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          },
+          "invitedBy": {
+            "type": ["string", "null"]
+          },
+          "email": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": ["salon", "role", "invitedBy", "email", "expiresAt"]
       },
       "SalonList": {
         "type": "object",
@@ -2598,9 +2794,13 @@
                 },
                 "path": {
                   "type": "string"
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["owner", "manager"]
                 }
               },
-              "required": ["id", "name", "suburb", "state", "status", "source", "path"]
+              "required": ["id", "name", "suburb", "state", "status", "source", "path", "role"]
             }
           },
           "flags": {
@@ -2871,7 +3071,34 @@
                 "type": ["string", "null"]
               }
             },
-            "required": ["id", "name", "email", "phone", "banned_at"]
+            "required": ["id", "name", "email", "phone", "banned_at"],
+            "description": "Its longest-standing owner."
+          },
+          "team": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": ["string", "null"]
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["owner", "manager"]
+                },
+                "joined_at": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "name", "email", "role", "joined_at"]
+            },
+            "description": "Everyone who manages it (D-11), owners first."
           },
           "jobs": {
             "type": "array",
@@ -2998,6 +3225,7 @@
           "subscription",
           "entitlement",
           "owner",
+          "team",
           "jobs",
           "payments",
           "claims"
@@ -5763,8 +5991,8 @@
     },
     "/admin/v1/salons/{id}/unclaim": {
       "post": {
-        "summary": "Detach a salon's owner",
-        "description": "The salon becomes an unclaimed directory listing, which anyone can claim. The owner's account stays.",
+        "summary": "Detach a salon's team",
+        "description": "Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay.",
         "tags": ["Admin"],
         "parameters": [
           {
@@ -6577,7 +6805,7 @@
     "/admin/v1/claims/{id}/approve": {
       "post": {
         "summary": "Approve a claim",
-        "description": "The claimant becomes the listing's owner, with the launch free period (and founding pricing while places last). Other open claims on it are rejected. An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.",
+        "description": "The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.",
         "tags": ["Admin"],
         "parameters": [
           {
@@ -6637,7 +6865,7 @@
             }
           },
           "409": {
-            "description": "Already decided, or someone else manages the salon",
+            "description": "Already decided",
             "content": {
               "application/problem+json": {
                 "schema": {

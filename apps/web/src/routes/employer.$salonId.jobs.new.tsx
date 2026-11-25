@@ -7,8 +7,9 @@ import { AppLink } from "@/components/app-link";
 import {
   EntitlementSummary,
   JobFields,
+  NotifyFields,
   readJobForm,
-  requireOwnSalon,
+  readNotify,
   SalonStatusBanner,
 } from "@/components/employer";
 import { FormMessage, SubmitButton, useAction } from "@/components/form";
@@ -16,17 +17,20 @@ import { PageHeader } from "@/components/page";
 import { api, unwrap } from "@/lib/api";
 import { privatePage } from "@/lib/seo";
 
-export const Route = createFileRoute("/employer/jobs/new")({
-  beforeLoad: ({ context }) => {
-    requireOwnSalon(context.me);
+export const Route = createFileRoute("/employer/$salonId/jobs/new")({
+  loader: async ({ context, params }) => {
+    const team = await api.GET("/v1/employer/salons/{salonId}/team", {
+      params: { path: { salonId: params.salonId } },
+    });
+    return { salon: context.salon, team: unwrap(team).members };
   },
-  loader: async () => unwrap(await api.GET("/v1/salon")),
   head: () => privatePage("Post a job"),
   component: NewJob,
 });
 
 function NewJob() {
-  const salon = Route.useLoaderData();
+  const { salon, team } = Route.useLoaderData();
+  const salonId = salon.id;
   const navigate = useNavigate();
   const action = useAction();
   /** Which button sent the form. */
@@ -38,6 +42,7 @@ function NewJob() {
         title="Post a job"
         description={
           <EntitlementSummary
+            salonId={salonId}
             entitlement={salon.entitlement}
             freeUntil={salon.freeUntil}
             listingCredits={salon.listingCredits}
@@ -50,18 +55,31 @@ function NewJob() {
           <form
             className="space-y-4"
             onSubmit={action.submit(async (form) => {
-              const body = { ...readJobForm(form), publish: publish.current };
-              const job = unwrap(await api.POST("/v1/salon/jobs", { body }));
+              const body = {
+                ...readJobForm(form),
+                notifyUserIds: readNotify(form),
+                publish: publish.current,
+              };
+              const job = unwrap(
+                await api.POST("/v1/employer/salons/{salonId}/jobs", {
+                  params: { path: { salonId } },
+                  body,
+                }),
+              );
               toast.success(job.status === "published" ? "Your job is live" : "Draft saved");
-              await navigate({ to: "/employer/jobs/$id", params: { id: job.id } });
+              await navigate({
+                to: "/employer/$salonId/jobs/$id",
+                params: { salonId, id: job.id },
+              });
             })}
           >
             <JobFields salon={salon} errors={action.errors} />
+            <NotifyFields team={team} />
             <FormMessage message={action.message}>
               {needsListing && (
                 <>
                   {" "}
-                  <AppLink href="/employer/billing" className="font-medium underline">
+                  <AppLink href={`/employer/${salonId}/billing`} className="font-medium underline">
                     Buy a listing
                   </AppLink>
                   , or save a draft for now.

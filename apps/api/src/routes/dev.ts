@@ -96,7 +96,7 @@ devRoutes.openapi(
     if (payment?.provider !== "mock" || billingOn(c.env)) {
       throw new ApiError("not_found", {
         detail: "No mock checkout with that reference",
-        hint: "Start one with POST /v1/salon/billing/checkout and use the `ref` in its URL.",
+        hint: "Start one with POST /v1/employer/salons/{salonId}/billing/checkout and use the `ref` in its URL.",
       });
     }
     if (c.get("dryRun")) return c.json({ status: outcome }, 200);

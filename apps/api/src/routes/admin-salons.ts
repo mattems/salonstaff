@@ -14,6 +14,7 @@ import {
   DIRECTORY_IMPORT_MAX_ROWS,
   DirectoryImportError,
   DuplicateListingError,
+  isClaimed,
 } from "@salonstaff/db";
 import {
   ApiError,
@@ -154,7 +155,19 @@ const SalonDetail = z
         phone: z.string().nullable(),
         banned_at: z.string().nullable(),
       })
-      .nullable(),
+      .nullable()
+      .openapi({ description: "Its longest-standing owner." }),
+    team: z
+      .array(
+        z.object({
+          id: z.string(),
+          name: z.string(),
+          email: z.string().nullable(),
+          role: z.enum(["owner", "manager"]),
+          joined_at: z.string(),
+        }),
+      )
+      .openapi({ description: "Everyone who manages it (D-11), owners first." }),
     jobs: z.array(SalonJob),
     payments: z.array(Payment),
     claims: z.array(
@@ -199,10 +212,9 @@ function salonJson(row: {
     state: salon.state,
     postcode: salon.postcode,
     path: salonPath(salon),
-    owner:
-      owner?.id && salon.ownerId
-        ? { id: encodeId("user", owner.id), name: owner.name ?? "", email: realEmail(owner.email) }
-        : null,
+    owner: owner?.id
+      ? { id: encodeId("user", owner.id), name: owner.name ?? "", email: realEmail(owner.email) }
+      : null,
     abn: salon.abn,
     abn_status: salon.abnStatus,
     status: salon.status,
@@ -326,6 +338,13 @@ admin.openapi(
               banned_at: iso(owner.suspendedAt),
             }
           : null,
+        team: d.team.map((m) => ({
+          id: encodeId("user", m.userId),
+          name: m.name,
+          email: realEmail(m.email),
+          role: m.role,
+          joined_at: m.joinedAt.toISOString(),
+        })),
         jobs,
         payments: d.payments.map((p) => paymentJson(p, salon)),
         claims: d.claims.map(({ claim, claimant }) => ({
@@ -574,9 +593,9 @@ admin.openapi(
   createRoute({
     method: "post",
     path: `${LIST}/{id}/unclaim`,
-    summary: "Detach a salon's owner",
+    summary: "Detach a salon's team",
     description:
-      "The salon becomes an unclaimed directory listing, which anyone can claim. The owner's account stays.",
+      "Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay.",
     tags: ["Admin"],
     request: { params: IdParams },
     responses: {
@@ -589,13 +608,13 @@ admin.openapi(
   async (c) => {
     const { data, actor } = await requireStaff(c, "salons:moderate");
     const salon = await findSalon(c, data);
-    if (!salon.ownerId) {
+    if (!isClaimed(salon)) {
       throw new ApiError("conflict", {
         detail: "This salon has no owner",
         hint: "It is already an unclaimed directory listing.",
       });
     }
-    const unclaimed = { ...salon, ownerId: null, claimedAt: null, source: "directory" as const };
+    const unclaimed = { ...salon, claimedAt: null, source: "directory" as const };
     if (c.get("dryRun")) return c.json(await salonRow(data, unclaimed), 200);
     return c.json(await salonRow(data, await data.salons.unclaim(salon, actor)), 200);
   },

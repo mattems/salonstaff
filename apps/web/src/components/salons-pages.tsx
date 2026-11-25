@@ -387,6 +387,14 @@ function SalonView({ page }: { page: SalonPage }) {
               </CardContent>
             </Card>
           )}
+          {!page.claimable && (
+            <p className="text-muted-foreground text-xs">
+              Taken over this business?{" "}
+              <AppLink href={`${salon.path}/claim`} className="underline">
+                Claim it
+              </AppLink>
+            </p>
+          )}
         </aside>
       </div>
     </Page>

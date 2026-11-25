@@ -42,7 +42,7 @@ describe("billing", () => {
       entitlement: { via: string };
       prices: { singleListingCents: number; planMonthlyCents: number };
       subscription: unknown;
-    }>("GET", "/v1/salon/billing");
+    }>("GET", owner.at("/billing"));
     expect(billing.status).toBe(200);
     expect(billing.body).toMatchObject({
       billingOn: true,
@@ -51,7 +51,7 @@ describe("billing", () => {
     });
     expect(billing.body.prices.singleListingCents).toBe(4900);
     // Off locally, there's no Stripe portal.
-    expect((await owner.api("POST", "/v1/salon/billing/portal")).status).toBe(404);
+    expect((await owner.api("POST", owner.at("/billing/portal"))).status).toBe(404);
   });
 
   it("only accepts webhooks Stripe signed, and fulfils a checkout once", async () => {
@@ -91,7 +91,7 @@ describe("billing", () => {
       });
       expect(delivered.status).toBe(200);
     }
-    const billing = await owner.api<{ listingCredits: number }>("GET", "/v1/salon/billing");
+    const billing = await owner.api<{ listingCredits: number }>("GET", owner.at("/billing"));
     expect(billing.body.listingCredits).toBe(1);
   });
 });

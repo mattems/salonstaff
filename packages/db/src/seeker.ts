@@ -15,6 +15,7 @@ import { and, asc, count, desc, eq, gt, sql } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, summarise } from "./checks";
 import type { Db } from "./index";
+import { type MySalon, salonsFor } from "./salon";
 import {
   applications,
   jobs,
@@ -27,7 +28,8 @@ import {
   seekerProfiles,
   users,
 } from "./schema";
-import { type JobWithSalon, publicJob, type Salon } from "./visibility";
+import { releaseSalonsOf } from "./team";
+import { type JobWithSalon, publicJob } from "./visibility";
 
 export type User = typeof users.$inferSelect;
 export type SeekerProfile = typeof seekerProfiles.$inferSelect;
@@ -102,8 +104,8 @@ export interface Account {
   user: User;
   profile: SeekerProfile | null;
   checks: CheckSummary;
-  /** The salon they manage, if any. */
-  salon: Salon | null;
+  /** The salons they're on the team of (D-11), in the order they joined. */
+  salons: MySalon[];
 }
 
 export interface MyApplication extends JobWithSalon {
@@ -125,12 +127,12 @@ export function seeker(db: Db, userId: string) {
     async account(): Promise<Account | null> {
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return null;
-      const [profile, checkRows, [salon]] = await Promise.all([
+      const [profile, checkRows, mySalons] = await Promise.all([
         profileRow(),
         db.select().from(seekerChecks).where(eq(seekerChecks.userId, userId)),
-        db.select().from(salons).where(eq(salons.ownerId, userId)).limit(1),
+        salonsFor(db).ofUser(userId),
       ]);
-      return { user, profile, checks: summarise(checkRows), salon: salon ?? null };
+      return { user, profile, checks: summarise(checkRows), salons: mySalons };
     },
 
     profile: () => profileRow(),
@@ -471,44 +473,26 @@ export function seeker(db: Db, userId: string) {
     // ---------- Deleting the account ----------
 
     /**
-     * Permanently deletes the person and everything attached to them. A directory listing they
-     * claimed goes back to being unclaimed; a salon they created is deleted with its jobs.
+     * Permanently deletes the person and everything attached to them. They leave every salon's team;
+     * where they were the last owner, a directory listing they claimed goes back to being unclaimed
+     * and a salon they created is deleted with its jobs.
      * Returns the stored files the caller must delete.
      */
     async deleteAccount(actor: Actor): Promise<{ mediaKeys: string[]; privateKeys: string[] }> {
       return db.transaction(async (tx) => {
         const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
         if (!user) return { mediaKeys: [], privateKeys: [] };
-        const [profile, portfolio, checkRows, owned] = await Promise.all([
+        const [profile, portfolio, checkRows] = await Promise.all([
           profileRow(tx),
           tx.select().from(portfolioItems).where(eq(portfolioItems.userId, userId)),
           tx.select().from(seekerChecks).where(eq(seekerChecks.userId, userId)),
-          tx.select().from(salons).where(eq(salons.ownerId, userId)),
         ]);
-        const created = owned.filter((s) => s.source === "owner");
-        const claimed = owned.filter((s) => s.source === "directory");
-        for (const salon of claimed) {
-          await tx
-            .update(salons)
-            .set({ ownerId: null, claimedAt: null })
-            .where(eq(salons.id, salon.id));
-          await recordAudit(tx, actor, {
-            action: "salon.unclaimed",
-            targetType: "salon",
-            targetId: salon.id,
-            reason: "The owner deleted their account",
-          });
-        }
-        for (const salon of created) {
-          await tx.delete(salons).where(eq(salons.id, salon.id));
-          await recordAudit(tx, actor, {
-            action: "salon.deleted",
-            targetType: "salon",
-            targetId: salon.id,
-            before: { name: salon.name },
-            reason: "The owner deleted their account",
-          });
-        }
+        const { deleted: created } = await releaseSalonsOf(
+          tx,
+          userId,
+          actor,
+          "The owner deleted their account",
+        );
         await tx.delete(users).where(eq(users.id, userId));
         await recordAudit(tx, actor, {
           action: "user.deleted",

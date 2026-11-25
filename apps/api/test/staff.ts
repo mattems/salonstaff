@@ -162,6 +162,8 @@ export async function seedSalon(
   values: Partial<typeof schema.salons.$inferInsert> = {},
 ): Promise<typeof schema.salons.$inferSelect> {
   const t = tag();
+  // `ownerId` here means "on the team as its owner" (D-11): the column itself is no longer used.
+  const { ownerId, ...rest } = values;
   const [row] = await withDb((db) =>
     db
       .insert(schema.salons)
@@ -172,11 +174,17 @@ export async function seedSalon(
         suburbSlug: `suburb-${t}`,
         state: "NSW",
         postcode: "2000",
-        ...values,
+        ...rest,
       })
       .returning(),
   );
-  return row as typeof schema.salons.$inferSelect;
+  const salon = row as typeof schema.salons.$inferSelect;
+  if (ownerId) {
+    await withDb((db) =>
+      db.insert(schema.salonMembers).values({ salonId: salon.id, userId: ownerId, role: "owner" }),
+    );
+  }
+  return salon;
 }
 
 export async function seedJob(

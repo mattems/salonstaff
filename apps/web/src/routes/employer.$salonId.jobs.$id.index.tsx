@@ -12,20 +12,16 @@ import { createFileRoute, Link, notFound, useRouter } from "@tanstack/react-rout
 import { useState } from "react";
 import { toast } from "sonner";
 import { AppLink } from "@/components/app-link";
-import { requireOwnSalon } from "@/components/employer";
 import { selectClass } from "@/components/form";
 import { EmptyState, Notice, PageHeader, Section } from "@/components/page";
 import { ApiProblem, api, errorMessage, type Schemas, unwrap } from "@/lib/api";
 import { employmentLabel, formatDate, rightToWorkLabel, roleLabel } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
-export const Route = createFileRoute("/employer/jobs/$id/")({
-  beforeLoad: ({ context }) => {
-    requireOwnSalon(context.me);
-  },
+export const Route = createFileRoute("/employer/$salonId/jobs/$id/")({
   loader: async ({ params }) => {
-    const result = await api.GET("/v1/salon/jobs/{id}/applicants", {
-      params: { path: { id: params.id } },
+    const result = await api.GET("/v1/employer/salons/{salonId}/jobs/{id}/applicants", {
+      params: { path: { salonId: params.salonId, id: params.id } },
     });
     if (result.response.status === 404) throw notFound();
     return unwrap(result);
@@ -83,17 +79,18 @@ function JobPage() {
 
 function JobActions({ job }: { job: Schemas["SalonJob"] }) {
   const router = useRouter();
+  const { salonId } = Route.useParams();
   const [pending, setPending] = useState(false);
   const [problem, setProblem] = useState<ApiProblem | null>(null);
   async function act(kind: "publish" | "close") {
     setPending(true);
     setProblem(null);
     try {
-      const options = { params: { path: { id: job.id } } };
+      const options = { params: { path: { salonId, id: job.id } } };
       unwrap(
         kind === "publish"
-          ? await api.POST("/v1/salon/jobs/{id}/publish", options)
-          : await api.POST("/v1/salon/jobs/{id}/close", options),
+          ? await api.POST("/v1/employer/salons/{salonId}/jobs/{id}/publish", options)
+          : await api.POST("/v1/employer/salons/{salonId}/jobs/{id}/close", options),
       );
       toast.success(kind === "publish" ? "Your job is live" : "Job closed");
       await router.invalidate();
@@ -118,7 +115,7 @@ function JobActions({ job }: { job: Schemas["SalonJob"] }) {
           </Button>
         )}
         <Button asChild variant="outline">
-          <Link to="/employer/jobs/$id/edit" params={{ id: job.id }}>
+          <Link to="/employer/$salonId/jobs/$id/edit" params={{ salonId, id: job.id }}>
             Edit
           </Link>
         </Button>
@@ -134,7 +131,7 @@ function JobActions({ job }: { job: Schemas["SalonJob"] }) {
           {problem.code === "listing_needed" && (
             <>
               {" "}
-              <AppLink href="/employer/billing" className="underline">
+              <AppLink href={`/employer/${salonId}/billing`} className="underline">
                 Go to billing
               </AppLink>
             </>
@@ -147,6 +144,7 @@ function JobActions({ job }: { job: Schemas["SalonJob"] }) {
 
 function ApplicantCard({ applicant }: { applicant: Schemas["Applicant"] }) {
   const router = useRouter();
+  const { salonId } = Route.useParams();
   const [status, setStatus] = useState(applicant.status);
   const [pending, setPending] = useState(false);
   const person = applicant.candidate;
@@ -157,8 +155,8 @@ function ApplicantCard({ applicant }: { applicant: Schemas["Applicant"] }) {
     setPending(true);
     try {
       unwrap(
-        await api.PATCH("/v1/salon/applications/{id}", {
-          params: { path: { id: applicant.id } },
+        await api.PATCH("/v1/employer/salons/{salonId}/applications/{id}", {
+          params: { path: { salonId, id: applicant.id } },
           body: { status: next },
         }),
       );
@@ -177,8 +175,8 @@ function ApplicantCard({ applicant }: { applicant: Schemas["Applicant"] }) {
         <CardTitle className="flex flex-wrap items-center gap-2">
           {person ? (
             <Link
-              to="/employer/candidates/$id"
-              params={{ id: applicant.candidateId }}
+              to="/employer/$salonId/candidates/$id"
+              params={{ salonId, id: applicant.candidateId }}
               className="hover:underline"
             >
               {person.firstName} {person.lastName}
@@ -222,7 +220,10 @@ function ApplicantCard({ applicant }: { applicant: Schemas["Applicant"] }) {
           <span className="text-muted-foreground">Applied {formatDate(applicant.createdAt)}</span>
           {person && (
             <Button asChild size="sm" variant="outline" className="ml-auto">
-              <Link to="/employer/candidates/$id" params={{ id: applicant.candidateId }}>
+              <Link
+                to="/employer/$salonId/candidates/$id"
+                params={{ salonId, id: applicant.candidateId }}
+              >
                 Full profile
               </Link>
             </Button>

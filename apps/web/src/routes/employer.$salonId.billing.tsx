@@ -15,8 +15,8 @@ import {
   TableHeader,
   TableRow,
 } from "@salonstaff/ui/components/table";
-import { createFileRoute } from "@tanstack/react-router";
-import { EntitlementSummary, requireOwnSalon } from "@/components/employer";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { EntitlementSummary } from "@/components/employer";
 import { FormMessage, useAction } from "@/components/form";
 import { Notice, PageHeader } from "@/components/page";
 import { api, unwrap } from "@/lib/api";
@@ -27,15 +27,22 @@ interface BillingSearch {
   status?: "success" | "cancelled" | undefined;
 }
 
-export const Route = createFileRoute("/employer/billing")({
+export const Route = createFileRoute("/employer/$salonId/billing")({
   validateSearch: (search: Record<string, unknown>): BillingSearch => ({
     status:
       search.status === "success" || search.status === "cancelled" ? search.status : undefined,
   }),
-  beforeLoad: ({ context }) => {
-    requireOwnSalon(context.me);
+  beforeLoad: ({ context, params }) => {
+    if (context.salon.role !== "owner") {
+      throw redirect({ to: "/employer/$salonId", params: { salonId: params.salonId } });
+    }
   },
-  loader: async () => unwrap(await api.GET("/v1/salon/billing")),
+  loader: async ({ params }) =>
+    unwrap(
+      await api.GET("/v1/employer/salons/{salonId}/billing", {
+        params: { path: { salonId: params.salonId } },
+      }),
+    ),
   head: () => privatePage("Billing"),
   component: Billing,
 });
@@ -50,6 +57,8 @@ const PAYMENT = { pending: "Pending", paid: "Paid", failed: "Failed" } as const;
 
 function Billing() {
   const billing = Route.useLoaderData();
+  const { salonId } = Route.useParams();
+  const path = { params: { path: { salonId } } };
   const { status } = Route.useSearch();
   const action = useAction();
   const subscribed = billing.subscription?.active ?? false;
@@ -60,8 +69,16 @@ function Billing() {
       window.location.href = url;
     });
   const checkout = (kind: "single_listing" | "salon_plan") =>
-    go(async () => unwrap(await api.POST("/v1/salon/billing/checkout", { body: { kind } })));
-  const portal = () => go(async () => unwrap(await api.POST("/v1/salon/billing/portal")));
+    go(async () =>
+      unwrap(
+        await api.POST("/v1/employer/salons/{salonId}/billing/checkout", {
+          ...path,
+          body: { kind },
+        }),
+      ),
+    );
+  const portal = () =>
+    go(async () => unwrap(await api.POST("/v1/employer/salons/{salonId}/billing/portal", path)));
 
   return (
     <div className="space-y-6">
@@ -69,6 +86,7 @@ function Billing() {
         title="Billing"
         description={
           <EntitlementSummary
+            salonId={salonId}
             entitlement={billing.entitlement}
             freeUntil={billing.freeUntil}
             listingCredits={billing.listingCredits}

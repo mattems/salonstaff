@@ -186,7 +186,7 @@ function Actions({ detail }: { detail: UserDetail }) {
             label="Delete account"
             destructive
             title="Delete this account permanently"
-            description="Removes their account, profile, pictures, applications and checks. A salon they made is deleted with its jobs; a directory listing they claimed goes back to unclaimed. This can't be undone. Asks for your passkey."
+            description="Removes their account, profile, pictures, applications and checks. Where they were the last owner, a salon they made is deleted with its jobs and a directory listing they claimed goes back to unclaimed. This can't be undone. Asks for your passkey."
             reason={{
               label: "Reason (optional)",
               placeholder: "e.g. asked us to delete it",
@@ -283,7 +283,7 @@ export function UserPage() {
           <Flags detail={d} canFlag={can(me, "users:flag")} />
 
           {d.salons.length > 0 ? (
-            <Section title="Salon">
+            <Section title={d.salons.length === 1 ? "Salon" : "Salons"}>
               <ul className="divide-y">
                 {d.salons.map((salon) => (
                   <li key={salon.id} className="flex flex-wrap items-center gap-2 p-4 text-sm">
@@ -300,6 +300,7 @@ export function UserPage() {
                     {salon.status !== "active" ? (
                       <Badge variant="destructive">{humanize(salon.status)}</Badge>
                     ) : null}
+                    <Badge variant="outline">{salon.role === "owner" ? "Owner" : "Manager"}</Badge>
                     {salon.source === "directory" ? (
                       <Badge variant="outline">Claimed listing</Badge>
                     ) : null}

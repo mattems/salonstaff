@@ -8,7 +8,7 @@ import { type BackOffice, checks, claims } from "@salonstaff/db";
 import { ApiError, encodeId, salonPath } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
-import { appUrl, notify } from "../lib/notify";
+import { appUrl, notify, tellOwnersAboutClaim } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { decodeCursor, PaginationQuery } from "../lib/pagination";
 import { requireStaff } from "../lib/staff-context";
@@ -301,7 +301,7 @@ function claimJson(row: ClaimRow) {
       email: salon.email,
       phone: salon.phone,
       path: salonPath(salon),
-      has_owner: salon.ownerId !== null,
+      has_owner: salon.hasOwner,
     },
     claimant: {
       id: encodeId("user", claimant.id),
@@ -355,14 +355,14 @@ admin.openapi(
     path: `${CLAIMS}/{id}/approve`,
     summary: "Approve a claim",
     description:
-      "The claimant becomes the listing's owner, with the launch free period (and founding pricing while places last). Other open claims on it are rejected. An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.",
+      "The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.",
     tags: ["Admin"],
     request: { params: IdParams, body: body(z.object({ note: Note.optional() })) },
     responses: {
       200: ok(Claim, "The claim, approved"),
       ...errors,
       ...notFound,
-      409: problemResponse("Already decided, or someone else manages the salon"),
+      409: problemResponse("Already decided"),
     },
   }),
   async (c) => {
@@ -377,8 +377,9 @@ admin.openapi(
       title: `Your claim for ${decided.salon.name} was approved`,
       body: "You can now update the listing and post jobs.",
       action: "Open your salon",
-      url: appUrl(c, "/employer"),
+      url: appUrl(c, `/employer/${encodeId("salon", decided.salon.id)}`),
     });
+    tellOwnersAboutClaim(c, decided.otherOwners, decided.salon, decided.claim.contactName);
     return c.json(claimJson((await findClaim(c, data)) ?? row), 200);
   },
 );

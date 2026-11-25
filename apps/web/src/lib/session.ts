@@ -46,15 +46,20 @@ export function requireSignedIn(me: Me | null, here: string, as?: "employer"): M
   return me;
 }
 
-/** Pages that complete a claim: someone coming back to one shouldn't be sent elsewhere. */
+/**
+ * Pages that complete a claim or accept a team invite: someone coming back to one shouldn't be
+ * sent elsewhere.
+ */
 export const isClaimPath = (path: string) =>
-  path.startsWith("/claim/") || /^\/salons\/[^/]+\/[^/]+\/[^/]+\/claim(?:$|\?)/.test(path);
+  path.startsWith("/claim/") ||
+  path.startsWith("/invite") ||
+  /^\/salons\/[^/]+\/[^/]+\/[^/]+\/claim(?:$|\?)/.test(path);
 
 /** Where to go once signed in (D-02 flows). */
 export function landingAfterSignIn(me: Me, next: string | undefined, as?: string): string {
   if (next && isClaimPath(next)) return next;
   if (me.role === "employer" || as === "employer") {
-    if (!me.salon) return "/employer/onboarding";
+    if (me.salons.length === 0) return "/employer/onboarding";
     return next ?? "/employer";
   }
   if (!me.profile) return next ? `/account?next=${encodeURIComponent(next)}` : "/account";

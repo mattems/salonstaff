@@ -40,6 +40,7 @@ import {
   portfolioItems,
   type SalonStatus,
   salonClaims,
+  salonMembers,
   salons,
   seekerChecks,
   seekerProfiles,
@@ -49,6 +50,8 @@ import {
   users,
 } from "./schema";
 import { staffOffice } from "./staff-office";
+import { releaseSalonsOf, salonTeam, unclaimSalon } from "./team";
+import { claimed, unclaimed } from "./visibility";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -259,12 +262,27 @@ async function existingListings(tx: Executor, inputs: ListingInput[]) {
   return found;
 }
 
+/** For a query on `salons`: the ID of the salon's longest-standing owner. */
+const firstOwnerId = sql`(select m.user_id from salon_members m where m.salon_id = ${salons.id} and m.role = 'owner' order by m.created_at limit 1)`;
+
 // ---------------------------------------------------------------------------
 
 export function backOffice(db: Db) {
   async function userById(id: string): Promise<AdminUser | null> {
     const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1);
     return row ?? null;
+  }
+
+  /** The salon's longest-standing owner, shown as "the owner" in lists (D-11). */
+  async function firstOwnerOf(salonId: string): Promise<AdminUser | null> {
+    const [row] = await db
+      .select({ user: users })
+      .from(salonMembers)
+      .innerJoin(users, eq(users.id, salonMembers.userId))
+      .where(and(eq(salonMembers.salonId, salonId), eq(salonMembers.role, "owner")))
+      .orderBy(salonMembers.createdAt)
+      .limit(1);
+    return row?.user ?? null;
   }
 
   async function salonById(id: string): Promise<AdminSalon | null> {
@@ -327,7 +345,7 @@ export function backOffice(db: Db) {
         ),
         one(db.select({ n: count() }).from(users).where(eq(users.role, "employer"))),
         one(db.select({ n: count() }).from(salons)),
-        one(db.select({ n: count() }).from(salons).where(isNotNull(salons.ownerId))),
+        one(db.select({ n: count() }).from(salons).where(claimed())),
         one(db.select({ n: count() }).from(jobs).where(live())),
         one(db.select({ n: count() }).from(applications)),
         one(db.select({ n: count() }).from(applications).where(gt(applications.createdAt, week))),
@@ -483,7 +501,12 @@ export function backOffice(db: Db) {
             .innerJoin(salons, eq(salons.id, jobs.salonId))
             .where(eq(applications.seekerId, id))
             .orderBy(desc(applications.createdAt)),
-          db.select().from(salons).where(eq(salons.ownerId, id)).orderBy(salons.createdAt),
+          db
+            .select({ salon: salons, role: salonMembers.role })
+            .from(salonMembers)
+            .innerJoin(salons, eq(salons.id, salonMembers.salonId))
+            .where(eq(salonMembers.userId, id))
+            .orderBy(salonMembers.createdAt),
           db
             .select()
             .from(userFlags)
@@ -644,29 +667,12 @@ export function backOffice(db: Db) {
             .select({ key: seekerChecks.documentKey })
             .from(seekerChecks)
             .where(and(eq(seekerChecks.userId, user.id), isNotNull(seekerChecks.documentKey)));
-          const owned = await tx.select().from(salons).where(eq(salons.ownerId, user.id));
-          const made = owned.filter((s) => s.source === "owner");
-          const claimed = owned.filter((s) => s.source === "directory");
-
-          if (made.length) {
-            await tx.delete(salons).where(
-              inArray(
-                salons.id,
-                made.map((s) => s.id),
-              ),
-            );
-          }
-          if (claimed.length) {
-            await tx
-              .update(salons)
-              .set({ ownerId: null, claimedAt: null })
-              .where(
-                inArray(
-                  salons.id,
-                  claimed.map((s) => s.id),
-                ),
-              );
-          }
+          const { deleted: made, unclaimed: claimedListings } = await releaseSalonsOf(
+            tx,
+            user.id,
+            actor,
+            "Their owner's account was deleted by staff",
+          );
           await tx.delete(users).where(eq(users.id, user.id));
           await recordAudit(tx, actor, {
             action: "user.deleted",
@@ -675,7 +681,7 @@ export function backOffice(db: Db) {
             before: { name: user.name, email: user.email, role: user.role },
             after: {
               salons_deleted: made.map((s) => s.id),
-              listings_unclaimed: claimed.map((s) => s.id),
+              listings_unclaimed: claimedListings.map((s) => s.id),
             },
             reason,
           });
@@ -712,17 +718,13 @@ export function backOffice(db: Db) {
           options.before ? lt(salons.id, options.before) : undefined,
           options.abnStatus ? eq(salons.abnStatus, options.abnStatus) : undefined,
           options.status ? eq(salons.status, options.status) : undefined,
-          options.claimed === undefined
-            ? undefined
-            : options.claimed
-              ? isNotNull(salons.ownerId)
-              : isNull(salons.ownerId),
+          options.claimed === undefined ? undefined : options.claimed ? claimed() : unclaimed(),
           q
             ? or(
                 ilike(salons.name, contains(q)),
                 ilike(salons.suburb, contains(q)),
                 ilike(salons.abn, contains(q.replace(/\s+/g, ""))),
-                ilike(users.email, contains(q)),
+                sql`exists (select 1 from salon_members m join users u on u.id = m.user_id where m.salon_id = ${salons.id} and u.email ilike ${contains(q)})`,
               )
             : undefined,
         );
@@ -733,16 +735,16 @@ export function backOffice(db: Db) {
             liveJobs: liveJobCount,
           })
           .from(salons)
-          .leftJoin(users, eq(users.id, salons.ownerId))
+          .leftJoin(users, eq(users.id, firstOwnerId))
           .where(where)
           .orderBy(desc(salons.id))
           .limit(options.limit);
       },
 
-      /** The owner and live job count shown beside a salon in the list. */
+      /** The first owner and live job count shown beside a salon in the list. */
       async summary(salon: AdminSalon) {
         const [owner, [liveRow]] = await Promise.all([
-          salon.ownerId ? userById(salon.ownerId) : Promise.resolve(null),
+          firstOwnerOf(salon.id),
           db
             .select({ n: count() })
             .from(jobs)
@@ -758,8 +760,9 @@ export function backOffice(db: Db) {
       async detail(id: string) {
         const salon = await salonById(id);
         if (!salon) return null;
-        const [owner, salonJobs, salonPayments, claims] = await Promise.all([
-          salon.ownerId ? userById(salon.ownerId) : Promise.resolve(null),
+        const [owner, team, salonJobs, salonPayments, claims] = await Promise.all([
+          firstOwnerOf(id),
+          salonTeam(db, id).members(),
           db
             .select({ job: jobs, applicants: applicantCount })
             .from(jobs)
@@ -780,7 +783,7 @@ export function backOffice(db: Db) {
             .where(eq(salonClaims.salonId, id))
             .orderBy(desc(salonClaims.createdAt)),
         ]);
-        return { salon, owner, jobs: salonJobs, payments: salonPayments, claims };
+        return { salon, owner, team, jobs: salonJobs, payments: salonPayments, claims };
       },
 
       /**
@@ -827,7 +830,6 @@ export function backOffice(db: Db) {
               name: salon.name,
               suburb: salon.suburb,
               state: salon.state,
-              owner: salon.ownerId,
             },
             reason,
           });
@@ -940,19 +942,22 @@ export function backOffice(db: Db) {
         return (await salonScope(db, salon.id).update(changes, null, actor)) as AdminSalon;
       },
 
-      /** Detaches the owner: the salon becomes an unclaimed directory listing anyone can claim. */
+      /**
+       * Detaches the whole team (owners and managers): the salon becomes an unclaimed directory
+       * listing anyone can claim.
+       */
       async unclaim(salon: AdminSalon, actor: Actor): Promise<AdminSalon> {
         return db.transaction(async (tx) => {
-          const [row] = await tx
-            .update(salons)
-            .set({ ownerId: null, claimedAt: null, source: "directory" })
-            .where(eq(salons.id, salon.id))
-            .returning();
+          const team = await tx
+            .select({ userId: salonMembers.userId, role: salonMembers.role })
+            .from(salonMembers)
+            .where(eq(salonMembers.salonId, salon.id));
+          const row = await unclaimSalon(tx, salon.id);
           await recordAudit(tx, actor, {
             action: "salon.unclaimed",
             targetType: "salon",
             targetId: salon.id,
-            before: { owner: salon.ownerId, source: salon.source },
+            before: { team, source: salon.source },
           });
           return row as AdminSalon;
         });
@@ -1259,7 +1264,7 @@ export function backOffice(db: Db) {
               abn: salons.abn,
               email: salons.email,
               phone: salons.phone,
-              ownerId: salons.ownerId,
+              hasOwner: sql<boolean>`${claimed()}`,
               slug: salons.slug,
               suburbSlug: salons.suburbSlug,
             },

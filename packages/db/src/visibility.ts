@@ -2,17 +2,34 @@
  * What the public may see. Shared by the scopes so that "live" means the same thing everywhere:
  * the feed, salon pages, the sitemap, applying and saving.
  */
-import { and, eq, gt, isNull, or, type SQL, sql } from "drizzle-orm";
+import { and, eq, gt, isNotNull, isNull, or, type SQL, sql } from "drizzle-orm";
 import { jobs, salons } from "./schema";
 
-/** The salon is active and, if it has an owner, the owner isn't banned. Needs `salons` in the query. */
+/**
+ * A salon is claimed when its owner made it or claimed it, and it then has at least one owner
+ * (D-11): the last owner can't leave, and a salon whose last owner goes is deleted or unclaimed.
+ */
+export const isClaimed = (salon: Pick<Salon, "source" | "claimedAt">) =>
+  salon.source === "owner" || salon.claimedAt !== null;
+
+/** `isClaimed` for the salon in the current row of `salons`. */
+export const claimed = (): SQL =>
+  or(eq(salons.source, "owner"), isNotNull(salons.claimedAt)) as SQL;
+
+/** Nobody manages the salon in the current row of `salons`: an unclaimed directory listing. */
+export const unclaimed = (): SQL =>
+  and(eq(salons.source, "directory"), isNull(salons.claimedAt)) as SQL;
+
+/**
+ * The salon is active and, if it has owners, not all of them are banned. Needs `salons` in the query.
+ */
 export const visibleSalon = (): SQL =>
   and(
     eq(salons.status, "active"),
     or(
-      isNull(salons.ownerId),
       // Written out in full: Drizzle leaves the table off a column in a one-table query.
-      sql`not exists (select 1 from users u where u.id = "salons"."owner_id" and u.suspended_at is not null)`,
+      sql`not exists (select 1 from salon_members m where m.salon_id = "salons"."id" and m.role = 'owner')`,
+      sql`exists (select 1 from salon_members m join users u on u.id = m.user_id where m.salon_id = "salons"."id" and m.role = 'owner' and u.suspended_at is null)`,
     ),
   ) as SQL;
 

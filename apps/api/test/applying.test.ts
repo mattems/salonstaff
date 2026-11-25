@@ -121,7 +121,7 @@ describe("applying for a job", () => {
     const app = createTestApp();
     const { owner } = await salonOwner(app);
     const job = await postJob(owner);
-    expect((await owner.api("POST", `/v1/salon/jobs/${job.id}/close`)).status).toBe(200);
+    expect((await owner.api("POST", owner.at(`/jobs/${job.id}/close`))).status).toBe(200);
     const seeker = await readySeeker(app);
     expect((await seeker.api("POST", `/v1/jobs/${job.id}/apply`, {})).status).toBe(404);
     expect(
@@ -164,7 +164,7 @@ describe("saving jobs", () => {
       (await seeker.api<JobAd>("GET", `/v1/jobs/by-path?path=${job.path}`)).body.viewer?.saved,
     ).toBe(true);
 
-    await owner.api("POST", `/v1/salon/jobs/${job.id}/close`);
+    await owner.api("POST", owner.at(`/jobs/${job.id}/close`));
     const after = await seeker.api<{ items: { closed: boolean }[] }>("GET", "/v1/me/saved");
     expect(after.body.items[0]?.closed).toBe(true);
 

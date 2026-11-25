@@ -58,7 +58,7 @@ export const meRoutes = createRouter();
 const TAGS = ["Me"];
 
 function meJson(c: Context<AppEnv>, account: Account) {
-  const { user, profile, checks, salon } = account;
+  const { user, profile, checks, salons } = account;
   return {
     id: encodeId("user", user.id),
     name: user.name,
@@ -68,14 +68,13 @@ function meJson(c: Context<AppEnv>, account: Account) {
     createdAt: user.createdAt.toISOString(),
     profile: profile ? profileJson(c.env, profile) : null,
     verification: verificationJson(checks),
-    salon: salon
-      ? {
-          id: encodeId("salon", salon.id),
-          name: salon.name,
-          path: salonPath(salon),
-          status: salon.status,
-        }
-      : null,
+    salons: salons.map(({ salon, role }) => ({
+      id: encodeId("salon", salon.id),
+      name: salon.name,
+      path: salonPath(salon),
+      status: salon.status,
+      role,
+    })),
   };
 }
 
@@ -104,7 +103,7 @@ meRoutes.openapi(
     path: "/v1/me",
     summary: "Who you are",
     description:
-      "Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salon you manage (if any).",
+      "Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salons you manage.",
     tags: TAGS,
     responses: { 200: json(MeSchema, "Your account"), 401: errors[401] },
   }),
