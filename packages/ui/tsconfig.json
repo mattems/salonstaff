@@ -1,0 +1,11 @@
+{
+  "extends": "@salonstaff/config/tsconfig.base.json",
+  "compilerOptions": {
+    // shadcn/ui components are written without this stricter setting.
+    "exactOptionalPropertyTypes": false,
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "paths": { "@salonstaff/ui/*": ["./src/*"] }
+  },
+  "include": ["src"]
+}

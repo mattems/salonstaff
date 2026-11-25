@@ -1,0 +1,32 @@
+# Local development services. Started by `bun run setup` and `bun dev`.
+# Ports differ from kaybee's and uptime's so all three can run side by side.
+name: salonstaff
+
+services:
+  postgres:
+    # Same major version as PlanetScale Postgres.
+    image: postgres:18
+    environment:
+      POSTGRES_USER: salonstaff
+      POSTGRES_PASSWORD: salonstaff
+      POSTGRES_DB: salonstaff
+    ports:
+      - "${POSTGRES_PORT:-54349}:5432"
+    volumes:
+      # Postgres 18 images keep their data under /var/lib/postgresql/<version>.
+      - postgres18-data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U salonstaff -d salonstaff"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  mailpit:
+    # Catches every email (and, locally, every SMS code) the app sends. Inbox at http://localhost:8036
+    image: axllent/mailpit:latest
+    ports:
+      - "8036:8025"
+      - "1036:1025"
+
+volumes:
+  postgres18-data:

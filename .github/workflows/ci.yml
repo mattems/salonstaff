@@ -1,0 +1,123 @@
+name: CI
+
+# A deploy workflow can call this one before it deploys, once there is one.
+#
+# On pull requests it is paused to save Actions minutes, the secret scan too: `bun run ci` runs
+# the same checks locally. To run it on pull requests again,
+# with no change to this file:
+#   gh variable set RUN_CI_ON_PULL_REQUESTS --body true
+# and to pause it again: gh variable delete RUN_CI_ON_PULL_REQUESTS
+# A merge to main never runs it: the commits were checked on the pull request or locally.
+on:
+  pull_request:
+  workflow_call:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  # A newer push to a pull request replaces the older run.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  # A pull request that only touches documentation skips the tests.
+  changes:
+    name: What changed
+    if: github.event_name != 'pull_request' || vars.RUN_CI_ON_PULL_REQUESTS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - id: diff
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Before a deploy there is no pull request to compare with: check everything.
+          if [ -z "$BASE" ]; then code=true; else code=$(./scripts/changed-code.sh "$BASE" "$GITHUB_SHA"); fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          if [ "$code" = "true" ]; then
+            echo "Code changed: running everything."
+          else
+            echo "::notice::Only documentation or the springboard changed: tests are skipped."
+          fi
+
+  check:
+    name: Lint, typecheck, test
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      DATABASE_URL: postgres://salonstaff:salonstaff@localhost:54349/salonstaff
+    services:
+      postgres:
+        # Same image and credentials as docker-compose.yml.
+        image: postgres:18
+        env:
+          POSTGRES_USER: salonstaff
+          POSTGRES_PASSWORD: salonstaff
+          POSTGRES_DB: salonstaff
+        ports:
+          - 54349:5432
+        options: >-
+          --health-cmd "pg_isready -U salonstaff -d salonstaff"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: package.json
+      - run: bun install --frozen-lockfile
+      # The Workers' tests read each app's .dev.vars, which is not committed.
+      - run: bun scripts/dev-vars.ts
+      - run: bun run lint
+      - run: bun run typecheck
+      # Two test tasks at a time: the Workers' suites each boot their own Workers runtime, and on
+      # a four-core runner running every package at once only slows them.
+      - run: bun run test -- --concurrency 2
+      - name: Web apps build
+        run: |
+          bun run --cwd apps/web build
+          bun run --cwd apps/admin build
+      - name: API types match the API
+        run: |
+          bun run api:types
+          if [ -n "$(git status --porcelain apps/web/src/lib/api apps/admin/src/lib/api)" ]; then
+            echo "::error::The API changed without regenerating the web apps' types. Run 'bun run api:types' and commit the result."
+            git status --short apps/web/src/lib/api apps/admin/src/lib/api
+            exit 1
+          fi
+      - name: Migrations match the schema
+        working-directory: packages/db
+        run: |
+          bunx drizzle-kit generate
+          if [ -n "$(git status --porcelain migrations)" ]; then
+            echo "::error::The schema changed without a migration. Run 'bun run db:generate' and commit the result."
+            git status --short migrations
+            exit 1
+          fi
+
+  secrets:
+    name: Secret scan
+    if: github.event_name != 'pull_request' || vars.RUN_CI_ON_PULL_REQUESTS == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The whole history: a secret removed in a later commit is still leaked.
+          fetch-depth: 0
+      - name: Scan every commit for secrets
+        run: >-
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.30.1
+          git /repo --redact --no-banner -c /repo/.gitleaks.toml

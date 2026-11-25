@@ -1,0 +1,24 @@
+node_modules/
+dist/
+.turbo/
+.wrangler/
+.tanstack/
+.output/
+.vinxi/
+.env
+.env.*
+!.env.example
+# Each Worker's local secrets: copied from .dev.vars.example by `bun run setup`, never committed.
+.dev.vars
+# The web apps' env files hold only public settings (addresses), so they are committed.
+!apps/web/.env
+!apps/admin/.env
+!apps/admin/.env.production
+.DS_Store
+*.log
+coverage/
+test-results/
+playwright-report/
+*.tsbuildinfo
+*.bun-build
+# The parked Expo app keeps its own ignores (apps/mobile/.gitignore).

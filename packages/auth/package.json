@@ -1,0 +1,22 @@
+{
+  "name": "@salonstaff/auth",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@salonstaff/db": "workspace:*",
+    "@salonstaff/shared": "workspace:*",
+    "better-auth": "1.7.28",
+    "zod": "^4.6.7",
+    "jose": "^6.2.18"
+  },
+  "devDependencies": {
+    "@salonstaff/config": "workspace:*"
+  }
+}

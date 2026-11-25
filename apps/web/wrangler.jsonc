@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The website: TanStack Start, server-rendered on this Worker (src/server.ts). It forwards
+  // /api/* to the API Worker over the API service binding (src/routes/api.$.ts), so the session
+  // cookie belongs to this hostname only. Locally, without the binding, it calls the API at
+  // http://localhost:8890 (src/lib/upstream.ts).
+  // The settings at the top are local; `env.production` holds the deployed ones. Build for
+  // production with CLOUDFLARE_ENV=production (the Vite plugin picks the environment at build time).
+  "name": "salonstaff-web",
+  "main": "src/server.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": { "enabled": true },
+  "upload_source_maps": true,
+  "workers_dev": false,
+  "preview_urls": false,
+  "services": [{ "binding": "API", "service": "salonstaff-api" }],
+
+  "env": {
+    "production": {
+      "name": "salonstaff-web",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "salonstaff.com.au", "custom_domain": true }],
+      // Next to the API and the database (see apps/api/wrangler.jsonc).
+      "placement": { "region": "aws:ap-southeast-2" },
+      "services": [{ "binding": "API", "service": "salonstaff-api" }]
+    }
+  }
+}

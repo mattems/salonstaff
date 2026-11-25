@@ -1,0 +1,32 @@
+# Local values. `bun run setup` and `bun dev` copy this file to .dev.vars when it's missing;
+# .dev.vars is ignored by git, so a real value put there can never be committed.
+# Deployed, each secret is set with `wrangler secret put <NAME> --env production`.
+
+# Turns on what exists only locally (dev login, the staff picker, mock identity check and checkout).
+ENVIRONMENT=local
+AUTH_SECRET=local-only-secret-not-for-production-1234567890
+# Mailpit's HTTP API: every email, and every SMS code, lands at http://localhost:8036
+MAILPIT_URL=http://localhost:8036
+
+# Australian Business Register lookup (free from abr.business.gov.au). Without it ABNs are only
+# checksum-checked and wait for staff to verify.
+ABR_GUID=
+
+# Google / Apple sign-in. Without them those buttons say they're not set up yet.
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+APPLE_CLIENT_ID=
+APPLE_TEAM_ID=
+APPLE_KEY_ID=
+APPLE_PRIVATE_KEY=
+APPLE_BUNDLE_ID=au.com.salonstaff.app
+
+# Twilio: without it, SMS codes go to Mailpit.
+TWILIO_ACCOUNT_SID=
+TWILIO_AUTH_TOKEN=
+TWILIO_FROM=
+
+# Billing stays off (mock checkout) until these are a Stripe sandbox's keys and BILLING=on.
+# BILLING=
+# STRIPE_SECRET_KEY=
+# STRIPE_WEBHOOK_SECRET=

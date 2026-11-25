@@ -1,0 +1,39 @@
+{
+  "name": "salonstaff",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/api",
+    "apps/web",
+    "apps/admin",
+    "apps/springboard",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=26"
+  },
+  "scripts": {
+    "setup": "bun install && bun scripts/setup.ts",
+    "dev": "bun scripts/dev-vars.ts && docker compose up -d --wait && bun run db:migrate && turbo run dev",
+    "lint": "biome check .",
+    "format": "biome check --write .",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "ci": "./scripts/ci.sh",
+    "build": "turbo run build",
+    "deploy": "bun scripts/deploy.ts",
+    "db:generate": "bun run --cwd packages/db generate",
+    "db:migrate": "bun run --cwd packages/db migrate",
+    "db:reset": "bun run --cwd packages/db reset && bun run db:migrate",
+    "db:seed": "bun run --cwd packages/db seed",
+    "db:studio": "bun run --cwd packages/db studio",
+    "db:staff": "bun run --cwd packages/db staff",
+    "api:types": "bun apps/api/scripts/openapi.ts apps/web/src/lib/api/openapi.json apps/admin/src/lib/api/openapi.json && bunx openapi-typescript apps/web/src/lib/api/openapi.json -o apps/web/src/lib/api/schema.d.ts && bunx openapi-typescript apps/admin/src/lib/api/openapi.json -o apps/admin/src/lib/api/schema.d.ts && biome format --write apps/web/src/lib/api apps/admin/src/lib/api"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.6.8",
+    "turbo": "^2.11.13",
+    "typescript": "^7.0.2"
+  },
+  "packageManager": "bun@1.4.5"
+}

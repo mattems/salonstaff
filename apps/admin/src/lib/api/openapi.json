@@ -1,0 +1,6582 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Salon Staff admin API",
+    "version": "1",
+    "description": "Errors use RFC 9457 problem details with a stable `code` and a `hint`. Sign in through `/v1/auth/*` (Better Auth); the website uses a cookie, the mobile app `Authorization: Bearer <session token>`. Send an `Idempotency-Key` header with a `POST` to make it safe to retry. Add `?dry_run=true` to a change to validate it without applying it."
+  },
+  "components": {
+    "schemas": {
+      "ApiInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Salon Staff API"
+          },
+          "version": {
+            "type": "string",
+            "example": "v1"
+          },
+          "environment": {
+            "type": "string",
+            "enum": ["local", "production"]
+          },
+          "docs_url": {
+            "type": "string"
+          },
+          "openapi_url": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "version", "environment", "docs_url", "openapi_url"]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": ["string", "null"],
+            "description": "Null for an account made with a mobile number and no email yet."
+          },
+          "phoneNumber": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["seeker", "employer"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeekerProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          },
+          "salon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnSalonSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The salon you manage, if any."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phoneNumber",
+          "role",
+          "createdAt",
+          "profile",
+          "verification",
+          "salon"
+        ]
+      },
+      "SeekerProfile": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "headline": {
+            "type": ["string", "null"]
+          },
+          "about": {
+            "type": ["string", "null"]
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "senior_stylist",
+                "stylist",
+                "junior_stylist",
+                "apprentice_hair",
+                "colourist",
+                "barber",
+                "beauty_therapist",
+                "nail_technician",
+                "lash_brow",
+                "makeup_artist",
+                "skin_therapist",
+                "massage_spa",
+                "apprentice_beauty",
+                "salon_manager",
+                "receptionist",
+                "educator"
+              ],
+              "example": "colourist"
+            }
+          },
+          "yearsExperience": {
+            "type": "integer"
+          },
+          "qualifications": {
+            "type": ["string", "null"]
+          },
+          "instagram": {
+            "type": ["string", "null"]
+          },
+          "rightToWork": {
+            "type": "string",
+            "enum": [
+              "citizen",
+              "permanent_resident",
+              "visa_full",
+              "visa_limited",
+              "needs_sponsorship"
+            ]
+          },
+          "openToWork": {
+            "type": "boolean"
+          },
+          "photoUrl": {
+            "type": ["string", "null"]
+          },
+          "specialties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "availableDays": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "employmentTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "full_time",
+                "part_time",
+                "casual",
+                "contract",
+                "apprenticeship",
+                "chair_rental"
+              ]
+            }
+          },
+          "availableFrom": {
+            "type": ["string", "null"]
+          },
+          "travelKm": {
+            "type": ["integer", "null"]
+          },
+          "payExpectation": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "phone",
+          "headline",
+          "about",
+          "suburb",
+          "state",
+          "postcode",
+          "roles",
+          "yearsExperience",
+          "qualifications",
+          "instagram",
+          "rightToWork",
+          "openToWork",
+          "photoUrl",
+          "specialties",
+          "brands",
+          "availableDays",
+          "employmentTypes",
+          "availableFrom",
+          "travelKm",
+          "payExpectation"
+        ]
+      },
+      "Verification": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "rightToWork": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "qualification": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "0 not verified, 1 ID verified, 2 work-ready (ID and right to work)."
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "identity": {
+                "type": "string"
+              },
+              "rightToWork": {
+                "type": "string"
+              },
+              "qualification": {
+                "type": "string"
+              }
+            },
+            "description": "Verification IDs of passed checks (`SSV-7K3M-9QXA`). Only these are kept, never documents."
+          },
+          "nameMatched": {
+            "type": ["boolean", "null"],
+            "description": "Whether the name on the ID matched the profile when checked."
+          },
+          "identityVerifiedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "qualificationTitle": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "identity",
+          "rightToWork",
+          "qualification",
+          "level",
+          "references",
+          "nameMatched",
+          "identityVerifiedAt",
+          "qualificationTitle"
+        ]
+      },
+      "OwnSalonSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "removed"]
+          }
+        },
+        "required": ["id", "name", "path", "status"]
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable, machine-readable error code."
+          },
+          "detail": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string",
+            "description": "How to fix the problem."
+          },
+          "docs_url": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": ["path", "message"]
+            }
+          }
+        },
+        "required": ["type", "title", "status", "code"]
+      },
+      "FullProfile": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/SeekerProfile"
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experience"
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioItem"
+            }
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": ["profile", "experience", "education", "portfolio", "verification"]
+      },
+      "Experience": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "exp_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "salonName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "location": {
+            "type": ["string", "null"]
+          },
+          "startMonth": {
+            "type": "string",
+            "example": "2022-03"
+          },
+          "endMonth": {
+            "type": ["string", "null"]
+          },
+          "description": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "salonName",
+          "title",
+          "location",
+          "startMonth",
+          "endMonth",
+          "description"
+        ]
+      },
+      "Education": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "edu_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "qualification": {
+            "type": "string"
+          },
+          "institution": {
+            "type": "string"
+          },
+          "year": {
+            "type": ["integer", "null"]
+          }
+        },
+        "required": ["id", "qualification", "institution", "year"]
+      },
+      "PortfolioItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pfi_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "caption": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "imageUrl", "caption"]
+      },
+      "ProfilePhoto": {
+        "type": "object",
+        "properties": {
+          "photoUrl": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["photoUrl"]
+      },
+      "MyApplications": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyApplication"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "MyApplication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "coverNote": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "required": ["id", "status", "coverNote", "createdAt", "job"]
+      },
+      "JobSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "example": "/jobs/nsw/surry-hills/senior-colourist-willow-and-ash-hair"
+          },
+          "title": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "senior_stylist",
+              "stylist",
+              "junior_stylist",
+              "apprentice_hair",
+              "colourist",
+              "barber",
+              "beauty_therapist",
+              "nail_technician",
+              "lash_brow",
+              "makeup_artist",
+              "skin_therapist",
+              "massage_spa",
+              "apprentice_beauty",
+              "salon_manager",
+              "receptionist",
+              "educator"
+            ],
+            "example": "colourist"
+          },
+          "employmentType": {
+            "type": "string",
+            "enum": [
+              "full_time",
+              "part_time",
+              "casual",
+              "contract",
+              "apprenticeship",
+              "chair_rental"
+            ]
+          },
+          "payMin": {
+            "type": ["number", "null"]
+          },
+          "payMax": {
+            "type": ["number", "null"]
+          },
+          "payPeriod": {
+            "type": "string",
+            "enum": ["hour", "week", "year"]
+          },
+          "pay": {
+            "type": ["string", "null"],
+            "example": "$38–$45 per hour"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "suburbSlug": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Closed or expired: the ad stays up, marked closed."
+          },
+          "publishedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "expiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "salon": {
+            "$ref": "#/components/schemas/SalonSummary"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "path",
+          "title",
+          "role",
+          "employmentType",
+          "payMin",
+          "payMax",
+          "payPeriod",
+          "pay",
+          "suburb",
+          "suburbSlug",
+          "state",
+          "postcode",
+          "featured",
+          "closed",
+          "publishedAt",
+          "expiresAt",
+          "salon"
+        ]
+      },
+      "SalonSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "example": "/salons/nsw/surry-hills/willow-and-ash-hair"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "logoUrl": {
+            "type": ["string", "null"]
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Claimed, with its ABN checked on the ABR."
+          },
+          "claimed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "name", "path", "suburb", "state", "logoUrl", "verified", "claimed"]
+      },
+      "SavedJobs": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "Deleted": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["deleted"]
+      },
+      "Checks": {
+        "type": "object",
+        "properties": {
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            }
+          }
+        },
+        "required": ["verification", "checks"]
+      },
+      "Check": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "chk_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["identity", "right_to_work", "qualification"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "reference": {
+            "type": ["string", "null"],
+            "description": "The verification ID, once passed."
+          },
+          "title": {
+            "type": ["string", "null"],
+            "description": "A qualification's name."
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "kind", "status", "reference", "title", "createdAt", "decidedAt"]
+      },
+      "RedirectUrl": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Send the person here."
+          }
+        },
+        "required": ["url"]
+      },
+      "JobSearch": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobList"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "facets": {
+                "$ref": "#/components/schemas/JobFacets"
+              }
+            },
+            "required": ["facets"]
+          }
+        ]
+      },
+      "JobFacets": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "senior_stylist",
+                    "stylist",
+                    "junior_stylist",
+                    "apprentice_hair",
+                    "colourist",
+                    "barber",
+                    "beauty_therapist",
+                    "nail_technician",
+                    "lash_brow",
+                    "makeup_artist",
+                    "skin_therapist",
+                    "massage_spa",
+                    "apprentice_beauty",
+                    "salon_manager",
+                    "receptionist",
+                    "educator"
+                  ],
+                  "example": "colourist"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": ["role", "count"]
+            }
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                  "example": "NSW"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": ["state", "count"]
+            }
+          }
+        },
+        "required": ["roles", "states"],
+        "description": "Live jobs per role and per state, given the other filters."
+      },
+      "JobList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          }
+        },
+        "required": ["items", "page", "pageSize", "total", "pageCount"]
+      },
+      "JobsPath": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/JobsLanding"
+          },
+          {
+            "$ref": "#/components/schemas/JobAd"
+          },
+          {
+            "$ref": "#/components/schemas/PathRedirect"
+          }
+        ]
+      },
+      "JobsLanding": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["landing"]
+          },
+          "path": {
+            "type": "string"
+          },
+          "role": {
+            "type": ["string", "null"],
+            "enum": [
+              "senior_stylist",
+              "stylist",
+              "junior_stylist",
+              "apprentice_hair",
+              "colourist",
+              "barber",
+              "beauty_therapist",
+              "nail_technician",
+              "lash_brow",
+              "makeup_artist",
+              "skin_therapist",
+              "massage_spa",
+              "apprentice_beauty",
+              "salon_manager",
+              "receptionist",
+              "educator",
+              null
+            ],
+            "example": "colourist"
+          },
+          "state": {
+            "type": ["string", "null"],
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT", null],
+            "example": "NSW"
+          },
+          "suburbSlug": {
+            "type": ["string", "null"]
+          },
+          "suburbName": {
+            "type": ["string", "null"]
+          },
+          "heading": {
+            "type": "string",
+            "example": "Colourist jobs in Surry Hills NSW"
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "noindex": {
+            "type": "boolean",
+            "description": "No live jobs here: keep it out of search results."
+          },
+          "jobs": {
+            "$ref": "#/components/schemas/JobList"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "role",
+          "state",
+          "suburbSlug",
+          "suburbName",
+          "heading",
+          "breadcrumbs",
+          "noindex",
+          "jobs"
+        ]
+      },
+      "Breadcrumb": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "path"]
+      },
+      "JobAd": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["job"]
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "noindex": {
+            "type": "boolean",
+            "description": "Closed ads stay up but out of search results."
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "similar": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            },
+            "description": "Up to 5 live jobs like it, for a closed ad."
+          },
+          "viewer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobViewer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when signed in."
+          }
+        },
+        "required": ["kind", "job", "closed", "noindex", "breadcrumbs", "similar", "viewer"]
+      },
+      "JobDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "requirements": {
+                "type": ["string", "null"]
+              },
+              "requireQualification": {
+                "type": "boolean"
+              }
+            },
+            "required": ["description", "requirements", "requireQualification"]
+          }
+        ]
+      },
+      "JobViewer": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "canApply": {
+            "type": "boolean"
+          },
+          "blocker": {
+            "type": ["string", "null"],
+            "enum": [
+              "login",
+              "employer",
+              "applied",
+              "profile",
+              "verify",
+              "qualification",
+              "closed",
+              null
+            ],
+            "description": "Why you can't apply, so the right next step can be shown."
+          },
+          "reason": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["applied", "saved", "canApply", "blocker", "reason"]
+      },
+      "PathRedirect": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["redirect"]
+          },
+          "redirect": {
+            "type": "string",
+            "description": "Answer with a 301 to this path."
+          }
+        },
+        "required": ["kind", "redirect"]
+      },
+      "ApplicationCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "required": ["id", "status", "createdAt", "job"]
+      },
+      "SavedState": {
+        "type": "object",
+        "properties": {
+          "saved": {
+            "type": "boolean"
+          }
+        },
+        "required": ["saved"]
+      },
+      "MySalon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "abn": {
+            "type": ["string", "null"]
+          },
+          "abnStatus": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "abnEntityName": {
+            "type": ["string", "null"]
+          },
+          "contactName": {
+            "type": ["string", "null"]
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "email": {
+            "type": ["string", "null"]
+          },
+          "website": {
+            "type": ["string", "null"]
+          },
+          "instagram": {
+            "type": ["string", "null"]
+          },
+          "address": {
+            "type": ["string", "null"]
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "about": {
+            "type": ["string", "null"]
+          },
+          "logoUrl": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "removed"]
+          },
+          "statusReason": {
+            "type": ["string", "null"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["owner", "directory"]
+          },
+          "founding": {
+            "type": "boolean"
+          },
+          "freeUntil": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "listingCredits": {
+            "type": "integer"
+          },
+          "claimedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "entitlement": {
+            "$ref": "#/components/schemas/Entitlement"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "path",
+          "abn",
+          "abnStatus",
+          "abnEntityName",
+          "contactName",
+          "phone",
+          "email",
+          "website",
+          "instagram",
+          "address",
+          "suburb",
+          "state",
+          "postcode",
+          "about",
+          "logoUrl",
+          "status",
+          "statusReason",
+          "source",
+          "founding",
+          "freeUntil",
+          "listingCredits",
+          "claimedAt",
+          "createdAt",
+          "entitlement"
+        ]
+      },
+      "Entitlement": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether a job can be published right now."
+          },
+          "via": {
+            "type": ["string", "null"],
+            "enum": ["free_period", "subscription", "credit", null]
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": ["suspended", "needs_listing", null]
+          }
+        },
+        "required": ["ok", "via", "reason"]
+      },
+      "SalonJobs": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalonJob"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "SalonJob": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["draft", "published", "expired", "closed"],
+                "description": "`expired`: published, but its 30 days are up."
+              },
+              "paidVia": {
+                "type": ["string", "null"]
+              },
+              "applicants": {
+                "type": "integer"
+              },
+              "newApplicants": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-25T03:00:00.000Z"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-25T03:00:00.000Z"
+              }
+            },
+            "required": [
+              "status",
+              "paidVia",
+              "applicants",
+              "newApplicants",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        ]
+      },
+      "NewJob": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 120
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "senior_stylist",
+                  "stylist",
+                  "junior_stylist",
+                  "apprentice_hair",
+                  "colourist",
+                  "barber",
+                  "beauty_therapist",
+                  "nail_technician",
+                  "lash_brow",
+                  "makeup_artist",
+                  "skin_therapist",
+                  "massage_spa",
+                  "apprentice_beauty",
+                  "salon_manager",
+                  "receptionist",
+                  "educator"
+                ]
+              },
+              "employmentType": {
+                "type": "string",
+                "enum": [
+                  "full_time",
+                  "part_time",
+                  "casual",
+                  "contract",
+                  "apprenticeship",
+                  "chair_rental"
+                ]
+              },
+              "payMin": {
+                "type": ["number", "null"],
+                "minimum": 0,
+                "maximum": 500000
+              },
+              "payMax": {
+                "type": ["number", "null"],
+                "minimum": 0,
+                "maximum": 500000
+              },
+              "payPeriod": {
+                "type": "string",
+                "enum": ["hour", "week", "year"],
+                "default": "hour"
+              },
+              "suburb": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "state": {
+                "type": "string",
+                "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+              },
+              "postcode": {
+                "type": "string",
+                "pattern": "^\\d{4}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 40,
+                "maxLength": 8000
+              },
+              "requirements": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "requireQualification": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "title",
+              "role",
+              "employmentType",
+              "suburb",
+              "state",
+              "postcode",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "publish": {
+                "type": "boolean",
+                "default": false,
+                "description": "Publish straight away (uses the free period, the plan or a credit)."
+              }
+            }
+          }
+        ]
+      },
+      "JobChanges": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 120
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "senior_stylist",
+              "stylist",
+              "junior_stylist",
+              "apprentice_hair",
+              "colourist",
+              "barber",
+              "beauty_therapist",
+              "nail_technician",
+              "lash_brow",
+              "makeup_artist",
+              "skin_therapist",
+              "massage_spa",
+              "apprentice_beauty",
+              "salon_manager",
+              "receptionist",
+              "educator"
+            ]
+          },
+          "employmentType": {
+            "type": "string",
+            "enum": [
+              "full_time",
+              "part_time",
+              "casual",
+              "contract",
+              "apprenticeship",
+              "chair_rental"
+            ]
+          },
+          "payMin": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "payMax": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "payPeriod": {
+            "type": "string",
+            "enum": ["hour", "week", "year"],
+            "default": "hour"
+          },
+          "suburb": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 40,
+            "maxLength": 8000
+          },
+          "requirements": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "requireQualification": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "Applicants": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/SalonJob"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Applicant"
+            }
+          }
+        },
+        "required": ["job", "items"]
+      },
+      "Applicant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Not seen before this request."
+          },
+          "coverNote": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "candidateId": {
+            "type": "string"
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "isNew",
+          "coverNote",
+          "createdAt",
+          "candidateId",
+          "candidate",
+          "verification"
+        ]
+      },
+      "CandidateSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "headline": {
+            "type": ["string", "null"]
+          },
+          "photoUrl": {
+            "type": ["string", "null"]
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "senior_stylist",
+                "stylist",
+                "junior_stylist",
+                "apprentice_hair",
+                "colourist",
+                "barber",
+                "beauty_therapist",
+                "nail_technician",
+                "lash_brow",
+                "makeup_artist",
+                "skin_therapist",
+                "massage_spa",
+                "apprentice_beauty",
+                "salon_manager",
+                "receptionist",
+                "educator"
+              ],
+              "example": "colourist"
+            }
+          },
+          "yearsExperience": {
+            "type": "integer"
+          },
+          "rightToWork": {
+            "type": "string",
+            "enum": [
+              "citizen",
+              "permanent_resident",
+              "visa_full",
+              "visa_limited",
+              "needs_sponsorship"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "headline",
+          "photoUrl",
+          "suburb",
+          "state",
+          "roles",
+          "yearsExperience",
+          "rightToWork"
+        ]
+      },
+      "ApplicationStatusChanged": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          }
+        },
+        "required": ["id", "status"]
+      },
+      "Candidate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FullProfile"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              },
+              "contact": {
+                "$ref": "#/components/schemas/Contact"
+              },
+              "applications": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "jobTitle": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "submitted",
+                        "viewed",
+                        "shortlisted",
+                        "interview",
+                        "hired",
+                        "declined"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-11-25T03:00:00.000Z"
+                    }
+                  },
+                  "required": ["id", "jobId", "jobTitle", "status", "createdAt"]
+                }
+              }
+            },
+            "required": ["id", "contact", "applications"]
+          }
+        ]
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": ["string", "null"]
+          },
+          "phone": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["email", "phone"]
+      },
+      "SalonList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectorySalon"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          }
+        },
+        "required": ["items", "page", "pageSize", "total", "pageCount"]
+      },
+      "DirectorySalon": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SalonSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "suburbSlug": {
+                "type": "string"
+              },
+              "about": {
+                "type": ["string", "null"]
+              },
+              "liveJobs": {
+                "type": "integer"
+              }
+            },
+            "required": ["suburbSlug", "about", "liveJobs"]
+          }
+        ]
+      },
+      "SalonsPath": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/SalonsLanding"
+          },
+          {
+            "$ref": "#/components/schemas/SalonPage"
+          },
+          {
+            "$ref": "#/components/schemas/PathRedirect"
+          }
+        ]
+      },
+      "SalonsLanding": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["landing"]
+          },
+          "path": {
+            "type": "string"
+          },
+          "state": {
+            "type": ["string", "null"],
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT", null],
+            "example": "NSW"
+          },
+          "suburbSlug": {
+            "type": ["string", "null"]
+          },
+          "suburbName": {
+            "type": ["string", "null"]
+          },
+          "heading": {
+            "type": "string",
+            "example": "Hair and beauty salons in Fitzroy VIC"
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "noindex": {
+            "type": "boolean"
+          },
+          "salons": {
+            "$ref": "#/components/schemas/SalonList"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "state",
+          "suburbSlug",
+          "suburbName",
+          "heading",
+          "breadcrumbs",
+          "noindex",
+          "salons"
+        ]
+      },
+      "SalonPage": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["salon"]
+          },
+          "salon": {
+            "$ref": "#/components/schemas/PublicSalon"
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          },
+          "claimable": {
+            "type": "boolean",
+            "description": "Unclaimed: its owner can claim it."
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "noindex": {
+            "type": "boolean"
+          }
+        },
+        "required": ["kind", "salon", "jobs", "claimable", "breadcrumbs", "noindex"]
+      },
+      "PublicSalon": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DirectorySalon"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "postcode": {
+                "type": "string"
+              },
+              "website": {
+                "type": ["string", "null"]
+              },
+              "instagram": {
+                "type": ["string", "null"]
+              },
+              "contact": {
+                "type": ["object", "null"],
+                "properties": {
+                  "phone": {
+                    "type": ["string", "null"]
+                  },
+                  "email": {
+                    "type": ["string", "null"]
+                  },
+                  "address": {
+                    "type": ["string", "null"]
+                  }
+                },
+                "required": ["phone", "email", "address"],
+                "description": "Shown only to signed-in visitors."
+              }
+            },
+            "required": ["postcode", "website", "instagram", "contact"]
+          }
+        ]
+      },
+      "Claim": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clm_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "salonId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending_email", "pending_review", "approved", "rejected"]
+          },
+          "sentTo": {
+            "type": ["string", "null"],
+            "description": "Where the confirmation link went, masked (`he•••@salon.com`)."
+          },
+          "decisionNote": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "decidedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "salonId", "status", "sentTo", "decisionNote", "createdAt", "decidedAt"]
+      },
+      "StartClaim": {
+        "type": "object",
+        "properties": {
+          "abn": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 20
+          },
+          "method": {
+            "type": "string",
+            "enum": ["email", "review"],
+            "default": "email",
+            "description": "`email`: a link to the listing's business email (when it has one). `review`: staff check it."
+          }
+        },
+        "required": ["abn", "contactName", "phone"]
+      },
+      "ClaimConfirmed": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/Claim"
+          },
+          "salon": {
+            "$ref": "#/components/schemas/MySalon"
+          }
+        },
+        "required": ["claim", "salon"]
+      },
+      "Billing": {
+        "type": "object",
+        "properties": {
+          "billingOn": {
+            "type": "boolean",
+            "description": "Real payments are switched on here."
+          },
+          "entitlement": {
+            "$ref": "#/components/schemas/Entitlement"
+          },
+          "freeUntil": {
+            "type": ["string", "null"]
+          },
+          "listingCredits": {
+            "type": "integer"
+          },
+          "founding": {
+            "type": "boolean"
+          },
+          "prices": {
+            "type": "object",
+            "properties": {
+              "singleListingCents": {
+                "type": "integer"
+              },
+              "planMonthlyCents": {
+                "type": "integer",
+                "description": "Your plan price (founding salons pay less)."
+              },
+              "listingDays": {
+                "type": "integer"
+              }
+            },
+            "required": ["singleListingCents", "planMonthlyCents", "listingDays"]
+          },
+          "subscription": {
+            "type": ["object", "null"],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "currentPeriodEnd": {
+                "type": ["string", "null"]
+              },
+              "active": {
+                "type": "boolean"
+              }
+            },
+            "required": ["status", "currentPeriodEnd", "active"]
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["single_listing", "salon_plan", "founding_plan"]
+                },
+                "amountCents": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "paid", "failed"]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "kind", "amountCents", "status", "createdAt"]
+            }
+          }
+        },
+        "required": [
+          "billingOn",
+          "entitlement",
+          "freeUntil",
+          "listingCredits",
+          "founding",
+          "prices",
+          "subscription",
+          "payments"
+        ]
+      },
+      "Checkout": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["single_listing", "salon_plan"]
+          }
+        },
+        "required": ["kind"]
+      },
+      "WebhookReceived": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["received"]
+      },
+      "Sitemap": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "lastmod": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["job", "salon", "jobs_landing", "salons_landing"]
+                }
+              },
+              "required": ["path", "lastmod", "kind"]
+            }
+          }
+        },
+        "required": ["entries"]
+      },
+      "DevOutcome": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": ["status"]
+      },
+      "AdminMe": {
+        "type": "object",
+        "properties": {
+          "staff": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "email"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["owner", "support", "readonly"]
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["staff", "role", "permissions"]
+      },
+      "AdminOverview": {
+        "type": "object",
+        "properties": {
+          "seekers": {
+            "type": "integer"
+          },
+          "id_verified_seekers": {
+            "type": "integer"
+          },
+          "employers": {
+            "type": "integer"
+          },
+          "salons": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "claimed": {
+                "type": "integer"
+              },
+              "unclaimed": {
+                "type": "integer"
+              }
+            },
+            "required": ["total", "claimed", "unclaimed"]
+          },
+          "live_jobs": {
+            "type": "integer"
+          },
+          "applications": {
+            "type": "object",
+            "properties": {
+              "week": {
+                "type": "integer"
+              },
+              "all": {
+                "type": "integer"
+              }
+            },
+            "required": ["week", "all"]
+          },
+          "signups_week": {
+            "type": "integer"
+          },
+          "active_plans": {
+            "type": "integer"
+          },
+          "revenue_cents": {
+            "type": "integer",
+            "description": "Paid payments, all time, in Australian cents."
+          },
+          "queues": {
+            "$ref": "#/components/schemas/AdminQueues"
+          },
+          "newest": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "email": {
+                  "type": ["string", "null"]
+                },
+                "role": {
+                  "type": "string",
+                  "enum": ["seeker", "employer"]
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "name", "email", "role", "created_at"]
+            }
+          }
+        },
+        "required": [
+          "seekers",
+          "id_verified_seekers",
+          "employers",
+          "salons",
+          "live_jobs",
+          "applications",
+          "signups_week",
+          "active_plans",
+          "revenue_cents",
+          "queues",
+          "newest"
+        ]
+      },
+      "AdminQueues": {
+        "type": "object",
+        "properties": {
+          "pending_checks": {
+            "type": "integer",
+            "description": "Right-to-work and qualification checks waiting for a decision."
+          },
+          "pending_abn": {
+            "type": "integer",
+            "description": "Salons whose ABN waits for a staff check."
+          },
+          "pending_claims": {
+            "type": "integer",
+            "description": "Listing claims waiting for staff review."
+          }
+        },
+        "required": ["pending_checks", "pending_abn", "pending_claims"]
+      },
+      "AdminStaffMember": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "stf_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["owner", "support", "readonly"]
+          },
+          "is_you": {
+            "type": "boolean"
+          },
+          "added_at": {
+            "type": "string"
+          },
+          "added_by": {
+            "type": ["string", "null"],
+            "description": "Null when a script added them."
+          },
+          "last_seen_at": {
+            "type": ["string", "null"]
+          },
+          "passkeys": {
+            "type": "integer",
+            "description": "How many passkeys they have. With none they can't confirm changes that need one."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "role",
+          "is_you",
+          "added_at",
+          "added_by",
+          "last_seen_at",
+          "passkeys"
+        ]
+      },
+      "AdminAuditEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "occurred_at": {
+            "type": "string"
+          },
+          "actor_type": {
+            "type": "string",
+            "enum": ["user", "staff", "system"]
+          },
+          "actor_name": {
+            "type": ["string", "null"]
+          },
+          "action": {
+            "type": "string"
+          },
+          "target_type": {
+            "type": ["string", "null"]
+          },
+          "target_id": {
+            "type": ["string", "null"],
+            "description": "Prefixed (`usr_…`, `sln_…`) when the target is something with an API ID."
+          },
+          "before": {},
+          "after": {},
+          "reason": {
+            "type": ["string", "null"]
+          },
+          "ip": {
+            "type": ["string", "null"]
+          },
+          "confirmed_with_passkey": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "occurred_at",
+          "actor_type",
+          "actor_name",
+          "action",
+          "target_type",
+          "target_id",
+          "reason",
+          "ip",
+          "confirmed_with_passkey"
+        ]
+      },
+      "AdminPasskey": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pk_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string",
+            "example": "MacBook"
+          },
+          "added_at": {
+            "type": "string"
+          },
+          "last_used_at": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "name", "added_at", "last_used_at"]
+      },
+      "AdminUser": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string",
+            "description": "Their profile's name when they have one."
+          },
+          "email": {
+            "type": ["string", "null"],
+            "description": "Null for a mobile sign-up with no email yet."
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["seeker", "employer"]
+          },
+          "banned_at": {
+            "type": ["string", "null"]
+          },
+          "banned_reason": {
+            "type": ["string", "null"]
+          },
+          "open_flags": {
+            "type": "integer"
+          },
+          "id_verified": {
+            "type": "boolean"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phone",
+          "role",
+          "banned_at",
+          "banned_reason",
+          "open_flags",
+          "id_verified",
+          "created_at"
+        ]
+      },
+      "AdminUserDetail": {
+        "type": "object",
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/AdminUser"
+          },
+          "profile": {
+            "type": ["object", "null"],
+            "properties": {
+              "first_name": {
+                "type": "string"
+              },
+              "last_name": {
+                "type": "string"
+              },
+              "phone": {
+                "type": ["string", "null"]
+              },
+              "headline": {
+                "type": ["string", "null"]
+              },
+              "suburb": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "postcode": {
+                "type": "string"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "years_experience": {
+                "type": "integer"
+              },
+              "right_to_work": {
+                "type": "string"
+              },
+              "open_to_work": {
+                "type": "boolean"
+              },
+              "instagram": {
+                "type": ["string", "null"]
+              },
+              "photo_url": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": [
+              "first_name",
+              "last_name",
+              "phone",
+              "headline",
+              "suburb",
+              "state",
+              "postcode",
+              "roles",
+              "years_experience",
+              "right_to_work",
+              "open_to_work",
+              "instagram",
+              "photo_url"
+            ]
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminUserCheck"
+            }
+          },
+          "applications": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "job": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "path": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "title", "path"]
+                },
+                "salon": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": ["id", "name"]
+                }
+              },
+              "required": ["id", "status", "created_at", "job", "salon"]
+            }
+          },
+          "salons": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "suburb": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string",
+                  "enum": ["owner", "directory"]
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "name", "suburb", "state", "status", "source", "path"]
+            }
+          },
+          "flags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminFlag"
+            }
+          },
+          "active_sessions": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "user",
+          "profile",
+          "checks",
+          "applications",
+          "salons",
+          "flags",
+          "active_sessions"
+        ]
+      },
+      "AdminUserCheck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["identity", "right_to_work", "qualification"]
+          },
+          "status": {
+            "type": "string"
+          },
+          "reference": {
+            "type": ["string", "null"],
+            "description": "The verification ID salons see, e.g. SSV-7K3M-9QXA."
+          },
+          "provider": {
+            "type": "string"
+          },
+          "result": {
+            "type": ["object", "null"],
+            "additionalProperties": {},
+            "description": "The minimal result kept once decided. Null while the check is open."
+          },
+          "review_note": {
+            "type": ["string", "null"]
+          },
+          "has_document": {
+            "type": "boolean"
+          },
+          "decided_at": {
+            "type": ["string", "null"]
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "reference",
+          "provider",
+          "result",
+          "review_note",
+          "has_document",
+          "decided_at",
+          "created_at"
+        ]
+      },
+      "AdminFlag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "resolved_at": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "reason", "created_at", "resolved_at"]
+      },
+      "AdminSalon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "description": "Its public page on the website."
+          },
+          "owner": {
+            "type": ["object", "null"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["id", "name", "email"]
+          },
+          "abn": {
+            "type": ["string", "null"]
+          },
+          "abn_status": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "removed"]
+          },
+          "status_reason": {
+            "type": ["string", "null"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["owner", "directory"]
+          },
+          "claimed_at": {
+            "type": ["string", "null"]
+          },
+          "live_jobs": {
+            "type": "integer"
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "suburb",
+          "state",
+          "postcode",
+          "path",
+          "owner",
+          "abn",
+          "abn_status",
+          "status",
+          "status_reason",
+          "source",
+          "claimed_at",
+          "live_jobs",
+          "created_at"
+        ]
+      },
+      "AdminSalonDetail": {
+        "type": "object",
+        "properties": {
+          "salon": {
+            "$ref": "#/components/schemas/AdminSalon"
+          },
+          "contact_name": {
+            "type": ["string", "null"]
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "email": {
+            "type": ["string", "null"],
+            "description": "The business's own email. Claim links go here."
+          },
+          "website": {
+            "type": ["string", "null"]
+          },
+          "instagram": {
+            "type": ["string", "null"]
+          },
+          "address": {
+            "type": ["string", "null"]
+          },
+          "about": {
+            "type": ["string", "null"]
+          },
+          "logo_url": {
+            "type": ["string", "null"]
+          },
+          "abn_entity_name": {
+            "type": ["string", "null"],
+            "description": "The registered name the ABR gave."
+          },
+          "founding": {
+            "type": "boolean"
+          },
+          "free_until": {
+            "type": ["string", "null"]
+          },
+          "listing_credits": {
+            "type": "integer"
+          },
+          "subscription": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": ["string", "null"]
+              },
+              "current_period_end": {
+                "type": ["string", "null"]
+              },
+              "active": {
+                "type": "boolean"
+              }
+            },
+            "required": ["status", "current_period_end", "active"]
+          },
+          "entitlement": {
+            "type": "object",
+            "properties": {
+              "ok": {
+                "type": "boolean"
+              },
+              "via": {
+                "type": ["string", "null"],
+                "enum": ["free_period", "subscription", "credit", null]
+              },
+              "reason": {
+                "type": ["string", "null"],
+                "enum": ["suspended", "needs_listing", null]
+              }
+            },
+            "required": ["ok", "via", "reason"]
+          },
+          "owner": {
+            "type": ["object", "null"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "phone": {
+                "type": ["string", "null"]
+              },
+              "banned_at": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["id", "name", "email", "phone", "banned_at"]
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["draft", "live", "expired", "closed"]
+                },
+                "featured": {
+                  "type": "boolean"
+                },
+                "paid_via": {
+                  "type": ["string", "null"]
+                },
+                "applicants": {
+                  "type": "integer"
+                },
+                "published_at": {
+                  "type": ["string", "null"]
+                },
+                "expires_at": {
+                  "type": ["string", "null"]
+                },
+                "created_at": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status",
+                "featured",
+                "paid_via",
+                "applicants",
+                "published_at",
+                "expires_at",
+                "created_at",
+                "path"
+              ]
+            }
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AdminPayment"
+            }
+          },
+          "claims": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "abn": {
+                  "type": "string"
+                },
+                "contact_name": {
+                  "type": "string"
+                },
+                "claimant": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "email": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["id", "name", "email"]
+                },
+                "decision_note": {
+                  "type": ["string", "null"]
+                },
+                "created_at": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "status",
+                "abn",
+                "contact_name",
+                "claimant",
+                "decision_note",
+                "created_at"
+              ]
+            }
+          }
+        },
+        "required": [
+          "salon",
+          "contact_name",
+          "phone",
+          "email",
+          "website",
+          "instagram",
+          "address",
+          "about",
+          "logo_url",
+          "abn_entity_name",
+          "founding",
+          "free_until",
+          "listing_credits",
+          "subscription",
+          "entitlement",
+          "owner",
+          "jobs",
+          "payments",
+          "claims"
+        ]
+      },
+      "AdminPayment": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "salon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name"]
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["single_listing", "salon_plan", "founding_plan"]
+          },
+          "amount_cents": {
+            "type": "integer"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending", "paid", "failed"]
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "salon", "kind", "amount_cents", "provider", "status", "created_at"]
+      },
+      "AdminListingInput": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "suburb": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "address": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254
+          },
+          "website": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "instagram": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "abn": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "about": {
+            "type": "string",
+            "maxLength": 2000
+          }
+        },
+        "required": ["name", "suburb", "state", "postcode"]
+      },
+      "AdminImportReport": {
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "integer"
+          },
+          "duplicates": {
+            "type": "integer",
+            "description": "Rows skipped because the salon is already listed (same ABN, or same name and postcode)."
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "row": {
+                  "type": "integer"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": ["row", "message"]
+            },
+            "description": "Rows skipped because something in them isn't valid. Row 1 is the header."
+          }
+        },
+        "required": ["added", "duplicates", "errors"]
+      },
+      "AdminJob": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["draft", "live", "expired", "closed"]
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "paid_via": {
+            "type": ["string", "null"],
+            "description": "free_period, subscription, credit or staff."
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          },
+          "salon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["active", "suspended", "removed"]
+              }
+            },
+            "required": ["id", "name", "status"]
+          },
+          "applicants": {
+            "type": "integer"
+          },
+          "published_at": {
+            "type": ["string", "null"]
+          },
+          "expires_at": {
+            "type": ["string", "null"]
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "status",
+          "featured",
+          "paid_via",
+          "suburb",
+          "state",
+          "salon",
+          "applicants",
+          "published_at",
+          "expires_at",
+          "created_at",
+          "path"
+        ]
+      },
+      "AdminCheck": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "chk_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["right_to_work", "qualification"]
+          },
+          "status": {
+            "type": "string"
+          },
+          "person": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "phone": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["id", "name", "email", "phone"]
+          },
+          "details": {
+            "type": "object",
+            "additionalProperties": {},
+            "description": "What they sent: the basis, visa grant number and passport country for right to work (until decided), or the qualification's title. Once decided only a minimal result is left."
+          },
+          "document_url": {
+            "type": ["string", "null"],
+            "description": "The certificate, from the private bucket, while it waits for a decision."
+          },
+          "reference": {
+            "type": ["string", "null"]
+          },
+          "review_note": {
+            "type": ["string", "null"]
+          },
+          "submitted_at": {
+            "type": "string"
+          },
+          "decided_at": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "person",
+          "details",
+          "document_url",
+          "reference",
+          "review_note",
+          "submitted_at",
+          "decided_at"
+        ]
+      },
+      "AdminClaim": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clm_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending_email", "pending_review", "approved", "rejected"]
+          },
+          "method": {
+            "type": "string",
+            "enum": ["email", "review"],
+            "description": "`email`: proven by the link sent to the listing's email. `review`: staff decide."
+          },
+          "salon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "suburb": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "phone": {
+                "type": ["string", "null"]
+              },
+              "path": {
+                "type": "string"
+              },
+              "has_owner": {
+                "type": "boolean"
+              }
+            },
+            "required": ["id", "name", "suburb", "state", "email", "phone", "path", "has_owner"]
+          },
+          "claimant": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": ["string", "null"]
+              },
+              "phone": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["id", "name", "email", "phone"]
+          },
+          "contact_name": {
+            "type": "string"
+          },
+          "contact_phone": {
+            "type": "string"
+          },
+          "abn_given": {
+            "type": "string"
+          },
+          "listing_abn": {
+            "type": ["string", "null"]
+          },
+          "abn_matches": {
+            "type": ["boolean", "null"],
+            "description": "Whether the ABN given is the listing's. Null when the listing had none."
+          },
+          "abr_name": {
+            "type": ["string", "null"],
+            "description": "The registered name the ABR gave for the ABN, if looked up."
+          },
+          "decided_by": {
+            "type": ["string", "null"]
+          },
+          "decision_note": {
+            "type": ["string", "null"]
+          },
+          "decided_at": {
+            "type": ["string", "null"]
+          },
+          "created_at": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "method",
+          "salon",
+          "claimant",
+          "contact_name",
+          "contact_phone",
+          "abn_given",
+          "listing_abn",
+          "abn_matches",
+          "abr_name",
+          "decided_by",
+          "decision_note",
+          "decided_at",
+          "created_at"
+        ]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/admin/v1/me": {
+      "get": {
+        "summary": "The staff member Cloudflare Access let in",
+        "tags": ["Admin"],
+        "responses": {
+          "200": {
+            "description": "Your staff role and what it allows",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminMe"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/overview": {
+      "get": {
+        "summary": "The numbers that matter, and what's waiting",
+        "tags": ["Admin"],
+        "responses": {
+          "200": {
+            "description": "Counts and the newest accounts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminOverview"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/queues": {
+      "get": {
+        "summary": "What's waiting for staff",
+        "description": "The counts beside the portal's menu: checks, ABNs and claims to review.",
+        "tags": ["Admin"],
+        "responses": {
+          "200": {
+            "description": "The counts",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminQueues"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/staff": {
+      "get": {
+        "summary": "List staff",
+        "tags": ["Admin"],
+        "responses": {
+          "200": {
+            "description": "Current staff, oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminStaffMember"
+                      }
+                    }
+                  },
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Add a staff member",
+        "description": "They need no Salon Staff account: passing Cloudflare Access with this email address is their sign-in. Add the same address to the Access list in Cloudflare, or they still can't get in. Must be confirmed with your passkey (action `staff.add`, target their email address).",
+        "tags": ["Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "email": {
+                    "type": "string",
+                    "maxLength": 254,
+                    "format": "email"
+                  },
+                  "role": {
+                    "type": "string",
+                    "enum": ["owner", "support", "readonly"]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                },
+                "required": ["name", "email", "role", "reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new staff member",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStaffMember"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Someone with that email address is already staff",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/staff/{id}": {
+      "patch": {
+        "summary": "Change a staff member's role",
+        "description": "You can't change your own role, and the last owner can't be made anything else. Must be confirmed with your passkey (action `staff.change_role`, target their ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": ["owner", "support", "readonly"]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                },
+                "required": ["role", "reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The staff member with their new role",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStaffMember"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This is the only owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove a staff member",
+        "description": "They are refused from their next request. What they did stays named in the audit log. You can't remove yourself or the last owner. Remove them from the Access list in Cloudflare as well. Must be confirmed with your passkey (action `staff.remove`, target their ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                },
+                "required": ["reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "They are no longer staff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["removed"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "This is the only owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/local-staff": {
+      "get": {
+        "summary": "Local development: the staff you can choose to be",
+        "description": "Exists only in local development, where there is no Cloudflare Access to say who you are. It is the one admin route with no staff check; everywhere else it answers 404.",
+        "tags": ["Admin"],
+        "responses": {
+          "200": {
+            "description": "Local staff",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "name": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": ["owner", "support", "readonly"]
+                          }
+                        },
+                        "required": ["name", "email", "role"]
+                      }
+                    }
+                  },
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not local development",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/audit-log": {
+      "get": {
+        "summary": "The audit log",
+        "description": "Newest first: what people, staff and the system did. `q` matches the action, the target's ID, or the name or email of who acted. `target` keeps it to one thing (a person, salon, job…), by its ID.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "target",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["user", "staff", "system"]
+            },
+            "required": false,
+            "name": "actor_type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 365
+            },
+            "required": false,
+            "name": "days",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of events",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminAuditEvent"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/confirmations": {
+      "post": {
+        "summary": "Ask to confirm an action with your passkey",
+        "description": "Returns a challenge for one action on one target. Have the passkey answer it, and send the answer as `confirmation` with the change itself. It works once and lasts two minutes. `can_skip` is true only in local development, where the change may be sent with `confirmation: { skip: true }` instead; `id` and `options` are then null for someone with no passkey.",
+        "tags": ["Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "action": {
+                    "type": "string",
+                    "enum": [
+                      "passkey.add",
+                      "passkey.remove",
+                      "staff.reset_passkeys",
+                      "staff.add",
+                      "staff.change_role",
+                      "staff.remove",
+                      "user.ban",
+                      "user.delete",
+                      "salon.suspend",
+                      "salon.remove",
+                      "salon.delete"
+                    ]
+                  },
+                  "target": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The ID or code of what is being changed, or `new` when adding something."
+                  }
+                },
+                "required": ["action", "target"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The challenge",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": ["string", "null"]
+                    },
+                    "options": {
+                      "type": ["object", "null"],
+                      "additionalProperties": {}
+                    },
+                    "can_skip": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["id", "options", "can_skip"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/passkeys": {
+      "get": {
+        "summary": "List your passkeys",
+        "tags": ["Admin"],
+        "responses": {
+          "200": {
+            "description": "Oldest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminPasskey"
+                      }
+                    }
+                  },
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Finish registering a passkey",
+        "tags": ["Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "response": {
+                    "type": "object",
+                    "additionalProperties": {}
+                  }
+                },
+                "required": ["id", "name", "response"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPasskey"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The registration expired, or the passkey is already registered",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/passkeys/options": {
+      "post": {
+        "summary": "Start registering a passkey",
+        "description": "Your first passkey needs nothing more. Once you have one, adding another must be confirmed with it (action `passkey.add`, target `new`).",
+        "tags": ["Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What to give the browser",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "options": {
+                      "type": "object",
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": ["id", "options"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/passkeys/{id}": {
+      "patch": {
+        "summary": "Rename a passkey",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The passkey",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminPasskey"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove a passkey",
+        "description": "Must be confirmed with one of your passkeys, which can be this one (action `passkey.remove`, target its ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "It is gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["removed"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/staff/{id}/passkeys": {
+      "delete": {
+        "summary": "Reset a staff member's passkeys",
+        "description": "For someone who has lost theirs: removes them all, so they can register a new one. Must be confirmed with your own passkey (action `staff.reset_passkeys`, target their ID). You can't reset your own.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                },
+                "required": ["reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "How many were removed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "removed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["removed"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users": {
+      "get": {
+        "summary": "Search people",
+        "description": "Newest first. `q` matches an email address, name, phone number (`0412 345 678` works) or verification ID (`SSV-…`).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["seeker", "employer"]
+            },
+            "required": false,
+            "name": "role",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "name": "banned",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "name": "flagged",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of people",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminUser"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users/{id}": {
+      "get": {
+        "summary": "A person's page",
+        "description": "Their account, profile, checks (verification IDs and minimal results only), applications, any salon they own, flags and how many sessions are open.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUserDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Change a person's role",
+        "description": "Job seeker or employer: what they see when they sign in.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "role": {
+                    "type": "string",
+                    "enum": ["seeker", "employer"]
+                  }
+                },
+                "required": ["role"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a person",
+        "description": "Permanently deletes their account, profile, pictures, applications and checks (with any evidence waiting for review). A salon they made is deleted with its jobs; a directory listing they claimed goes back to unclaimed. Must be confirmed with your passkey (action `user.delete`, target their ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "They are gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users/{id}/flags": {
+      "post": {
+        "summary": "Flag a person",
+        "description": "A note for the team (reported by a salon, a suspicious profile…). A flag blocks nothing; a ban does.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": ["reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The flag",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminFlag"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/flags/{id}/resolve": {
+      "post": {
+        "summary": "Resolve a flag",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The flag, resolved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminFlag"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users/{id}/ban": {
+      "post": {
+        "summary": "Ban a person",
+        "description": "Signs them out everywhere at once and stops them signing in. Salons stop seeing their applications; a salon owner's jobs are hidden. Must be confirmed with your passkey (action `user.ban`, target their ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                },
+                "required": ["reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The person, banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users/{id}/unban": {
+      "post": {
+        "summary": "Lift a ban",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The person, no longer banned",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminUser"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users/{id}/sign-out-everywhere": {
+      "post": {
+        "summary": "Sign a person out everywhere",
+        "description": "Ends every session on every device. They can sign in again.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How many sessions were ended",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "sessions_ended": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["sessions_ended"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons": {
+      "get": {
+        "summary": "Search salons",
+        "description": "Newest first: salons that signed up and directory listings. `q` matches the name, suburb, ABN or the owner's email.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            },
+            "required": false,
+            "name": "abn_status",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["claimed", "unclaimed"]
+            },
+            "required": false,
+            "name": "claimed",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["active", "suspended", "removed"]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of salons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminSalon"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}": {
+      "get": {
+        "summary": "A salon's page",
+        "description": "Its owner, contact details, ABN, what lets it publish (free period, plan or credits), its jobs with applicant counts, payments and claims.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalonDetail"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete a salon",
+        "description": "Permanently deletes the salon with its jobs, applications, payments and claims. The owner's account stays. Must be confirmed with your passkey (action `salon.delete`, target its ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "It is gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "deleted": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}/status": {
+      "post": {
+        "summary": "Suspend, remove or reinstate a salon",
+        "description": "`suspended`: its jobs are hidden and it can't post. `removed`: also gone from the directory. `active` puts it back. Suspending and removing need a reason (the owner sees it) and your passkey (action `salon.suspend` or `salon.remove`, target its ID).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["active", "suspended", "removed"]
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  },
+                  "confirmation": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "response": {
+                        "type": "object",
+                        "additionalProperties": {}
+                      },
+                      "skip": {
+                        "type": "boolean"
+                      }
+                    },
+                    "description": "`id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development."
+                  }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalon"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}/abn": {
+      "post": {
+        "summary": "Mark a salon's ABN checked",
+        "description": "After looking it up on the ABR: `verified` or `failed`.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["verified", "failed"]
+                  }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalon"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The salon has no ABN",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}/free-period": {
+      "post": {
+        "summary": "Extend or end a salon's free period",
+        "description": "`days` adds that many days, from today if it has already ended. `end: true` ends it now.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "days": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 365
+                      }
+                    },
+                    "required": ["days"]
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "end": {
+                        "type": "boolean",
+                        "enum": [true]
+                      }
+                    },
+                    "required": ["end"]
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "When the free period ends",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "free_until": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["free_until"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}/credits": {
+      "post": {
+        "summary": "Give or take away listing credits",
+        "description": "A positive `delta` gives free listings (goodwill, a partner deal); a negative one takes them away. Never below zero.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "delta": {
+                    "type": "integer",
+                    "minimum": -100,
+                    "maximum": 100
+                  },
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": ["delta", "reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The salon's credits now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "listing_credits": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["listing_credits"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}/founding": {
+      "post": {
+        "summary": "Switch founding pricing on or off",
+        "description": "Founding salons pay the lower Salon Plan price for life.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "founding": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["founding"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Whether it's a founding salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "founding": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": ["founding"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/salons/{id}/unclaim": {
+      "post": {
+        "summary": "Detach a salon's owner",
+        "description": "The salon becomes an unclaimed directory listing, which anyone can claim. The owner's account stays.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The salon, unclaimed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalon"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nobody owns it",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/directory/listings": {
+      "post": {
+        "summary": "Add a directory listing",
+        "description": "An unclaimed salon in the public directory, which its owner can claim. Refused when a salon with the same ABN, or the same name and postcode, is already listed.",
+        "tags": ["Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminListingInput"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new listing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalon"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already listed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/directory/import": {
+      "post": {
+        "summary": "Import directory listings from a CSV",
+        "description": "Send the CSV as `file`. Its first row is the header: name,suburb,state,postcode,address,phone,email,website,instagram,abn,about (name, suburb, state and postcode are required). Up to 5,000 rows. Salons already listed (same ABN, or same name and postcode) are skipped as duplicates; rows that don't check out are listed in `errors` and skipped. Only import data you may use: a business's own published details, the ABR or licensed data.",
+        "tags": ["Admin"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What was added, skipped and why",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminImportReport"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is larger than 5MB",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/jobs": {
+      "get": {
+        "summary": "Search jobs",
+        "description": "Newest first. `q` matches the title, the salon's name or the suburb. `status`: `live`, `expired` (past its date), `draft`, `closed` or `featured`.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 200
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["live", "expired", "draft", "closed", "featured"]
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminJob"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/jobs/{id}/feature": {
+      "post": {
+        "summary": "Feature a job, or stop featuring it",
+        "description": "Featured jobs are shown first.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "featured": {
+                    "type": "boolean"
+                  }
+                },
+                "required": ["featured"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/jobs/{id}/take-down": {
+      "post": {
+        "summary": "Take a job down",
+        "description": "Closes a job that breaks the rules: spam, a scam, discrimination. The reason is recorded.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": ["reason"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job, closed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It is already closed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/jobs/{id}/relist": {
+      "post": {
+        "summary": "Relist a job for free",
+        "description": "Puts it live for a fresh 30 days without charging the salon (paid via `staff`).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job, live",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminJob"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The salon is suspended or removed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/payments": {
+      "get": {
+        "summary": "Payments",
+        "description": "Every payment, newest first: listing credits and Salon Plans.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of payments",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminPayment"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/checks": {
+      "get": {
+        "summary": "Checks for staff to decide",
+        "description": "Right-to-work and qualification checks. `pending` (the default): waiting for a decision, oldest first. `all`: every one, newest first. Identity checks are decided by Stripe Identity and aren't here.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["pending", "all"],
+              "default": "pending"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminCheck"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/checks/{id}/document": {
+      "get": {
+        "summary": "A check's certificate",
+        "description": "From the private bucket, never cached. Only while the check waits for a decision: deciding deletes it.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file",
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/jpeg": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              },
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such check, or it has no document (any more)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/checks/{id}/decision": {
+      "post": {
+        "summary": "Decide a check",
+        "description": "`verified` gives it a verification ID; `failed` needs a note saying why (the person is told). Either way the evidence is deleted: the certificate from the private bucket, and visa details from the record (D-03).",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "decision": {
+                    "type": "string",
+                    "enum": ["verified", "failed"]
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                },
+                "required": ["decision"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The check, decided",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminCheck"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It has already been decided",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/claims": {
+      "get": {
+        "summary": "Claims on directory listings",
+        "description": "`open` (the default): waiting for staff, or for the claimant to click the link emailed to the listing. `all`: every claim. Newest first.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 50,
+              "description": "How many items to return.",
+              "example": 50
+            },
+            "required": false,
+            "description": "How many items to return.",
+            "name": "limit",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "description": "The `next_cursor` from the previous page. Omit for the first page."
+            },
+            "required": false,
+            "description": "The `next_cursor` from the previous page. Omit for the first page.",
+            "name": "cursor",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["open", "all"],
+              "default": "open"
+            },
+            "required": false,
+            "name": "status",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of claims",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "$ref": "#/components/schemas/AdminClaim"
+                      }
+                    },
+                    "next_cursor": {
+                      "type": ["string", "null"]
+                    }
+                  },
+                  "required": ["data", "next_cursor"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/claims/{id}/approve": {
+      "post": {
+        "summary": "Approve a claim",
+        "description": "The claimant becomes the listing's owner, with the launch free period (and founding pricing while places last). Other open claims on it are rejected. An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The claim, approved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminClaim"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already decided, or someone else manages the salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/claims/{id}/reject": {
+      "post": {
+        "summary": "Reject a claim",
+        "description": "`note` says why: the claimant is told.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "note": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 500
+                  }
+                },
+                "required": ["note"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The claim, rejected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminClaim"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already decided",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

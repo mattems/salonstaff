@@ -1,0 +1,8 @@
+{
+  "extends": "@salonstaff/config/tsconfig.base.json",
+  "compilerOptions": {
+    // Runs in Workers, Node and the browser: Web Crypto, but no `window` or Node globals.
+    "lib": ["ES2023", "WebWorker"]
+  },
+  "include": ["src"]
+}

@@ -1,0 +1,31 @@
+{
+  "name": "@salonstaff/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema.ts",
+    "./vitest-aliases": "./vitest-aliases.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "generate": "bun --env-file=../../.env drizzle-kit generate",
+    "migrate": "bun --env-file=../../.env scripts/migrate.ts",
+    "studio": "bun --env-file=../../.env drizzle-kit studio",
+    "reset": "bun --env-file=../../.env scripts/reset.ts",
+    "staff": "bun --env-file=../../.env scripts/staff.ts",
+    "seed": "bun --env-file=../../.env scripts/seed.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "@salonstaff/config": "workspace:*",
+    "drizzle-kit": "^0.31.11"
+  },
+  "dependencies": {
+    "@salonstaff/shared": "workspace:*",
+    "drizzle-orm": "^0.45.4",
+    "pg": "^8.23.1"
+  }
+}

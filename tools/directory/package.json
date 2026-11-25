@@ -1,0 +1,10 @@
+{
+  "name": "salonstaff-directory",
+  "private": true,
+  "type": "module",
+  "description": "Builds CSVs of Australia's hair and beauty businesses for the admin directory import. Not part of the app.",
+  "scripts": {
+    "build": "bun build.ts",
+    "test": "bun test"
+  }
+}

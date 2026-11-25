@@ -1,0 +1,15 @@
+{
+  "extends": "@salonstaff/config/tsconfig.base.json",
+  "compilerOptions": {
+    // The email templates this app imports are written in JSX.
+    "jsx": "react-jsx",
+    "allowImportingTsExtensions": true,
+    "types": [
+      "@cloudflare/workers-types",
+      "@cloudflare/vitest-pool-workers/types",
+      "node",
+      "vite/client"
+    ]
+  },
+  "include": ["src", "test", "vitest.config.ts"]
+}

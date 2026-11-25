@@ -1,0 +1,32 @@
+# Secret scanning (gitleaks), run in CI on every pull request. GitHub's own
+# secret scanning isn't available on a private repository on the free plan.
+title = "salonstaff"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Things that look like keys but are public by design"
+regexTarget = "line"
+regexes = [
+  # The Cloudflare Access audience tag identifies an application; it grants nothing.
+  '''"ACCESS_AUD":''',
+  # The fixed local-development key for monitor secrets (each Worker's .dev.vars). It is the
+  # words "local-development-only-key-32byt" in base64, protects nothing, and is never used when deployed.
+  '''bG9jYWwtZGV2ZWxvcG1lbnQtb25seS1rZXktMzJieXQ=''',
+  # Slack's published worked example for verifying its requests (packages/shared/src/slack.test.ts).
+  '''8f742231b10e8888abcd99yyyzzz85a5''',
+  # The local-only key pair for private status pages' access (apps/api/.dev.vars.example).
+  '''PAGE_ACCESS_KEY=\{"crv":"P-256"''',
+  # App Store Connect's Issuer ID names the Apple team's API keys; without a key's .p8 it grants
+  # nothing (apps/mobile/eas.json).
+  '''"ascApiKeyIssuerId":''',
+  # An Assistant's key goes in every page that loads it (D-41); it names the Assistant, and grants nothing.
+  '''\bast_[0-9a-z]{20,40}\b''',
+]
+paths = [
+  # Design mockups show a made-up API token.
+  '''docs/design/phase-0-mockups\.html''',
+  # A self-signed key a test SAML IdP signs with (the API's SSO tests). It protects nothing.
+  '''apps/api/test/fixtures/saml-idp\.ts''',
+]

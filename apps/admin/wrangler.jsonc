@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The admin portal: the built app, plus a small Worker (worker/index.ts) that forwards the
+  // app's API calls (/api/admin/v1/*) to the API Worker over a service binding. Its hostname
+  // must be behind Cloudflare Access before the first deploy (docs/runbooks/cloudflare-access.md).
+  // The settings at the top are local; `env.production` holds the deployed ones.
+  "name": "salonstaff-admin",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  // Only the custom domain, which Access protects. A workers.dev or preview
+  // address would be a way around it.
+  "workers_dev": false,
+  "preview_urls": false,
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*"]
+  },
+  "services": [{ "binding": "API", "service": "salonstaff-api" }],
+
+  "env": {
+    "production": {
+      "name": "salonstaff-admin",
+      "workers_dev": false,
+      "preview_urls": false,
+      "routes": [{ "pattern": "admin.salonstaff.com.au", "custom_domain": true }],
+      "services": [{ "binding": "API", "service": "salonstaff-api" }]
+    }
+  }
+}

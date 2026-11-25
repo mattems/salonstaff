@@ -1,0 +1,5397 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Salon Staff API",
+    "version": "1",
+    "description": "Errors use RFC 9457 problem details with a stable `code` and a `hint`. Sign in through `/v1/auth/*` (Better Auth); the website uses a cookie, the mobile app `Authorization: Bearer <session token>`. Send an `Idempotency-Key` header with a `POST` to make it safe to retry. Add `?dry_run=true` to a change to validate it without applying it."
+  },
+  "components": {
+    "schemas": {
+      "ApiInfo": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Salon Staff API"
+          },
+          "version": {
+            "type": "string",
+            "example": "v1"
+          },
+          "environment": {
+            "type": "string",
+            "enum": ["local", "production"]
+          },
+          "docs_url": {
+            "type": "string"
+          },
+          "openapi_url": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "version", "environment", "docs_url", "openapi_url"]
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": ["string", "null"],
+            "description": "Null for an account made with a mobile number and no email yet."
+          },
+          "phoneNumber": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["seeker", "employer"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SeekerProfile"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          },
+          "salon": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/OwnSalonSummary"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The salon you manage, if any."
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "phoneNumber",
+          "role",
+          "createdAt",
+          "profile",
+          "verification",
+          "salon"
+        ]
+      },
+      "SeekerProfile": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "headline": {
+            "type": ["string", "null"]
+          },
+          "about": {
+            "type": ["string", "null"]
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "senior_stylist",
+                "stylist",
+                "junior_stylist",
+                "apprentice_hair",
+                "colourist",
+                "barber",
+                "beauty_therapist",
+                "nail_technician",
+                "lash_brow",
+                "makeup_artist",
+                "skin_therapist",
+                "massage_spa",
+                "apprentice_beauty",
+                "salon_manager",
+                "receptionist",
+                "educator"
+              ],
+              "example": "colourist"
+            }
+          },
+          "yearsExperience": {
+            "type": "integer"
+          },
+          "qualifications": {
+            "type": ["string", "null"]
+          },
+          "instagram": {
+            "type": ["string", "null"]
+          },
+          "rightToWork": {
+            "type": "string",
+            "enum": [
+              "citizen",
+              "permanent_resident",
+              "visa_full",
+              "visa_limited",
+              "needs_sponsorship"
+            ]
+          },
+          "openToWork": {
+            "type": "boolean"
+          },
+          "photoUrl": {
+            "type": ["string", "null"]
+          },
+          "specialties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "brands": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "availableDays": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "employmentTypes": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "full_time",
+                "part_time",
+                "casual",
+                "contract",
+                "apprenticeship",
+                "chair_rental"
+              ]
+            }
+          },
+          "availableFrom": {
+            "type": ["string", "null"]
+          },
+          "travelKm": {
+            "type": ["integer", "null"]
+          },
+          "payExpectation": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "phone",
+          "headline",
+          "about",
+          "suburb",
+          "state",
+          "postcode",
+          "roles",
+          "yearsExperience",
+          "qualifications",
+          "instagram",
+          "rightToWork",
+          "openToWork",
+          "photoUrl",
+          "specialties",
+          "brands",
+          "availableDays",
+          "employmentTypes",
+          "availableFrom",
+          "travelKm",
+          "payExpectation"
+        ]
+      },
+      "Verification": {
+        "type": "object",
+        "properties": {
+          "identity": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "rightToWork": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "qualification": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "level": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 2,
+            "description": "0 not verified, 1 ID verified, 2 work-ready (ID and right to work)."
+          },
+          "references": {
+            "type": "object",
+            "properties": {
+              "identity": {
+                "type": "string"
+              },
+              "rightToWork": {
+                "type": "string"
+              },
+              "qualification": {
+                "type": "string"
+              }
+            },
+            "description": "Verification IDs of passed checks (`SSV-7K3M-9QXA`). Only these are kept, never documents."
+          },
+          "nameMatched": {
+            "type": ["boolean", "null"],
+            "description": "Whether the name on the ID matched the profile when checked."
+          },
+          "identityVerifiedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "qualificationTitle": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "identity",
+          "rightToWork",
+          "qualification",
+          "level",
+          "references",
+          "nameMatched",
+          "identityVerifiedAt",
+          "qualificationTitle"
+        ]
+      },
+      "OwnSalonSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "removed"]
+          }
+        },
+        "required": ["id", "name", "path", "status"]
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "status": {
+            "type": "integer"
+          },
+          "code": {
+            "type": "string",
+            "description": "Stable, machine-readable error code."
+          },
+          "detail": {
+            "type": "string"
+          },
+          "hint": {
+            "type": "string",
+            "description": "How to fix the problem."
+          },
+          "docs_url": {
+            "type": "string"
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "errors": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "message": {
+                  "type": "string"
+                }
+              },
+              "required": ["path", "message"]
+            }
+          }
+        },
+        "required": ["type", "title", "status", "code"]
+      },
+      "FullProfile": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/SeekerProfile"
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experience"
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioItem"
+            }
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": ["profile", "experience", "education", "portfolio", "verification"]
+      },
+      "Experience": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "exp_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "salonName": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "location": {
+            "type": ["string", "null"]
+          },
+          "startMonth": {
+            "type": "string",
+            "example": "2022-03"
+          },
+          "endMonth": {
+            "type": ["string", "null"]
+          },
+          "description": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": [
+          "id",
+          "salonName",
+          "title",
+          "location",
+          "startMonth",
+          "endMonth",
+          "description"
+        ]
+      },
+      "Education": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "edu_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "qualification": {
+            "type": "string"
+          },
+          "institution": {
+            "type": "string"
+          },
+          "year": {
+            "type": ["integer", "null"]
+          }
+        },
+        "required": ["id", "qualification", "institution", "year"]
+      },
+      "PortfolioItem": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pfi_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "imageUrl": {
+            "type": "string"
+          },
+          "caption": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "imageUrl", "caption"]
+      },
+      "ProfilePhoto": {
+        "type": "object",
+        "properties": {
+          "photoUrl": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["photoUrl"]
+      },
+      "MyApplications": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyApplication"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "MyApplication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "coverNote": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "required": ["id", "status", "coverNote", "createdAt", "job"]
+      },
+      "JobSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "example": "/jobs/nsw/surry-hills/senior-colourist-willow-and-ash-hair"
+          },
+          "title": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "senior_stylist",
+              "stylist",
+              "junior_stylist",
+              "apprentice_hair",
+              "colourist",
+              "barber",
+              "beauty_therapist",
+              "nail_technician",
+              "lash_brow",
+              "makeup_artist",
+              "skin_therapist",
+              "massage_spa",
+              "apprentice_beauty",
+              "salon_manager",
+              "receptionist",
+              "educator"
+            ],
+            "example": "colourist"
+          },
+          "employmentType": {
+            "type": "string",
+            "enum": [
+              "full_time",
+              "part_time",
+              "casual",
+              "contract",
+              "apprenticeship",
+              "chair_rental"
+            ]
+          },
+          "payMin": {
+            "type": ["number", "null"]
+          },
+          "payMax": {
+            "type": ["number", "null"]
+          },
+          "payPeriod": {
+            "type": "string",
+            "enum": ["hour", "week", "year"]
+          },
+          "pay": {
+            "type": ["string", "null"],
+            "example": "$38–$45 per hour"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "suburbSlug": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "featured": {
+            "type": "boolean"
+          },
+          "closed": {
+            "type": "boolean",
+            "description": "Closed or expired: the ad stays up, marked closed."
+          },
+          "publishedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "expiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "salon": {
+            "$ref": "#/components/schemas/SalonSummary"
+          }
+        },
+        "required": [
+          "id",
+          "slug",
+          "path",
+          "title",
+          "role",
+          "employmentType",
+          "payMin",
+          "payMax",
+          "payPeriod",
+          "pay",
+          "suburb",
+          "suburbSlug",
+          "state",
+          "postcode",
+          "featured",
+          "closed",
+          "publishedAt",
+          "expiresAt",
+          "salon"
+        ]
+      },
+      "SalonSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string",
+            "example": "/salons/nsw/surry-hills/willow-and-ash-hair"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "logoUrl": {
+            "type": ["string", "null"]
+          },
+          "verified": {
+            "type": "boolean",
+            "description": "Claimed, with its ABN checked on the ABR."
+          },
+          "claimed": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "name", "path", "suburb", "state", "logoUrl", "verified", "claimed"]
+      },
+      "SavedJobs": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "Deleted": {
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["deleted"]
+      },
+      "Checks": {
+        "type": "object",
+        "properties": {
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          },
+          "checks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Check"
+            }
+          }
+        },
+        "required": ["verification", "checks"]
+      },
+      "Check": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "chk_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["identity", "right_to_work", "qualification"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "reference": {
+            "type": ["string", "null"],
+            "description": "The verification ID, once passed."
+          },
+          "title": {
+            "type": ["string", "null"],
+            "description": "A qualification's name."
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "decidedAt": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["id", "kind", "status", "reference", "title", "createdAt", "decidedAt"]
+      },
+      "RedirectUrl": {
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "description": "Send the person here."
+          }
+        },
+        "required": ["url"]
+      },
+      "JobSearch": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobList"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "facets": {
+                "$ref": "#/components/schemas/JobFacets"
+              }
+            },
+            "required": ["facets"]
+          }
+        ]
+      },
+      "JobFacets": {
+        "type": "object",
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "enum": [
+                    "senior_stylist",
+                    "stylist",
+                    "junior_stylist",
+                    "apprentice_hair",
+                    "colourist",
+                    "barber",
+                    "beauty_therapist",
+                    "nail_technician",
+                    "lash_brow",
+                    "makeup_artist",
+                    "skin_therapist",
+                    "massage_spa",
+                    "apprentice_beauty",
+                    "salon_manager",
+                    "receptionist",
+                    "educator"
+                  ],
+                  "example": "colourist"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": ["role", "count"]
+            }
+          },
+          "states": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "state": {
+                  "type": "string",
+                  "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                  "example": "NSW"
+                },
+                "count": {
+                  "type": "integer"
+                }
+              },
+              "required": ["state", "count"]
+            }
+          }
+        },
+        "required": ["roles", "states"],
+        "description": "Live jobs per role and per state, given the other filters."
+      },
+      "JobList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          }
+        },
+        "required": ["items", "page", "pageSize", "total", "pageCount"]
+      },
+      "JobsPath": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/JobsLanding"
+          },
+          {
+            "$ref": "#/components/schemas/JobAd"
+          },
+          {
+            "$ref": "#/components/schemas/PathRedirect"
+          }
+        ]
+      },
+      "JobsLanding": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["landing"]
+          },
+          "path": {
+            "type": "string"
+          },
+          "role": {
+            "type": ["string", "null"],
+            "enum": [
+              "senior_stylist",
+              "stylist",
+              "junior_stylist",
+              "apprentice_hair",
+              "colourist",
+              "barber",
+              "beauty_therapist",
+              "nail_technician",
+              "lash_brow",
+              "makeup_artist",
+              "skin_therapist",
+              "massage_spa",
+              "apprentice_beauty",
+              "salon_manager",
+              "receptionist",
+              "educator",
+              null
+            ],
+            "example": "colourist"
+          },
+          "state": {
+            "type": ["string", "null"],
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT", null],
+            "example": "NSW"
+          },
+          "suburbSlug": {
+            "type": ["string", "null"]
+          },
+          "suburbName": {
+            "type": ["string", "null"]
+          },
+          "heading": {
+            "type": "string",
+            "example": "Colourist jobs in Surry Hills NSW"
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "noindex": {
+            "type": "boolean",
+            "description": "No live jobs here: keep it out of search results."
+          },
+          "jobs": {
+            "$ref": "#/components/schemas/JobList"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "role",
+          "state",
+          "suburbSlug",
+          "suburbName",
+          "heading",
+          "breadcrumbs",
+          "noindex",
+          "jobs"
+        ]
+      },
+      "Breadcrumb": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["name", "path"]
+      },
+      "JobAd": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["job"]
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          "closed": {
+            "type": "boolean"
+          },
+          "noindex": {
+            "type": "boolean",
+            "description": "Closed ads stay up but out of search results."
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "similar": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            },
+            "description": "Up to 5 live jobs like it, for a closed ad."
+          },
+          "viewer": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobViewer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when signed in."
+          }
+        },
+        "required": ["kind", "job", "closed", "noindex", "breadcrumbs", "similar", "viewer"]
+      },
+      "JobDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "description": {
+                "type": "string"
+              },
+              "requirements": {
+                "type": ["string", "null"]
+              },
+              "requireQualification": {
+                "type": "boolean"
+              }
+            },
+            "required": ["description", "requirements", "requireQualification"]
+          }
+        ]
+      },
+      "JobViewer": {
+        "type": "object",
+        "properties": {
+          "applied": {
+            "type": "boolean"
+          },
+          "saved": {
+            "type": "boolean"
+          },
+          "canApply": {
+            "type": "boolean"
+          },
+          "blocker": {
+            "type": ["string", "null"],
+            "enum": [
+              "login",
+              "employer",
+              "applied",
+              "profile",
+              "verify",
+              "qualification",
+              "closed",
+              null
+            ],
+            "description": "Why you can't apply, so the right next step can be shown."
+          },
+          "reason": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["applied", "saved", "canApply", "blocker", "reason"]
+      },
+      "PathRedirect": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["redirect"]
+          },
+          "redirect": {
+            "type": "string",
+            "description": "Answer with a 301 to this path."
+          }
+        },
+        "required": ["kind", "redirect"]
+      },
+      "ApplicationCreated": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "createdAt": {
+            "type": "string"
+          },
+          "job": {
+            "$ref": "#/components/schemas/JobSummary"
+          }
+        },
+        "required": ["id", "status", "createdAt", "job"]
+      },
+      "SavedState": {
+        "type": "object",
+        "properties": {
+          "saved": {
+            "type": "boolean"
+          }
+        },
+        "required": ["saved"]
+      },
+      "MySalon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "slug": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "abn": {
+            "type": ["string", "null"]
+          },
+          "abnStatus": {
+            "type": "string",
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+          },
+          "abnEntityName": {
+            "type": ["string", "null"]
+          },
+          "contactName": {
+            "type": ["string", "null"]
+          },
+          "phone": {
+            "type": ["string", "null"]
+          },
+          "email": {
+            "type": ["string", "null"]
+          },
+          "website": {
+            "type": ["string", "null"]
+          },
+          "instagram": {
+            "type": ["string", "null"]
+          },
+          "address": {
+            "type": ["string", "null"]
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "postcode": {
+            "type": "string"
+          },
+          "about": {
+            "type": ["string", "null"]
+          },
+          "logoUrl": {
+            "type": ["string", "null"]
+          },
+          "status": {
+            "type": "string",
+            "enum": ["active", "suspended", "removed"]
+          },
+          "statusReason": {
+            "type": ["string", "null"]
+          },
+          "source": {
+            "type": "string",
+            "enum": ["owner", "directory"]
+          },
+          "founding": {
+            "type": "boolean"
+          },
+          "freeUntil": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "listingCredits": {
+            "type": "integer"
+          },
+          "claimedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "entitlement": {
+            "$ref": "#/components/schemas/Entitlement"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "slug",
+          "path",
+          "abn",
+          "abnStatus",
+          "abnEntityName",
+          "contactName",
+          "phone",
+          "email",
+          "website",
+          "instagram",
+          "address",
+          "suburb",
+          "state",
+          "postcode",
+          "about",
+          "logoUrl",
+          "status",
+          "statusReason",
+          "source",
+          "founding",
+          "freeUntil",
+          "listingCredits",
+          "claimedAt",
+          "createdAt",
+          "entitlement"
+        ]
+      },
+      "Entitlement": {
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "description": "Whether a job can be published right now."
+          },
+          "via": {
+            "type": ["string", "null"],
+            "enum": ["free_period", "subscription", "credit", null]
+          },
+          "reason": {
+            "type": ["string", "null"],
+            "enum": ["suspended", "needs_listing", null]
+          }
+        },
+        "required": ["ok", "via", "reason"]
+      },
+      "SalonJobs": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalonJob"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "SalonJob": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobDetail"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["draft", "published", "expired", "closed"],
+                "description": "`expired`: published, but its 30 days are up."
+              },
+              "paidVia": {
+                "type": ["string", "null"]
+              },
+              "applicants": {
+                "type": "integer"
+              },
+              "newApplicants": {
+                "type": "integer"
+              },
+              "createdAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-25T03:00:00.000Z"
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "example": "2026-11-25T03:00:00.000Z"
+              }
+            },
+            "required": [
+              "status",
+              "paidVia",
+              "applicants",
+              "newApplicants",
+              "createdAt",
+              "updatedAt"
+            ]
+          }
+        ]
+      },
+      "NewJob": {
+        "allOf": [
+          {
+            "type": "object",
+            "properties": {
+              "title": {
+                "type": "string",
+                "minLength": 4,
+                "maxLength": 120
+              },
+              "role": {
+                "type": "string",
+                "enum": [
+                  "senior_stylist",
+                  "stylist",
+                  "junior_stylist",
+                  "apprentice_hair",
+                  "colourist",
+                  "barber",
+                  "beauty_therapist",
+                  "nail_technician",
+                  "lash_brow",
+                  "makeup_artist",
+                  "skin_therapist",
+                  "massage_spa",
+                  "apprentice_beauty",
+                  "salon_manager",
+                  "receptionist",
+                  "educator"
+                ]
+              },
+              "employmentType": {
+                "type": "string",
+                "enum": [
+                  "full_time",
+                  "part_time",
+                  "casual",
+                  "contract",
+                  "apprenticeship",
+                  "chair_rental"
+                ]
+              },
+              "payMin": {
+                "type": ["number", "null"],
+                "minimum": 0,
+                "maximum": 500000
+              },
+              "payMax": {
+                "type": ["number", "null"],
+                "minimum": 0,
+                "maximum": 500000
+              },
+              "payPeriod": {
+                "type": "string",
+                "enum": ["hour", "week", "year"],
+                "default": "hour"
+              },
+              "suburb": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "state": {
+                "type": "string",
+                "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+              },
+              "postcode": {
+                "type": "string",
+                "pattern": "^\\d{4}$"
+              },
+              "description": {
+                "type": "string",
+                "minLength": 40,
+                "maxLength": 8000
+              },
+              "requirements": {
+                "type": "string",
+                "maxLength": 3000
+              },
+              "requireQualification": {
+                "type": "boolean",
+                "default": false
+              }
+            },
+            "required": [
+              "title",
+              "role",
+              "employmentType",
+              "suburb",
+              "state",
+              "postcode",
+              "description"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "publish": {
+                "type": "boolean",
+                "default": false,
+                "description": "Publish straight away (uses the free period, the plan or a credit)."
+              }
+            }
+          }
+        ]
+      },
+      "JobChanges": {
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 4,
+            "maxLength": 120
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "senior_stylist",
+              "stylist",
+              "junior_stylist",
+              "apprentice_hair",
+              "colourist",
+              "barber",
+              "beauty_therapist",
+              "nail_technician",
+              "lash_brow",
+              "makeup_artist",
+              "skin_therapist",
+              "massage_spa",
+              "apprentice_beauty",
+              "salon_manager",
+              "receptionist",
+              "educator"
+            ]
+          },
+          "employmentType": {
+            "type": "string",
+            "enum": [
+              "full_time",
+              "part_time",
+              "casual",
+              "contract",
+              "apprenticeship",
+              "chair_rental"
+            ]
+          },
+          "payMin": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "payMax": {
+            "type": ["number", "null"],
+            "minimum": 0,
+            "maximum": 500000
+          },
+          "payPeriod": {
+            "type": "string",
+            "enum": ["hour", "week", "year"],
+            "default": "hour"
+          },
+          "suburb": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "description": {
+            "type": "string",
+            "minLength": 40,
+            "maxLength": 8000
+          },
+          "requirements": {
+            "type": "string",
+            "maxLength": 3000
+          },
+          "requireQualification": {
+            "type": "boolean",
+            "default": false
+          }
+        }
+      },
+      "Applicants": {
+        "type": "object",
+        "properties": {
+          "job": {
+            "$ref": "#/components/schemas/SalonJob"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Applicant"
+            }
+          }
+        },
+        "required": ["job", "items"]
+      },
+      "Applicant": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "isNew": {
+            "type": "boolean",
+            "description": "Not seen before this request."
+          },
+          "coverNote": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "candidateId": {
+            "type": "string"
+          },
+          "candidate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CandidateSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "isNew",
+          "coverNote",
+          "createdAt",
+          "candidateId",
+          "candidate",
+          "verification"
+        ]
+      },
+      "CandidateSummary": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "firstName": {
+            "type": "string"
+          },
+          "lastName": {
+            "type": "string"
+          },
+          "headline": {
+            "type": ["string", "null"]
+          },
+          "photoUrl": {
+            "type": ["string", "null"]
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "senior_stylist",
+                "stylist",
+                "junior_stylist",
+                "apprentice_hair",
+                "colourist",
+                "barber",
+                "beauty_therapist",
+                "nail_technician",
+                "lash_brow",
+                "makeup_artist",
+                "skin_therapist",
+                "massage_spa",
+                "apprentice_beauty",
+                "salon_manager",
+                "receptionist",
+                "educator"
+              ],
+              "example": "colourist"
+            }
+          },
+          "yearsExperience": {
+            "type": "integer"
+          },
+          "rightToWork": {
+            "type": "string",
+            "enum": [
+              "citizen",
+              "permanent_resident",
+              "visa_full",
+              "visa_limited",
+              "needs_sponsorship"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "firstName",
+          "lastName",
+          "headline",
+          "photoUrl",
+          "suburb",
+          "state",
+          "roles",
+          "yearsExperience",
+          "rightToWork"
+        ]
+      },
+      "ApplicationStatusChanged": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          }
+        },
+        "required": ["id", "status"]
+      },
+      "Candidate": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FullProfile"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              },
+              "contact": {
+                "$ref": "#/components/schemas/Contact"
+              },
+              "applications": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "jobId": {
+                      "type": "string"
+                    },
+                    "jobTitle": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "submitted",
+                        "viewed",
+                        "shortlisted",
+                        "interview",
+                        "hired",
+                        "declined"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "example": "2026-11-25T03:00:00.000Z"
+                    }
+                  },
+                  "required": ["id", "jobId", "jobTitle", "status", "createdAt"]
+                }
+              }
+            },
+            "required": ["id", "contact", "applications"]
+          }
+        ]
+      },
+      "Contact": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": ["string", "null"]
+          },
+          "phone": {
+            "type": ["string", "null"]
+          }
+        },
+        "required": ["email", "phone"]
+      },
+      "SalonList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DirectorySalon"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          }
+        },
+        "required": ["items", "page", "pageSize", "total", "pageCount"]
+      },
+      "DirectorySalon": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/SalonSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "suburbSlug": {
+                "type": "string"
+              },
+              "about": {
+                "type": ["string", "null"]
+              },
+              "liveJobs": {
+                "type": "integer"
+              }
+            },
+            "required": ["suburbSlug", "about", "liveJobs"]
+          }
+        ]
+      },
+      "SalonsPath": {
+        "anyOf": [
+          {
+            "$ref": "#/components/schemas/SalonsLanding"
+          },
+          {
+            "$ref": "#/components/schemas/SalonPage"
+          },
+          {
+            "$ref": "#/components/schemas/PathRedirect"
+          }
+        ]
+      },
+      "SalonsLanding": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["landing"]
+          },
+          "path": {
+            "type": "string"
+          },
+          "state": {
+            "type": ["string", "null"],
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT", null],
+            "example": "NSW"
+          },
+          "suburbSlug": {
+            "type": ["string", "null"]
+          },
+          "suburbName": {
+            "type": ["string", "null"]
+          },
+          "heading": {
+            "type": "string",
+            "example": "Hair and beauty salons in Fitzroy VIC"
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "noindex": {
+            "type": "boolean"
+          },
+          "salons": {
+            "$ref": "#/components/schemas/SalonList"
+          }
+        },
+        "required": [
+          "kind",
+          "path",
+          "state",
+          "suburbSlug",
+          "suburbName",
+          "heading",
+          "breadcrumbs",
+          "noindex",
+          "salons"
+        ]
+      },
+      "SalonPage": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["salon"]
+          },
+          "salon": {
+            "$ref": "#/components/schemas/PublicSalon"
+          },
+          "jobs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          },
+          "claimable": {
+            "type": "boolean",
+            "description": "Unclaimed: its owner can claim it."
+          },
+          "breadcrumbs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Breadcrumb"
+            }
+          },
+          "noindex": {
+            "type": "boolean"
+          }
+        },
+        "required": ["kind", "salon", "jobs", "claimable", "breadcrumbs", "noindex"]
+      },
+      "PublicSalon": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DirectorySalon"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "postcode": {
+                "type": "string"
+              },
+              "website": {
+                "type": ["string", "null"]
+              },
+              "instagram": {
+                "type": ["string", "null"]
+              },
+              "contact": {
+                "type": ["object", "null"],
+                "properties": {
+                  "phone": {
+                    "type": ["string", "null"]
+                  },
+                  "email": {
+                    "type": ["string", "null"]
+                  },
+                  "address": {
+                    "type": ["string", "null"]
+                  }
+                },
+                "required": ["phone", "email", "address"],
+                "description": "Shown only to signed-in visitors."
+              }
+            },
+            "required": ["postcode", "website", "instagram", "contact"]
+          }
+        ]
+      },
+      "Claim": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "clm_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "salonId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["pending_email", "pending_review", "approved", "rejected"]
+          },
+          "sentTo": {
+            "type": ["string", "null"],
+            "description": "Where the confirmation link went, masked (`he•••@salon.com`)."
+          },
+          "decisionNote": {
+            "type": ["string", "null"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "decidedAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "salonId", "status", "sentTo", "decisionNote", "createdAt", "decidedAt"]
+      },
+      "StartClaim": {
+        "type": "object",
+        "properties": {
+          "abn": {
+            "type": "string"
+          },
+          "contactName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "phone": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 20
+          },
+          "method": {
+            "type": "string",
+            "enum": ["email", "review"],
+            "default": "email",
+            "description": "`email`: a link to the listing's business email (when it has one). `review`: staff check it."
+          }
+        },
+        "required": ["abn", "contactName", "phone"]
+      },
+      "ClaimConfirmed": {
+        "type": "object",
+        "properties": {
+          "claim": {
+            "$ref": "#/components/schemas/Claim"
+          },
+          "salon": {
+            "$ref": "#/components/schemas/MySalon"
+          }
+        },
+        "required": ["claim", "salon"]
+      },
+      "Billing": {
+        "type": "object",
+        "properties": {
+          "billingOn": {
+            "type": "boolean",
+            "description": "Real payments are switched on here."
+          },
+          "entitlement": {
+            "$ref": "#/components/schemas/Entitlement"
+          },
+          "freeUntil": {
+            "type": ["string", "null"]
+          },
+          "listingCredits": {
+            "type": "integer"
+          },
+          "founding": {
+            "type": "boolean"
+          },
+          "prices": {
+            "type": "object",
+            "properties": {
+              "singleListingCents": {
+                "type": "integer"
+              },
+              "planMonthlyCents": {
+                "type": "integer",
+                "description": "Your plan price (founding salons pay less)."
+              },
+              "listingDays": {
+                "type": "integer"
+              }
+            },
+            "required": ["singleListingCents", "planMonthlyCents", "listingDays"]
+          },
+          "subscription": {
+            "type": ["object", "null"],
+            "properties": {
+              "status": {
+                "type": "string"
+              },
+              "currentPeriodEnd": {
+                "type": ["string", "null"]
+              },
+              "active": {
+                "type": "boolean"
+              }
+            },
+            "required": ["status", "currentPeriodEnd", "active"]
+          },
+          "payments": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["single_listing", "salon_plan", "founding_plan"]
+                },
+                "amountCents": {
+                  "type": "integer"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["pending", "paid", "failed"]
+                },
+                "createdAt": {
+                  "type": "string"
+                }
+              },
+              "required": ["id", "kind", "amountCents", "status", "createdAt"]
+            }
+          }
+        },
+        "required": [
+          "billingOn",
+          "entitlement",
+          "freeUntil",
+          "listingCredits",
+          "founding",
+          "prices",
+          "subscription",
+          "payments"
+        ]
+      },
+      "Checkout": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["single_listing", "salon_plan"]
+          }
+        },
+        "required": ["kind"]
+      },
+      "WebhookReceived": {
+        "type": "object",
+        "properties": {
+          "received": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["received"]
+      },
+      "Sitemap": {
+        "type": "object",
+        "properties": {
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": {
+                  "type": "string"
+                },
+                "lastmod": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": ["job", "salon", "jobs_landing", "salons_landing"]
+                }
+              },
+              "required": ["path", "lastmod", "kind"]
+            }
+          }
+        },
+        "required": ["entries"]
+      },
+      "DevOutcome": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string"
+          }
+        },
+        "required": ["status"]
+      }
+    },
+    "parameters": {}
+  },
+  "paths": {
+    "/v1": {
+      "get": {
+        "summary": "API information",
+        "description": "Where to find the documentation and the machine-readable description of this API.",
+        "tags": ["Meta"],
+        "responses": {
+          "200": {
+            "description": "API information",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiInfo"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me": {
+      "get": {
+        "summary": "Who you are",
+        "description": "Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salon you manage (if any).",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Your account",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete your account",
+        "description": "Permanently deletes your account, profile, pictures, applications and checks, and signs you out everywhere. A salon you created is deleted with its jobs; a directory listing you claimed goes back to being unclaimed. This can't be undone.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile": {
+      "get": {
+        "summary": "Your full profile",
+        "description": "Everything salons see when you apply: basics, skills and availability, experience, education, portfolio and verification.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "Save your basic details",
+        "description": "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. The mobile number may be in any Australian format; it's stored as +614….",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "lastName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  },
+                  "phone": {
+                    "type": "string"
+                  },
+                  "headline": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "about": {
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "suburb": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+                  },
+                  "postcode": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  },
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "senior_stylist",
+                        "stylist",
+                        "junior_stylist",
+                        "apprentice_hair",
+                        "colourist",
+                        "barber",
+                        "beauty_therapist",
+                        "nail_technician",
+                        "lash_brow",
+                        "makeup_artist",
+                        "skin_therapist",
+                        "massage_spa",
+                        "apprentice_beauty",
+                        "salon_manager",
+                        "receptionist",
+                        "educator"
+                      ]
+                    },
+                    "minItems": 1,
+                    "maxItems": 6
+                  },
+                  "yearsExperience": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "maximum": 60
+                  },
+                  "qualifications": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "instagram": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "rightToWork": {
+                    "type": "string",
+                    "enum": [
+                      "citizen",
+                      "permanent_resident",
+                      "visa_full",
+                      "visa_limited",
+                      "needs_sponsorship"
+                    ]
+                  },
+                  "openToWork": {
+                    "type": "boolean",
+                    "default": true
+                  }
+                },
+                "required": [
+                  "firstName",
+                  "lastName",
+                  "suburb",
+                  "state",
+                  "postcode",
+                  "roles",
+                  "yearsExperience",
+                  "rightToWork"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile/details": {
+      "put": {
+        "summary": "Save your skills and availability",
+        "description": "Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and your pay expectation. Needs a profile first.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "specialties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    },
+                    "maxItems": 20,
+                    "default": []
+                  },
+                  "brands": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 40
+                    },
+                    "maxItems": 15,
+                    "default": []
+                  },
+                  "availableDays": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+                    },
+                    "default": []
+                  },
+                  "employmentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "casual",
+                        "contract",
+                        "apprenticeship",
+                        "chair_rental"
+                      ]
+                    },
+                    "default": []
+                  },
+                  "availableFrom": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [""]
+                      }
+                    ]
+                  },
+                  "travelKm": {
+                    "type": ["integer", "null"],
+                    "minimum": 0,
+                    "maximum": 500
+                  },
+                  "payExpectation": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/photo": {
+      "post": {
+        "summary": "Set your profile photo",
+        "description": "A JPG, PNG, WebP or HEIC image of 8MB or less, as the `file` field of a multipart form. Replaces (and deletes) any earlier photo.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPG, PNG, WebP or HEIC, 8MB at most."
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilePhoto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Not an image",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Remove your profile photo",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "No photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfilePhoto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/portfolio": {
+      "post": {
+        "summary": "Add a portfolio photo",
+        "description": "An image of your work (`file`, multipart) with an optional `caption`. Up to 24 photos.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "JPG, PNG, WebP or HEIC, 8MB at most."
+                  },
+                  "caption": {
+                    "type": "string",
+                    "maxLength": 140
+                  }
+                },
+                "required": ["file"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The new portfolio photo",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioItem"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet, or the portfolio is full",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Not an image",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/portfolio/{id}": {
+      "delete": {
+        "summary": "Remove a portfolio photo",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "pfi_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/experience": {
+      "post": {
+        "summary": "Add a role to your experience",
+        "description": "Months are `YYYY-MM`; leave `endMonth` out for your current role. Up to 15.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "salonName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "location": {
+                    "type": "string",
+                    "maxLength": 120
+                  },
+                  "startMonth": {
+                    "type": "string",
+                    "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                  },
+                  "endMonth": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "pattern": "^\\d{4}-(0[1-9]|1[0-2])$"
+                      },
+                      {
+                        "type": "string",
+                        "enum": [""]
+                      }
+                    ]
+                  },
+                  "description": {
+                    "type": "string",
+                    "maxLength": 1000
+                  }
+                },
+                "required": ["salonName", "title", "startMonth"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet, or the list is full",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/experience/{id}": {
+      "delete": {
+        "summary": "Remove a role from your experience",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "exp_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/education": {
+      "post": {
+        "summary": "Add a qualification or course",
+        "description": "What you studied and where. Up to 10. To have a certificate verified, use POST /v1/me/checks/qualification.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "qualification": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "institution": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "year": {
+                    "type": ["integer", "null"],
+                    "minimum": 1960,
+                    "maximum": 2100
+                  }
+                },
+                "required": ["qualification", "institution"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet, or the list is full",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/education/{id}": {
+      "delete": {
+        "summary": "Remove a qualification or course",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "edu_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FullProfile"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/applications": {
+      "get": {
+        "summary": "Your applications",
+        "description": "Newest first, with where each is up to. Closed jobs stay listed, marked `closed`.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Your applications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyApplications"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/saved": {
+      "get": {
+        "summary": "Your saved jobs",
+        "description": "Newest first. Closed jobs stay listed, marked `closed`.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Your saved jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedJobs"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/checks": {
+      "get": {
+        "summary": "Your verification checks",
+        "description": "Your verification summary (statuses, level and verification IDs) and every check you've started, newest first.",
+        "tags": ["Verification"],
+        "responses": {
+          "200": {
+            "description": "Your checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Checks"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/checks/identity": {
+      "post": {
+        "summary": "Start an identity check",
+        "description": "Returns a `url` to send the person to: Stripe Identity's pages (a government ID and a live selfie), or locally a mock page. Afterwards they come back to `returnUrl` (default: the website's /account/verify; the mobile app passes `salonstaff://verify-complete`). The result arrives by webhook: re-read GET /v1/me/checks. Needs a profile first, so the name on the ID can be compared with it.",
+        "tags": ["Verification"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "returnUrl": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "example": "salonstaff://verify-complete"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to send the person",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectUrl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already verified, or no profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Identity checks aren't set up here",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/checks/right-to-work": {
+      "post": {
+        "summary": "Send your right to work for checking",
+        "description": "Staff check it (VEVO for a visa, so a visa needs its grant number). The grant number and passport country are deleted as soon as it's decided; only the basis and how it was checked are kept.",
+        "tags": ["Verification"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "basis": {
+                    "type": "string",
+                    "enum": ["citizen", "permanent_resident", "visa"]
+                  },
+                  "visaGrantNumber": {
+                    "type": "string",
+                    "maxLength": 20
+                  },
+                  "passportCountry": {
+                    "type": "string",
+                    "maxLength": 60
+                  }
+                },
+                "required": ["basis"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Checks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already waiting for review, or already verified",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/checks/qualification": {
+      "post": {
+        "summary": "Send a qualification for checking",
+        "description": "A certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) and the qualification's `title`, e.g. Cert III in Hairdressing. The certificate is kept privately only until staff decide, then deleted.",
+        "tags": ["Verification"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  }
+                },
+                "required": ["file", "title"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your checks",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Checks"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "A qualification is already waiting for review",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "Too large",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "Not a PDF or image",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs": {
+      "get": {
+        "summary": "Search live jobs",
+        "description": "Live jobs, featured first, then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`).",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "senior_stylist",
+                "stylist",
+                "junior_stylist",
+                "apprentice_hair",
+                "colourist",
+                "barber",
+                "beauty_therapist",
+                "nail_technician",
+                "lash_brow",
+                "makeup_artist",
+                "skin_therapist",
+                "massage_spa",
+                "apprentice_beauty",
+                "salon_manager",
+                "receptionist",
+                "educator"
+              ],
+              "example": "colourist"
+            },
+            "required": false,
+            "name": "role",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+              "example": "NSW"
+            },
+            "required": false,
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,80}$",
+              "example": "surry-hills"
+            },
+            "required": false,
+            "name": "suburb",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": [
+                "full_time",
+                "part_time",
+                "casual",
+                "contract",
+                "apprenticeship",
+                "chair_rental"
+              ]
+            },
+            "required": false,
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 1,
+              "description": "1 for the first page.",
+              "example": 1
+            },
+            "required": false,
+            "description": "1 for the first page.",
+            "name": "page",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobSearch"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/by-path": {
+      "get": {
+        "summary": "Resolve a /jobs address",
+        "description": "What the website shows at a `/jobs/...` address (D-07). `kind: landing` is a role and/or place listing (`/jobs/hairdresser/nsw/surry-hills`) with its live jobs, `noindex` when there are none. `kind: job` is a job ad; a closed or expired one still answers, with `closed: true` and up to 5 similar live jobs. `kind: redirect` means the ad or salon was renamed or moved: answer with a 301 to `redirect`. Anything else is a 404.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "example": "/jobs/nsw/surry-hills/senior-colourist-willow-and-ash-hair"
+            },
+            "required": true,
+            "name": "path",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 1,
+              "description": "1 for the first page.",
+              "example": 1
+            },
+            "required": false,
+            "description": "1 for the first page.",
+            "name": "page",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What's at that address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobsPath"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at that address",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/apply": {
+      "post": {
+        "summary": "Apply for a job",
+        "description": "Needs a profile and a verified identity (and a verified qualification if the job asks for one). Up to 20 applications a day. The salon is told straight away; they see your full profile and contact details.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "coverNote": {
+                    "type": "string",
+                    "maxLength": 1500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your application",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationCreated"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not eligible: see `code` (`not_verified`, `cannot_apply`, `forbidden`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live job with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already applied",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "The daily limit is reached",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/jobs/{id}/save": {
+      "post": {
+        "summary": "Save a job",
+        "description": "Keeps it in GET /v1/me/saved. Saving twice is fine.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No live job with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Stop saving a job",
+        "description": "Works for closed jobs too. Removing one that isn't saved is fine.",
+        "tags": ["Jobs"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Not saved",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedState"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon": {
+      "post": {
+        "summary": "Create your salon",
+        "description": "Onboarding. The ABN is checksum-checked, then looked up on the Australian Business Register. If the business is already in the directory (an unclaimed listing with that ABN), claim it instead: the 409's `hint` names its claim page. New salons list jobs free for 90 days, and the first 200 keep founding pricing. Your account becomes an employer account.",
+        "tags": ["Salon"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "abn": {
+                    "type": "string"
+                  },
+                  "contactName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "phone": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 20
+                  },
+                  "website": {
+                    "type": "string",
+                    "maxLength": 200
+                  },
+                  "instagram": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "suburb": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+                  },
+                  "postcode": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  },
+                  "about": {
+                    "type": "string",
+                    "maxLength": 2000
+                  }
+                },
+                "required": ["name", "abn", "contactName", "phone", "suburb", "state", "postcode"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Your salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySalon"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "You already manage a salon, or the business's listing should be claimed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "get": {
+        "summary": "Your salon",
+        "description": "Its details, public `path`, launch terms and whether it can publish a job now (`entitlement`).",
+        "tags": ["Salon"],
+        "responses": {
+          "200": {
+            "description": "Your salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySalon"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Change your salon's details",
+        "description": "Send only what changes; a blank or null website, Instagram or about clears it. A new name, suburb or state gives the salon (and its jobs) a new address; the old ones redirect. A new ABN is checked again.",
+        "tags": ["Salon"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 2,
+                    "maxLength": 120
+                  },
+                  "abn": {
+                    "type": "string"
+                  },
+                  "contactName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "phone": {
+                    "type": "string",
+                    "minLength": 8,
+                    "maxLength": 20
+                  },
+                  "website": {
+                    "type": ["string", "null"],
+                    "maxLength": 200
+                  },
+                  "instagram": {
+                    "type": ["string", "null"],
+                    "maxLength": 60
+                  },
+                  "suburb": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+                  },
+                  "postcode": {
+                    "type": "string",
+                    "pattern": "^\\d{4}$"
+                  },
+                  "about": {
+                    "type": ["string", "null"],
+                    "maxLength": 2000
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySalon"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/jobs": {
+      "get": {
+        "summary": "Your salon's jobs",
+        "description": "Newest first, drafts included, with how many people applied and how many are new.",
+        "tags": ["Salon"],
+        "responses": {
+          "200": {
+            "description": "Your jobs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonJobs"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Post a job",
+        "description": "Saved as a draft, or published for 30 days with `publish: true`. Publishing uses the free period, then the Salon Plan, then a listing credit; with none of those it's refused (`listing_needed`) and nothing is saved.",
+        "tags": ["Salon"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewJob"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "A listing credit or the Salon Plan is needed to publish",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The salon is suspended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/jobs/{id}": {
+      "get": {
+        "summary": "One of your jobs",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Change a job",
+        "description": "Send only what changes. A new title, suburb or state gives a published ad a new address; the old one redirects.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonJob"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/jobs/{id}/publish": {
+      "post": {
+        "summary": "Publish or relist a job",
+        "description": "Live for 30 days from now. Uses the free period, then the Salon Plan, then a listing credit (taken in the same step). A job that's already live is left alone and nothing is charged.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "402": {
+            "description": "A listing credit or the Salon Plan is needed",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The salon is suspended",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/jobs/{id}/close": {
+      "post": {
+        "summary": "Close a job",
+        "description": "Stops applications. The ad keeps its address, marked closed.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The job",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonJob"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/jobs/{id}/applicants": {
+      "get": {
+        "summary": "Who applied for a job",
+        "description": "Newest first, with each person's profile summary and verification. Opening the list marks new applications as viewed (`isNew` says which were new).",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "job_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The applicants",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Applicants"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/applications/{id}": {
+      "patch": {
+        "summary": "Move an application along",
+        "description": "The applicant is told (email, or SMS for a mobile-only account) when it becomes shortlisted, interview, hired or declined.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+                  }
+                },
+                "required": ["status"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The new status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationStatusChanged"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/candidates/{userId}": {
+      "get": {
+        "summary": "A candidate's full profile",
+        "description": "Only for someone who applied to one of your jobs: their full profile, verification, contact details and their applications to your salon.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The candidate",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Candidate"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nobody with that ID applied to your salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salons": {
+      "get": {
+        "summary": "Search the salon directory",
+        "description": "Salons with live jobs first, then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job.",
+        "tags": ["Directory"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 100
+            },
+            "required": false,
+            "name": "q",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+              "example": "NSW"
+            },
+            "required": false,
+            "name": "state",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^[a-z0-9-]{1,80}$"
+            },
+            "required": false,
+            "name": "suburb",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "required": false,
+            "name": "hiring",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 1,
+              "description": "1 for the first page.",
+              "example": 1
+            },
+            "required": false,
+            "description": "1 for the first page.",
+            "name": "page",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of salons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonList"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salons/by-path": {
+      "get": {
+        "summary": "Resolve a /salons address",
+        "description": "What the website shows at a `/salons/...` address (D-07): the directory for a state or suburb (`kind: landing`), a salon's page with its live jobs (`kind: salon`; contact details only for signed-in visitors), or `kind: redirect` for a renamed or moved salon (answer with a 301). Anything else is a 404.",
+        "tags": ["Directory"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "maxLength": 300,
+              "example": "/salons/vic/fitzroy/the-fade-room"
+            },
+            "required": true,
+            "name": "path",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500,
+              "default": 1,
+              "description": "1 for the first page.",
+              "example": 1
+            },
+            "required": false,
+            "description": "1 for the first page.",
+            "name": "page",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "What's at that address",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonsPath"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing at that address",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salons/{id}/claims": {
+      "post": {
+        "summary": "Claim a directory listing",
+        "description": "The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with `method: email` we send a link to the listing's own email (it lasts 48 hours; `sentTo` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with `method: review`, staff check it. An approved claim makes the listing yours, with the free period and founding pricing of a new salon.",
+        "tags": ["Directory"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/StartClaim"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Claim"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already claimed, the ABN doesn't match, or you already manage a salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/claims/verify/{token}": {
+      "post": {
+        "summary": "Confirm a claim from its emailed link",
+        "description": "Sign in as the person who started the claim first. Completes the claim: the listing becomes your salon and your account an employer account.",
+        "tags": ["Directory"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "q2f…"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your salon",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClaimConfirmed"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link is invalid or has expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Another account started this claim",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "In conflict with the current state",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/claims/{id}/review": {
+      "post": {
+        "summary": "Ask staff to check a claim instead",
+        "description": "For when the listing's email can't be reached. The emailed link stops working.",
+        "tags": ["Directory"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "clm_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Claim"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already decided",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salons/{id}/claims/mine": {
+      "get": {
+        "summary": "Your claim on a listing",
+        "description": "Your most recent claim on it, whatever its status.",
+        "tags": ["Directory"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your claim",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Claim"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No claim, or no such salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/billing": {
+      "get": {
+        "summary": "Your salon's billing",
+        "description": "Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.",
+        "tags": ["Billing"],
+        "responses": {
+          "200": {
+            "description": "Billing",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Billing"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/billing/checkout": {
+      "post": {
+        "summary": "Buy a listing or start the Salon Plan",
+        "description": "Returns a checkout `url` (Stripe Checkout; locally a mock page). A single listing ($49, GST included) adds one credit that publishes a job for 30 days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.",
+        "tags": ["Billing"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Checkout"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Where to pay",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectUrl"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet, or billing is off",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already on the Salon Plan",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/salon/billing/portal": {
+      "post": {
+        "summary": "Manage your plan and invoices",
+        "description": "Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.",
+        "tags": ["Billing"],
+        "responses": {
+          "200": {
+            "description": "The billing portal",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RedirectUrl"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No salon yet, or billing is off",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Nothing bought yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/webhooks/stripe": {
+      "post": {
+        "summary": "Stripe webhooks",
+        "description": "Checkout payments, subscription changes and Stripe Identity results, signed with the webhook secret (`Stripe-Signature`). For Stripe only.",
+        "tags": ["Webhooks"],
+        "responses": {
+          "200": {
+            "description": "Handled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WebhookReceived"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not signed by Stripe",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Webhooks aren't set up here",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/site/sitemap": {
+      "get": {
+        "summary": "Everything for the sitemap",
+        "description": "Every live job ad, every visible salon page, and every listing page that has something on it: jobs by role and place (`/jobs/{role}/{state}/{suburb}` and everything above it) and the directory by place. Closed jobs and empty listings are left out.",
+        "tags": ["Site"],
+        "responses": {
+          "200": {
+            "description": "Sitemap entries",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Sitemap"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dev/identity/{ref}": {
+      "post": {
+        "summary": "Finish a mock identity check (local only)",
+        "description": "What Stripe Identity's webhook does deployed. `verified` passes the check with the profile's own name, so the name matches.",
+        "tags": ["Development"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "mock_4fQ9…"
+            },
+            "required": true,
+            "name": "ref",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "type": "string",
+                    "enum": ["verified", "failed"]
+                  }
+                },
+                "required": ["outcome"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The check's new status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevOutcome"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such mock check",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/dev/checkout/{ref}": {
+      "post": {
+        "summary": "Finish a mock checkout (local only)",
+        "description": "What Stripe's checkout webhook does deployed: `paid` grants what was bought.",
+        "tags": ["Development"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "mock_4fQ9…"
+            },
+            "required": true,
+            "name": "ref",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "outcome": {
+                    "type": "string",
+                    "enum": ["paid", "cancelled"]
+                  }
+                },
+                "required": ["outcome"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The payment's new status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DevOutcome"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No such mock checkout",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "webhooks": {}
+}

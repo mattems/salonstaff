@@ -1,0 +1,22 @@
+/* The shadcn theme, then our additions to it. */
+@import "@salonstaff/ui/globals.css";
+@import "@salonstaff/ui/extras.css";
+
+/*
+ * Every panel on the page's own background while the UI is audited.
+ * Delete this block to bring them back.
+ */
+:root {
+  --card: var(--background);
+  --sidebar: var(--background);
+}
+[data-slot="card-footer"] {
+  background: transparent;
+}
+
+/*
+ * Tailwind only generates classes it finds in source files. Scan this app,
+ * and the shared UI package whose components it renders.
+ */
+@source "./";
+@source "../../../packages/ui/src";

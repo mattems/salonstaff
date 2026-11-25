@@ -1,0 +1,94 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // The API Worker: /v1/* (website + mobile), /v1/auth/* (Better Auth), /admin/v1/* (admin portal).
+  // The settings at the top are local; `env.production` holds the deployed ones.
+  // ENVIRONMENT is never set here: unset counts as production; locally .dev.vars sets it.
+  "name": "salonstaff-api",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": { "port": 8890 },
+  "observability": { "enabled": true },
+  "minify": true,
+  "upload_source_maps": true,
+  "vars": {
+    "BILLING": "off",
+    "IDENTITY_PROVIDER": "mock",
+    "APP_ORIGIN": "http://localhost:5300",
+    "ADMIN_ORIGIN": "http://localhost:5301",
+    "APP_ORIGINS": "http://localhost:5300,http://localhost:5301",
+    "EMAIL_FROM": "Salon Staff <hello@salonstaff.localhost>",
+    "MEDIA_URL": "http://localhost:8890/media"
+  },
+  "r2_buckets": [
+    { "binding": "MEDIA", "bucket_name": "salonstaff-media-local" },
+    { "binding": "PRIVATE", "bucket_name": "salonstaff-private-local" }
+  ],
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "00000000000000000000000000000000",
+      "localConnectionString": "postgres://salonstaff:salonstaff@localhost:54349/salonstaff"
+    }
+  ],
+  "ratelimits": [
+    { "name": "RATE_LIMITER", "namespace_id": "1000", "simple": { "limit": 300, "period": 60 } },
+    {
+      "name": "AUTH_RATE_LIMITER",
+      "namespace_id": "2000",
+      "simple": { "limit": 10, "period": 60 }
+    },
+    {
+      "name": "UPLOAD_RATE_LIMITER",
+      "namespace_id": "3000",
+      "simple": { "limit": 30, "period": 60 }
+    }
+  ],
+  "triggers": { "crons": ["17 3 * * *"] },
+
+  "env": {
+    "production": {
+      "name": "salonstaff-api",
+      "workers_dev": false,
+      "routes": [{ "pattern": "api.salonstaff.com.au", "custom_domain": true }],
+      // Next to the database. Set to the PlanetScale region you choose (docs/runbooks/first-deploy.md).
+      "placement": { "region": "aws:ap-southeast-2" },
+      "vars": {
+        "BILLING": "off",
+        "IDENTITY_PROVIDER": "stripe",
+        "APP_ORIGIN": "https://salonstaff.com.au",
+        "ADMIN_ORIGIN": "https://admin.salonstaff.com.au",
+        "APP_ORIGINS": "https://salonstaff.com.au,https://admin.salonstaff.com.au",
+        "EMAIL_FROM": "Salon Staff <hello@salonstaff.com.au>",
+        "MEDIA_URL": "https://cdn.salonstaff.com.au",
+        // Cloudflare Access in front of the admin portal (docs/runbooks/cloudflare-access.md). Not secrets.
+        "ACCESS_TEAM_DOMAIN": "",
+        "ACCESS_AUD": ""
+      },
+      "r2_buckets": [
+        { "binding": "MEDIA", "bucket_name": "salonstaff-media" },
+        { "binding": "PRIVATE", "bucket_name": "salonstaff-private" }
+      ],
+      // Replace with the Hyperdrive config's ID (docs/runbooks/planetscale.md).
+      "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "REPLACE_WITH_HYPERDRIVE_ID" }],
+      "ratelimits": [
+        {
+          "name": "RATE_LIMITER",
+          "namespace_id": "1000",
+          "simple": { "limit": 300, "period": 60 }
+        },
+        {
+          "name": "AUTH_RATE_LIMITER",
+          "namespace_id": "2000",
+          "simple": { "limit": 10, "period": 60 }
+        },
+        {
+          "name": "UPLOAD_RATE_LIMITER",
+          "namespace_id": "3000",
+          "simple": { "limit": 30, "period": 60 }
+        }
+      ],
+      "triggers": { "crons": ["17 3 * * *"] }
+    }
+  }
+}

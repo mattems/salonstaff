@@ -1,0 +1,13 @@
+{
+  "name": "@salonstaff/springboard",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun scripts/dev.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@salonstaff/config": "workspace:*"
+  }
+}
