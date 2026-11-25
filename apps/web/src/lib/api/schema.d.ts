@@ -120,7 +120,61 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    patch?: never;
+    /**
+     * Change your name
+     * @description The name a salon's team and the people you invite see. A job seeker's name follows their profile: change it with PUT /v1/me/profile instead.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["AccountChanges"];
+        };
+      };
+      responses: {
+        /** @description Your account */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Me"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Your name comes from your job seeker profile */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
     trace?: never;
   };
   "/v1/me/profile": {
@@ -4086,6 +4140,10 @@ export interface components {
         path: string;
         message: string;
       }[];
+    };
+    AccountChanges: {
+      /** @example Olive Owner */
+      name: string;
     };
     FullProfile: {
       profile: components["schemas"]["SeekerProfile"];

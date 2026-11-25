@@ -117,6 +117,38 @@ meRoutes.openapi(
 
 meRoutes.openapi(
   createRoute({
+    method: "patch",
+    path: "/v1/me",
+    summary: "Change your name",
+    description:
+      "The name a salon's team and the people you invite see. A job seeker's name follows their profile: change it with PUT /v1/me/profile instead.",
+    tags: TAGS,
+    request: jsonBody(
+      z
+        .object({ name: z.string().trim().min(1).max(100).openapi({ example: "Olive Owner" }) })
+        .openapi("AccountChanges"),
+    ),
+    responses: {
+      200: json(MeSchema, "Your account"),
+      400: errors[400],
+      401: errors[401],
+      409: problemResponse("Your name comes from your job seeker profile"),
+    },
+  }),
+  async (c) => {
+    const session = await requireUser(c);
+    const me = seeker(await c.get("db")(), session.user.id);
+    const { name } = c.req.valid("json");
+    if (!c.get("dryRun")) await me.rename(name, userActor(c, session.user.id));
+    const account = await me.account();
+    if (!account) throw new ApiError("unauthenticated", { hint: "Sign in again." });
+    if (c.get("dryRun")) account.user = { ...account.user, name };
+    return c.json(meJson(c, account), 200);
+  },
+);
+
+meRoutes.openapi(
+  createRoute({
     method: "get",
     path: "/v1/me/profile",
     summary: "Your full profile",

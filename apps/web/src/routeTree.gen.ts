@@ -29,6 +29,7 @@ import { Route as DevMockCheckoutRouteImport } from './routes/dev.mock-checkout'
 import { Route as DevMockIdentityRouteImport } from './routes/dev.mock-identity'
 import { Route as EmployerIndexRouteImport } from './routes/employer.index'
 import { Route as EmployerSalonIdRouteImport } from './routes/employer.$salonId'
+import { Route as EmployerAccountRouteImport } from './routes/employer.account'
 import { Route as EmployerOnboardingRouteImport } from './routes/employer.onboarding'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
 import { Route as JobsSplatRouteImport } from './routes/jobs.$'
@@ -144,6 +145,11 @@ const EmployerSalonIdRoute = EmployerSalonIdRouteImport.update({
   path: '/$salonId',
   getParentRoute: () => EmployerRoute,
 } as any)
+const EmployerAccountRoute = EmployerAccountRouteImport.update({
+  id: '/account',
+  path: '/account',
+  getParentRoute: () => EmployerRoute,
+} as any)
 const EmployerOnboardingRoute = EmployerOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -237,6 +243,7 @@ export interface FileRoutesByFullPath {
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
   '/employer/$salonId': typeof EmployerSalonIdRouteWithChildren
+  '/employer/account': typeof EmployerAccountRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
   '/jobs/$': typeof JobsSplatRoute
   '/salons/$': typeof SalonsSplatRoute
@@ -270,6 +277,7 @@ export interface FileRoutesByTo {
   '/claim/verify': typeof ClaimVerifyRoute
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
+  '/employer/account': typeof EmployerAccountRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
   '/jobs/$': typeof JobsSplatRoute
   '/salons/$': typeof SalonsSplatRoute
@@ -307,6 +315,7 @@ export interface FileRoutesById {
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
   '/employer/$salonId': typeof EmployerSalonIdRouteWithChildren
+  '/employer/account': typeof EmployerAccountRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
   '/jobs/$': typeof JobsSplatRoute
   '/salons/$': typeof SalonsSplatRoute
@@ -345,6 +354,7 @@ export interface FileRouteTypes {
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
     | '/employer/$salonId'
+    | '/employer/account'
     | '/employer/onboarding'
     | '/jobs/$'
     | '/salons/$'
@@ -378,6 +388,7 @@ export interface FileRouteTypes {
     | '/claim/verify'
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
+    | '/employer/account'
     | '/employer/onboarding'
     | '/jobs/$'
     | '/salons/$'
@@ -414,6 +425,7 @@ export interface FileRouteTypes {
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
     | '/employer/$salonId'
+    | '/employer/account'
     | '/employer/onboarding'
     | '/jobs/$'
     | '/salons/$'
@@ -595,6 +607,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployerSalonIdRouteImport
       parentRoute: typeof EmployerRoute
     }
+    '/employer/account': {
+      id: '/employer/account'
+      path: '/account'
+      fullPath: '/employer/account'
+      preLoaderRoute: typeof EmployerAccountRouteImport
+      parentRoute: typeof EmployerRoute
+    }
     '/employer/onboarding': {
       id: '/employer/onboarding'
       path: '/onboarding'
@@ -743,12 +762,14 @@ const EmployerSalonIdRouteWithChildren = EmployerSalonIdRoute._addFileChildren(
 
 interface EmployerRouteChildren {
   EmployerSalonIdRoute: typeof EmployerSalonIdRouteWithChildren
+  EmployerAccountRoute: typeof EmployerAccountRoute
   EmployerOnboardingRoute: typeof EmployerOnboardingRoute
   EmployerIndexRoute: typeof EmployerIndexRoute
 }
 
 const EmployerRouteChildren: EmployerRouteChildren = {
   EmployerSalonIdRoute: EmployerSalonIdRouteWithChildren,
+  EmployerAccountRoute: EmployerAccountRoute,
   EmployerOnboardingRoute: EmployerOnboardingRoute,
   EmployerIndexRoute: EmployerIndexRoute,
 }

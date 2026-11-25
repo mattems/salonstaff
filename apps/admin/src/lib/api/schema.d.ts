@@ -3124,6 +3124,10 @@ export interface components {
         message: string;
       }[];
     };
+    AccountChanges: {
+      /** @example Olive Owner */
+      name: string;
+    };
     FullProfile: {
       profile: components["schemas"]["SeekerProfile"];
       experience: components["schemas"]["Experience"][];

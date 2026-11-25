@@ -93,6 +93,10 @@ function SalonSwitcher({
         <DropdownMenuItem asChild>
           <Link to="/employer/onboarding">Add a salon</Link>
         </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/employer/account">Your account</Link>
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

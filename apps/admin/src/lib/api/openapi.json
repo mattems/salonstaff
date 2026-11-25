@@ -368,6 +368,18 @@
         },
         "required": ["type", "title", "status", "code"]
       },
+      "AccountChanges": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "example": "Olive Owner"
+          }
+        },
+        "required": ["name"]
+      },
       "FullProfile": {
         "type": "object",
         "properties": {

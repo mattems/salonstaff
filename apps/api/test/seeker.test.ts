@@ -207,6 +207,29 @@ describe("a job seeker's profile", () => {
   });
 });
 
+describe("an account's name", () => {
+  it("is set by an employer, and by a job seeker's profile", async () => {
+    const app = createTestApp();
+    const { owner } = await salonOwner(app);
+    expect((await owner.api("PATCH", "/v1/me", { name: "  " })).status).toBe(400);
+    const dry = await owner.api<{ name: string }>("PATCH", "/v1/me?dry_run=true", {
+      name: "Not Saved",
+    });
+    expect(dry.body.name).toBe("Not Saved");
+    const renamed = await owner.api<{ name: string }>("PATCH", "/v1/me", {
+      name: " Olive Owner ",
+    });
+    expect(renamed.status).toBe(200);
+    expect(renamed.body.name).toBe("Olive Owner");
+    expect((await owner.api<{ name: string }>("GET", "/v1/me")).body.name).toBe("Olive Owner");
+
+    const seeker = await seekerWithProfile(app, "Named");
+    const refused = await seeker.api<{ hint: string }>("PATCH", "/v1/me", { name: "Other" });
+    expect(refused.status).toBe(409);
+    expect(refused.body.hint).toContain("/v1/me/profile");
+  });
+});
+
 describe("deleting an account", () => {
   it("removes the person, their files and the salon they created", async () => {
     const app = createTestApp();
