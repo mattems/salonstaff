@@ -45,7 +45,13 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   Deferred until after the initial phase; needs more thought (Matt). Until then applying needs a passed ID check.
 - Identity provider for a later DVS check: research and shortlist in docs/idmatch-research.md.
 
+### Proposed (not decided)
+- Listing checks (docs/listing-checks.md): a script run on demand that finds closed listings and fills in missing
+  phones and emails from salons' own websites, reviewed before anything changes.
+
 ### Not done yet
+- Nothing runs on GitHub while developing locally: CI only runs when a deploy calls it (none yet). Run
+  `bun run ci` before merging. To check pull requests on GitHub again, add `pull_request:` to `.github/workflows/ci.yml`.
 - Directory pages don't yet credit the directory's data sources (Overture, ABS, ABR); needed before importing
   the built CSVs in production (tools/directory/README.md).
 - No Cloudflare account, PlanetScale database or deploy yet (docs/runbooks/first-deploy.md).

@@ -7,6 +7,7 @@
 | [conventions.md](conventions.md) | The rules for each area of the code |
 | [decisions/](decisions/) | One short record per decision (D-01…) |
 | [applicant-trust.md](applicant-trust.md) | Keeping bots, spam and ineligible applicants away (D-08, deferred) |
+| [listing-checks.md](listing-checks.md) | Proposal: checking listings are still open and filling in phones and emails, run on demand |
 | [idmatch-research.md](idmatch-research.md) | Research: identity providers with Australian DVS checks |
 | [runbooks/](runbooks/) | How to do things: deploy, add staff, set up sign-in, rotate a secret… |
 | [applicant-trust.md](applicant-trust.md) | Proposal: stopping bots, spam and applicants without work rights or not in Australia |
