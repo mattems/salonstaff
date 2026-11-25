@@ -753,7 +753,7 @@
       "JobSearch": {
         "allOf": [
           {
-            "$ref": "#/components/schemas/JobList"
+            "$ref": "#/components/schemas/JobResultList"
           },
           {
             "type": "object",
@@ -763,6 +763,23 @@
               }
             },
             "required": ["facets"]
+          }
+        ]
+      },
+      "JobResult": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/JobSummary"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "distanceKm": {
+                "type": ["number", "null"],
+                "description": "Kilometres from the point searched near (between suburb centres), or null."
+              }
+            },
+            "required": ["distanceKm"]
           }
         ]
       },
@@ -824,13 +841,13 @@
         "required": ["roles", "states"],
         "description": "Live jobs per role and per state, given the other filters."
       },
-      "JobList": {
+      "JobResultList": {
         "type": "object",
         "properties": {
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/JobSummary"
+              "$ref": "#/components/schemas/JobResult"
             }
           },
           "page": {
@@ -947,6 +964,30 @@
           }
         },
         "required": ["name", "path"]
+      },
+      "JobList": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/JobSummary"
+            }
+          },
+          "page": {
+            "type": "integer"
+          },
+          "pageSize": {
+            "type": "integer"
+          },
+          "total": {
+            "type": "integer"
+          },
+          "pageCount": {
+            "type": "integer"
+          }
+        },
+        "required": ["items", "page", "pageSize", "total", "pageCount"]
       },
       "JobAd": {
         "type": "object",
@@ -1743,9 +1784,13 @@
               },
               "liveJobs": {
                 "type": "integer"
+              },
+              "distanceKm": {
+                "type": ["number", "null"],
+                "description": "Kilometres from the point searched near (between suburb centres), or null."
               }
             },
-            "required": ["suburbSlug", "about", "liveJobs"]
+            "required": ["suburbSlug", "about", "liveJobs", "distanceKm"]
           }
         ]
       },
@@ -3499,7 +3544,7 @@
     "/v1/jobs": {
       "get": {
         "summary": "Search live jobs",
-        "description": "Live jobs, featured first, then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`).",
+        "description": "Live jobs, featured first, then the nearest (when searching near a point), then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`). Near me: `lat` and `lng` (or `near` with a postcode) and `km`; jobs are placed at their suburb's centre.",
         "tags": ["Jobs"],
         "parameters": [
           {
@@ -3572,6 +3617,55 @@
             },
             "required": false,
             "name": "type",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": -45,
+              "maximum": -9,
+              "description": "Latitude of the point to search near, with `lng`. Round it (2 decimal places is about 1km): places are at their suburb's centre.",
+              "example": -33.87
+            },
+            "required": false,
+            "description": "Latitude of the point to search near, with `lng`. Round it (2 decimal places is about 1km): places are at their suburb's centre.",
+            "name": "lat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 112,
+              "maximum": 154,
+              "description": "Longitude, with `lat`.",
+              "example": 151.21
+            },
+            "required": false,
+            "description": "Longitude, with `lat`.",
+            "name": "lng",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}$",
+              "description": "A postcode to search near, instead of `lat` and `lng`.",
+              "example": "2010"
+            },
+            "required": false,
+            "description": "A postcode to search near, instead of `lat` and `lng`.",
+            "name": "near",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["5", "10", "25", "50", "100"],
+              "description": "How far from the point, in km. Default 25."
+            },
+            "required": false,
+            "description": "How far from the point, in km. Default 25.",
+            "name": "km",
             "in": "query"
           },
           {
@@ -4659,7 +4753,7 @@
     "/v1/salons": {
       "get": {
         "summary": "Search the salon directory",
-        "description": "Salons with live jobs first, then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job.",
+        "description": "Salons with live jobs first, then the nearest (when searching near a point), then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job. Near me: `lat` and `lng` (or `near` with a postcode) and `km`; salons are placed at their suburb's centre.",
         "tags": ["Directory"],
         "parameters": [
           {
@@ -4697,6 +4791,55 @@
             },
             "required": false,
             "name": "hiring",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": -45,
+              "maximum": -9,
+              "description": "Latitude of the point to search near, with `lng`. Round it (2 decimal places is about 1km): places are at their suburb's centre.",
+              "example": -33.87
+            },
+            "required": false,
+            "description": "Latitude of the point to search near, with `lng`. Round it (2 decimal places is about 1km): places are at their suburb's centre.",
+            "name": "lat",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "number",
+              "minimum": 112,
+              "maximum": 154,
+              "description": "Longitude, with `lat`.",
+              "example": 151.21
+            },
+            "required": false,
+            "description": "Longitude, with `lat`.",
+            "name": "lng",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}$",
+              "description": "A postcode to search near, instead of `lat` and `lng`.",
+              "example": "2010"
+            },
+            "required": false,
+            "description": "A postcode to search near, instead of `lat` and `lng`.",
+            "name": "near",
+            "in": "query"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["5", "10", "25", "50", "100"],
+              "description": "How far from the point, in km. Default 25."
+            },
+            "required": false,
+            "description": "How far from the point, in km. Default 25.",
+            "name": "km",
             "in": "query"
           },
           {

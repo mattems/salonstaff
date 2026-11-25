@@ -26,12 +26,24 @@ Tests: `cd tools/directory && bun test`.
    exactly one matches (`src/abr.ts`).
 6. Writes `out/<date>/`:
    - `salons-01.csv`, `salons-02.csv`…: up to 5,000 listings each, in the import's format. Import them all.
-   - `review.csv`: the published postcode and the map pin disagree, so the suburb or postcode may be
-     wrong. Fix the rows you want and import the file (the extra `note` and `overture_id` columns are ignored).
+   - `review.csv`: the published postcode and the map pin disagree, or the pin is in an ABS area that
+     isn't a suburb ("ACT Remainder"), so the suburb or postcode may be wrong. Fix the rows you want and import the file (the extra `note` and `overture_id` columns are ignored).
    - `dropped.csv`: every place left out and why.
 
 Run it again whenever you like (Overture releases monthly, the ABR weekly): importing adds only salons
 that aren't listed yet.
+
+## Suburb and postcode centres (near-me search, D-10)
+
+`localities.ts` writes the SQL that loads the centre of every ABS suburb and postal area into the app's
+`localities` and `postcodes` tables. It has run once, for the 2021 edition
+(`packages/db/migrations/0002_location_data.sql`). For a new ASGS edition, make a new custom migration
+and fill it (the new rows then need replacing the old ones, so write that migration by hand around it):
+
+```bash
+bun db:generate -- --custom --name <name>
+bun tools/directory/localities.ts packages/db/migrations/<that file>.sql
+```
 
 ## Sources and licences
 

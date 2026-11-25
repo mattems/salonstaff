@@ -90,6 +90,14 @@ describe("placeToListing", () => {
     });
   });
 
+  test("a pin in an ABS area that isn't a suburb: sent to review", () => {
+    const outcome = placeToListing(place({ sal_name: "ACT Remainder - Tuggeranong" }), options);
+    expect(outcome).toMatchObject({
+      kind: "review",
+      note: 'The map pin is in "ACT Remainder - Tuggeranong", an ABS area that isn\'t a suburb',
+    });
+  });
+
   test("a multi-line street address becomes one line", () => {
     const outcome = placeToListing(
       place({

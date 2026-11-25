@@ -1,11 +1,15 @@
 import { describe, expect, it } from "vitest";
 import {
+  boundingBox,
   claimMethods,
+  distanceKm,
   eligibilityOf,
   entitlementOf,
+  formatDistance,
   isValidAbn,
   maskEmail,
   nameMatches,
+  roughCoordinate,
   verificationLevel,
 } from "./rules";
 
@@ -103,4 +107,56 @@ it("claims", () => {
   expect(maskEmail("hello@salon.com")).toBe("he•••@salon.com");
   expect(claimMethods({ email: "a@b.co" })).toEqual(["email", "review"]);
   expect(claimMethods({ email: null })).toEqual(["review"]);
+});
+
+describe("near me", () => {
+  const sydney = { latitude: -33.8688, longitude: 151.2093 };
+  const melbourne = { latitude: -37.8136, longitude: 144.9631 };
+  const parramatta = { latitude: -33.8151, longitude: 151.0011 };
+
+  it.each([
+    [sydney, sydney, 0],
+    [sydney, parramatta, 20],
+    [sydney, melbourne, 713],
+  ])("distanceKm(%o, %o) is about %i km", (a, b, km) => {
+    expect(Math.round(distanceKm(a, b))).toBe(km);
+    expect(Math.round(distanceKm(b, a))).toBe(km);
+  });
+
+  it("boundingBox holds every point within the radius", () => {
+    const box = boundingBox(sydney, 25);
+    for (const bearing of [0, 45, 90, 135, 180, 225, 270, 315]) {
+      // A point 24.9km away in each direction.
+      const r = (bearing * Math.PI) / 180;
+      const point = {
+        latitude: sydney.latitude + (24.9 / 111.2) * Math.cos(r),
+        longitude:
+          sydney.longitude +
+          (24.9 / (111.2 * Math.cos((sydney.latitude * Math.PI) / 180))) * Math.sin(r),
+      };
+      expect(distanceKm(sydney, point)).toBeLessThan(25);
+      expect(point.latitude).toBeGreaterThanOrEqual(box.south);
+      expect(point.latitude).toBeLessThanOrEqual(box.north);
+      expect(point.longitude).toBeGreaterThanOrEqual(box.west);
+      expect(point.longitude).toBeLessThanOrEqual(box.east);
+    }
+    expect(box.north - box.south).toBeCloseTo(0.45, 2);
+  });
+
+  it.each([
+    [-33.868812, -33.87],
+    [151.20931, 151.21],
+    [0.004, 0],
+  ])("roughCoordinate(%d) is %d", (input, expected) => {
+    expect(roughCoordinate(input)).toBe(expected);
+  });
+
+  it.each([
+    [0.02, "100m"],
+    [0.84, "800m"],
+    [1, "1km"],
+    [12.4, "12km"],
+  ])("formatDistance(%d) is %s", (km, text) => {
+    expect(formatDistance(km)).toBe(text);
+  });
 });

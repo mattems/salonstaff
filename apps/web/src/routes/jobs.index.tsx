@@ -10,6 +10,7 @@ import {
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { type JobSearchValues, searchHref } from "@/components/job-search";
 import { JobsPage, jobsHead, loadJobsPath, pageNumber, searchJobs } from "@/components/jobs-pages";
+import { isNear, parseNear } from "@/components/near-me";
 
 const oneOf = <T extends string>(values: readonly T[], value: unknown): T | undefined =>
   values.includes(value as T) ? (value as T) : undefined;
@@ -22,8 +23,8 @@ interface JobsSearchParams extends JobSearchValues {
 }
 
 /**
- * /jobs: every live job. With a keyword, an employment type or a suburb without a state it's a
- * search (not indexed); role, state and suburb alone redirect to their landing page.
+ * /jobs: every live job. With a keyword, an employment type, a suburb without a state or near me
+ * it's a search (not indexed); role, state and suburb alone redirect to their landing page.
  */
 export const Route = createFileRoute("/jobs/")({
   validateSearch: (search: Record<string, unknown>): JobsSearchParams => ({
@@ -32,12 +33,13 @@ export const Route = createFileRoute("/jobs/")({
     state: oneOf<AuState>(AU_STATE_VALUES, search.state),
     suburb: slugify(text(search.suburb, 80) ?? "") || undefined,
     type: oneOf<EmploymentType>(EMPLOYMENT_TYPE_VALUES, search.type),
+    ...parseNear(search),
     page: pageNumber(search.page),
   }),
   loaderDeps: ({ search }) => search,
   loader: async ({ deps }) => {
     const { page, ...values } = deps;
-    if (values.q || values.type || (values.suburb && !values.state)) {
+    if (values.q || values.type || isNear(values) || (values.suburb && !values.state)) {
       return searchJobs(values, page);
     }
     if (values.role || values.state) {

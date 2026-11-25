@@ -85,6 +85,8 @@ function previewSalon(input: SalonInput, ownerId: string): Salon {
     statusReason: null,
     source: "owner",
     claimedAt: null,
+    latitude: null,
+    longitude: null,
     createdAt: now,
     updatedAt: now,
   };
@@ -289,6 +291,8 @@ employerRoutes.openapi(
         paidVia: null,
         publishedAt: null,
         expiresAt: null,
+        latitude: null,
+        longitude: null,
         createdAt: now,
         updatedAt: now,
       };

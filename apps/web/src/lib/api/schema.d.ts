@@ -1437,7 +1437,7 @@ export interface paths {
     };
     /**
      * Search live jobs
-     * @description Live jobs, featured first, then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`).
+     * @description Live jobs, featured first, then the nearest (when searching near a point), then the newest, 20 a page. Each has its public `path`. `q` matches the title, suburb, postcode, salon name and description. `suburb` is a suburb's slug (`surry-hills`). Near me: `lat` and `lng` (or `near` with a postcode) and `km`; jobs are placed at their suburb's centre.
      */
     get: {
       parameters: {
@@ -1469,6 +1469,14 @@ export interface paths {
             | "contract"
             | "apprenticeship"
             | "chair_rental";
+          /** @description Latitude of the point to search near, with `lng`. Round it (2 decimal places is about 1km): places are at their suburb's centre. */
+          lat?: number;
+          /** @description Longitude, with `lat`. */
+          lng?: number;
+          /** @description A postcode to search near, instead of `lat` and `lng`. */
+          near?: string;
+          /** @description How far from the point, in km. Default 25. */
+          km?: "5" | "10" | "25" | "50" | "100";
           /** @description 1 for the first page. */
           page?: number;
         };
@@ -2538,7 +2546,7 @@ export interface paths {
     };
     /**
      * Search the salon directory
-     * @description Salons with live jobs first, then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job.
+     * @description Salons with live jobs first, then the nearest (when searching near a point), then by name, 30 a page. Includes unclaimed listings. `q` matches the name, suburb and postcode; `suburb` is a suburb's slug; `hiring=true` keeps only salons with a live job. Near me: `lat` and `lng` (or `near` with a postcode) and `km`; salons are placed at their suburb's centre.
      */
     get: {
       parameters: {
@@ -2547,6 +2555,14 @@ export interface paths {
           state?: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
           suburb?: string;
           hiring?: "true" | "false";
+          /** @description Latitude of the point to search near, with `lng`. Round it (2 decimal places is about 1km): places are at their suburb's centre. */
+          lat?: number;
+          /** @description Longitude, with `lat`. */
+          lng?: number;
+          /** @description A postcode to search near, instead of `lat` and `lng`. */
+          near?: string;
+          /** @description How far from the point, in km. Default 25. */
+          km?: "5" | "10" | "25" | "50" | "100";
           /** @description 1 for the first page. */
           page?: number;
         };
@@ -3642,8 +3658,12 @@ export interface components {
       /** @description Send the person here. */
       url: string;
     };
-    JobSearch: components["schemas"]["JobList"] & {
+    JobSearch: components["schemas"]["JobResultList"] & {
       facets: components["schemas"]["JobFacets"];
+    };
+    JobResult: components["schemas"]["JobSummary"] & {
+      /** @description Kilometres from the point searched near (between suburb centres), or null. */
+      distanceKm: number | null;
     };
     /** @description Live jobs per role and per state, given the other filters. */
     JobFacets: {
@@ -3680,8 +3700,8 @@ export interface components {
         count: number;
       }[];
     };
-    JobList: {
-      items: components["schemas"]["JobSummary"][];
+    JobResultList: {
+      items: components["schemas"]["JobResult"][];
       page: number;
       pageSize: number;
       total: number;
@@ -3734,6 +3754,13 @@ export interface components {
     Breadcrumb: {
       name: string;
       path: string;
+    };
+    JobList: {
+      items: components["schemas"]["JobSummary"][];
+      page: number;
+      pageSize: number;
+      total: number;
+      pageCount: number;
     };
     JobAd: {
       /** @enum {string} */
@@ -4061,6 +4088,8 @@ export interface components {
       suburbSlug: string;
       about: string | null;
       liveJobs: number;
+      /** @description Kilometres from the point searched near (between suburb centres), or null. */
+      distanceKm: number | null;
     };
     SalonsPath:
       | components["schemas"]["SalonsLanding"]

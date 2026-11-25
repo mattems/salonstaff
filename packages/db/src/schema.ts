@@ -321,6 +321,12 @@ export const salons = pgTable(
     /** `owner`: made by its owner. `directory`: added by us, claimable. */
     source: text("source").$type<"owner" | "directory">().notNull().default("owner"),
     claimedAt: ts("claimed_at"),
+    /**
+     * The suburb's centre (else the postcode's), for "near me" search. Set by the database from
+     * `localities`/`postcodes` whenever the place changes (trigger `set_coordinates`); never written by code.
+     */
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -329,6 +335,7 @@ export const salons = pgTable(
     index("salons_owner_idx").on(table.ownerId),
     index("salons_abn_idx").on(table.abn),
     index("salons_directory_idx").on(table.status, table.state, table.suburbSlug),
+    index("salons_location_idx").on(table.latitude, table.longitude),
   ],
 );
 
@@ -395,6 +402,12 @@ export const jobs = pgTable(
     paidVia: text("paid_via"),
     publishedAt: ts("published_at"),
     expiresAt: ts("expires_at"),
+    /**
+     * The suburb's centre (else the postcode's), for "near me" search. Set by the database from
+     * `localities`/`postcodes` whenever the place changes (trigger `set_coordinates`); never written by code.
+     */
+    latitude: doublePrecision("latitude"),
+    longitude: doublePrecision("longitude"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
@@ -403,8 +416,40 @@ export const jobs = pgTable(
     index("jobs_feed_idx").on(table.status, table.expiresAt, table.publishedAt),
     index("jobs_salon_idx").on(table.salonId),
     index("jobs_role_place_idx").on(table.role, table.state, table.suburbSlug),
+    index("jobs_location_idx").on(table.latitude, table.longitude),
   ],
 );
+
+// ---------------------------------------------------------------------------
+// Places: where suburbs and postcodes are, for "near me" search
+// ---------------------------------------------------------------------------
+
+/**
+ * The centre of every ABS suburb and locality (ASGS 2021, CC BY 4.0), loaded by a migration
+ * (tools/directory/localities.ts). Names can repeat within a state ("Alison", NSW, twice), so
+ * `postcodes` (the postal areas it lies in) tells them apart.
+ */
+export const localities = pgTable(
+  "localities",
+  {
+    /** The ABS SAL code. */
+    code: text("code").primaryKey(),
+    state: text("state").$type<AuState>().notNull(),
+    suburb: text("suburb").notNull(),
+    suburbSlug: text("suburb_slug").notNull(),
+    postcodes: text("postcodes").array().notNull(),
+    latitude: doublePrecision("latitude").notNull(),
+    longitude: doublePrecision("longitude").notNull(),
+  },
+  (table) => [index("localities_place_idx").on(table.state, table.suburbSlug)],
+);
+
+/** The centre of every ABS postal area (ASGS 2021), for places whose suburb isn't in `localities`. */
+export const postcodes = pgTable("postcodes", {
+  postcode: text("postcode").primaryKey(),
+  latitude: doublePrecision("latitude").notNull(),
+  longitude: doublePrecision("longitude").notNull(),
+});
 
 /** An old public path that now answers with a 301 to the job's or salon's current one. */
 export const slugRedirects = pgTable(

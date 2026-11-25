@@ -77,6 +77,8 @@ const STATES: Record<string, string> = {
   "Northern Territory": "NT",
 };
 
+/** ABS areas that aren't suburbs: "ACT Remainder - Tuggeranong", "No usual address (NSW)"… */
+const NOT_SUBURBS = /Remainder|No usual address|Migratory|Offshore/i;
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const INSTAGRAM_NOT_HANDLES = new Set(["p", "reel", "reels", "explore", "stories", "accounts"]);
 const SOCIAL_HOSTS =
@@ -118,6 +120,13 @@ export function placeToListing(place: Place, options: { minConfidence: number })
     instagram: firstOf([...(place.socials ?? []), ...(place.websites ?? [])], instagramHandle),
     abn: "",
   };
+  if (NOT_SUBURBS.test(place.sal_name)) {
+    return {
+      kind: "review",
+      listing,
+      note: `The map pin is in "${place.sal_name}", an ABS area that isn't a suburb`,
+    };
+  }
   if (published && place.poa && published !== place.poa) {
     return {
       kind: "review",

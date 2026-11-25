@@ -286,6 +286,13 @@ export const ViewerSchema = z
 
 export const JobPageSchema = pageOf(JobSummarySchema, "JobList");
 
+/** A job in search results: how far away it is, when the search was near a point. */
+export const JobResultSchema = JobSummarySchema.extend({
+  distanceKm: z.number().nullable().openapi({
+    description: "Kilometres from the point searched near (between suburb centres), or null.",
+  }),
+}).openapi("JobResult");
+
 export const BreadcrumbSchema = z
   .object({ name: z.string(), path: z.string() })
   .openapi("Breadcrumb");
@@ -420,6 +427,9 @@ export const DirectorySalonSchema = SalonSummarySchema.extend({
   suburbSlug: z.string(),
   about: z.string().nullable(),
   liveJobs: z.number().int(),
+  distanceKm: z.number().nullable().openapi({
+    description: "Kilometres from the point searched near (between suburb centres), or null.",
+  }),
 }).openapi("DirectorySalon");
 
 export const SalonListSchema = pageOf(DirectorySalonSchema, "SalonList");

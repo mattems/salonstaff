@@ -157,3 +157,52 @@ export function maskEmail(email: string): string {
 export function claimMethods(listing: { email: string | null }): ("email" | "review")[] {
   return listing.email ? ["email", "review"] : ["review"];
 }
+
+// ---------- Near me (D-10) ----------
+
+/** The radii a "near me" search offers, in kilometres. */
+export const SEARCH_RADII_KM = [5, 10, 25, 50, 100] as const;
+export type SearchRadiusKm = (typeof SEARCH_RADII_KM)[number];
+export const DEFAULT_RADIUS_KM: SearchRadiusKm = 25;
+
+export interface LatLng {
+  latitude: number;
+  longitude: number;
+}
+
+const EARTH_RADIUS_KM = 6371;
+const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
+
+/** The great-circle distance between two points, in kilometres. */
+export function distanceKm(a: LatLng, b: LatLng): number {
+  const dLat = toRadians(b.latitude - a.latitude);
+  const dLng = toRadians(b.longitude - a.longitude);
+  const h =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRadians(a.latitude)) * Math.cos(toRadians(b.latitude)) * Math.sin(dLng / 2) ** 2;
+  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
+}
+
+/** A box holding every point within `km` of `centre`: a cheap, indexable first cut before `distanceKm`. */
+export function boundingBox(centre: LatLng, km: number) {
+  const dLat = (km / EARTH_RADIUS_KM) * (180 / Math.PI);
+  const dLng = dLat / Math.max(Math.cos(toRadians(centre.latitude)), 0.01);
+  return {
+    south: centre.latitude - dLat,
+    north: centre.latitude + dLat,
+    west: centre.longitude - dLng,
+    east: centre.longitude + dLng,
+  };
+}
+
+/**
+ * A browser's position rounded to 2 decimal places (about 1km) before it goes in a search URL, so
+ * links and logs never hold someone's exact location. Suburb centres are coarser than that anyway.
+ */
+export const roughCoordinate = (degrees: number) => Math.round(degrees * 100) / 100;
+
+/** "800m", "3km", "12km": a distance as shown next to a result. */
+export function formatDistance(km: number): string {
+  if (km < 1) return `${Math.max(100, Math.round((km * 1000) / 100) * 100)}m`;
+  return `${Math.round(km)}km`;
+}
