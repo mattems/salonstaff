@@ -31,6 +31,7 @@ export function ClaimView({
 }) {
   const { salon } = page;
   const claimPath = `${salon.path}/claim`;
+  const mine = me?.salons.find((s) => s.id === salon.id);
   return (
     <Page width="narrow">
       <Breadcrumbs crumbs={[...page.breadcrumbs, { name: "Claim", path: claimPath }]} />
@@ -38,11 +39,10 @@ export function ClaimView({
         title={`Claim ${salon.name}`}
         description="Manage this listing and post jobs. First we check you run the business."
       />
-      {!page.claimable && !claim ? (
-        <Notice title="This listing is already managed">
-          Its owner manages it.{" "}
-          <AppLink href={salon.path} className="underline">
-            Back to the salon
+      {mine?.role === "owner" ? (
+        <Notice title="You already own this salon">
+          <AppLink href={`/employer/${salon.id}`} className="underline">
+            Go to its dashboard
           </AppLink>
         </Notice>
       ) : !me ? (
@@ -56,15 +56,17 @@ export function ClaimView({
             </Button>
           </CardContent>
         </Card>
-      ) : me.salon && me.salon.id !== salon.id ? (
-        <Notice title="You already manage a salon">
-          Your account manages {me.salon.name}. Sign in with a different account to claim another
-          business.
-        </Notice>
       ) : claim && claim.status !== "rejected" ? (
         <ClaimStatus claim={claim} />
       ) : (
         <>
+          {!page.claimable && (
+            <Notice title="This listing already has an owner">
+              If you've taken over the business, you can still claim it with the same checks. If
+              your claim is approved you become one of its owners, and we email the others. To join
+              its team instead, ask an owner to invite you.
+            </Notice>
+          )}
           {claim?.status === "rejected" && (
             <Notice title="Your last claim wasn't approved" tone="destructive">
               {claim.decisionNote ?? "Check the details and try again."}
@@ -96,7 +98,7 @@ function ClaimStatus({ claim }: { claim: Claim }) {
     return (
       <Notice title="Your claim was approved">
         The listing is yours.{" "}
-        <AppLink href="/employer" className="underline">
+        <AppLink href={`/employer/${claim.salonId}`} className="underline">
           Go to your dashboard
         </AppLink>
       </Notice>

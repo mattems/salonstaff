@@ -25,23 +25,26 @@ describe("salon onboarding", () => {
     const person = await app.person("Founder");
     const badAbn = await person.api<{ errors: { path: string }[] }>(
       "POST",
-      "/v1/salon",
+      "/v1/employer/salons",
       salonInput({ abn: "12345678901" }),
     );
     expect(badAbn.status).toBe(400);
     expect(badAbn.body.errors[0]?.path).toBe("abn");
 
-    const dry = await person.api("POST", "/v1/salon?dry_run=true", salonInput());
+    const dry = await person.api("POST", "/v1/employer/salons?dry_run=true", salonInput());
     expect(dry.status).toBe(201);
-    expect((await person.api("GET", "/v1/salon")).status).toBe(404);
+    expect(
+      (await person.api<{ items: unknown[] }>("GET", "/v1/employer/salons")).body.items,
+    ).toEqual([]);
 
     const created = await person.api<MySalon & { founding: boolean; abnStatus: string }>(
       "POST",
-      "/v1/salon",
+      "/v1/employer/salons",
       salonInput({ abn: randomAbn().replace(/^(\d{2})(\d{3})(\d{3})(\d{3})$/, "$1 $2 $3 $4") }),
     );
     expect(created.status).toBe(201);
     expect(created.body.id).toMatch(/^sln_/);
+    expect(created.body.role).toBe("owner");
     expect(created.body.path).toMatch(/^\/salons\/nsw\/testvale-[a-z0-9]+\/test-salon-[a-z0-9]+$/);
     // No ABR_GUID in tests: the ABN waits for staff.
     expect(created.body.abnStatus).toBe("pending");
@@ -49,10 +52,42 @@ describe("salon onboarding", () => {
     const freeDays = (new Date(created.body.freeUntil as string).getTime() - Date.now()) / 86400000;
     expect(Math.round(freeDays)).toBe(90);
 
-    const me = await person.api<{ role: string; salon: { id: string } }>("GET", "/v1/me");
+    const me = await person.api<{ role: string; salons: { id: string; role: string }[] }>(
+      "GET",
+      "/v1/me",
+    );
     expect(me.body.role).toBe("employer");
-    expect(me.body.salon.id).toBe(created.body.id);
-    expect((await person.api("POST", "/v1/salon", salonInput())).status).toBe(409);
+    expect(me.body.salons).toEqual([
+      expect.objectContaining({ id: created.body.id, role: "owner" }),
+    ]);
+  });
+
+  it("lets one account run several salons, each with its own jobs and launch terms", async () => {
+    const app = createTestApp();
+    const { owner, salon: first } = await salonOwner(app);
+    const second = await owner.api<MySalon>("POST", "/v1/employer/salons", salonInput());
+    expect(second.status).toBe(201);
+    const mine = await owner.api<{ items: MySalon[] }>("GET", "/v1/employer/salons");
+    expect(mine.body.items.map((s) => s.id)).toEqual([first.id, second.body.id]);
+    expect(second.body.entitlement.via).toBe("free_period");
+
+    const atFirst = await postJob(owner, { title: "First location stylist" });
+    const atSecond = await owner.api<SalonJob>(
+      "POST",
+      `/v1/employer/salons/${second.body.id}/jobs`,
+      { ...jobInput({ title: "Second location stylist" }), publish: true },
+    );
+    expect(atSecond.status).toBe(201);
+    const listed = async (id: string) =>
+      (
+        await owner.api<{ items: SalonJob[] }>("GET", `/v1/employer/salons/${id}/jobs`)
+      ).body.items.map((j) => j.id);
+    expect(await listed(first.id)).toEqual([atFirst.id]);
+    expect(await listed(second.body.id)).toEqual([atSecond.body.id]);
+    // A job is only reachable under its own salon.
+    expect(
+      (await owner.api("GET", `/v1/employer/salons/${second.body.id}/jobs/${atFirst.id}`)).status,
+    ).toBe(404);
   });
 
   it("sends the owner of a directory listing to claim it instead", async () => {
@@ -67,7 +102,7 @@ describe("salon onboarding", () => {
     const person = await app.person("Lister");
     const refused = await person.api<{ code: string; hint: string }>(
       "POST",
-      "/v1/salon",
+      "/v1/employer/salons",
       salonInput({ abn }),
     );
     expect(refused.status).toBe(409);
@@ -83,7 +118,7 @@ describe("salon onboarding", () => {
     expect(second.salon.slug).toBe(`${first.salon.slug}-2`);
 
     const job = await postJob(first.owner, { title: "Barber", suburb });
-    const renamed = await first.owner.api<MySalon>("PATCH", "/v1/salon", {
+    const renamed = await first.owner.api<MySalon>("PATCH", first.owner.at(), {
       name: `${name} Studio`,
     });
     expect(renamed.status).toBe(200);
@@ -112,10 +147,10 @@ describe("salon onboarding", () => {
       instagram: string | null;
       about: string | null;
     };
-    const cleared = await owner.api<Details>("PATCH", "/v1/salon", { website: "", about: null });
+    const cleared = await owner.api<Details>("PATCH", owner.at(), { website: "", about: null });
     expect(cleared.status).toBe(200);
     expect(cleared.body).toMatchObject({ website: null, about: null, instagram: "testsalon" });
-    const again = await owner.api<Details>("PATCH", "/v1/salon", { instagram: null });
+    const again = await owner.api<Details>("PATCH", owner.at(), { instagram: null });
     expect(again.body).toMatchObject({ website: null, instagram: null });
   });
 });
@@ -130,7 +165,7 @@ describe("posting and publishing", () => {
 
     const published = await owner.api<SalonJob & { expiresAt: string }>(
       "POST",
-      `/v1/salon/jobs/${draft.id}/publish`,
+      owner.at(`/jobs/${draft.id}/publish`),
     );
     expect(published.body).toMatchObject({ status: "published", paidVia: "free_period" });
     const days = (new Date(published.body.expiresAt).getTime() - Date.now()) / 86400000;
@@ -142,30 +177,33 @@ describe("posting and publishing", () => {
     );
     const second = await postJob(owner, {}, true);
     expect(second.paidVia).toBe("credit");
-    expect((await owner.api<MySalon>("GET", "/v1/salon")).body.listingCredits).toBe(0);
+    expect((await owner.api<MySalon>("GET", owner.at())).body.listingCredits).toBe(0);
 
     // Publishing a live job again charges nothing.
-    expect((await owner.api("POST", `/v1/salon/jobs/${second.id}/publish`)).status).toBe(200);
+    expect((await owner.api("POST", owner.at(`/jobs/${second.id}/publish`))).status).toBe(200);
 
     const third = await postJob(owner, {}, false);
     const refused = await owner.api<{ code: string; hint: string }>(
       "POST",
-      `/v1/salon/jobs/${third.id}/publish`,
+      owner.at(`/jobs/${third.id}/publish`),
     );
     expect(refused.status).toBe(402);
     expect(refused.body.code).toBe("listing_needed");
-    expect(refused.body.hint).toContain("/v1/salon/billing/checkout");
+    expect(refused.body.hint).toContain("/billing/checkout");
     // Posting with `publish: true` saves nothing when it can't publish.
-    const before = (await owner.api<{ items: unknown[] }>("GET", "/v1/salon/jobs")).body.items
+    const before = (await owner.api<{ items: unknown[] }>("GET", owner.at("/jobs"))).body.items
       .length;
-    const refusedPost = await owner.api("POST", "/v1/salon/jobs", { ...jobInput(), publish: true });
+    const refusedPost = await owner.api("POST", owner.at("/jobs"), {
+      ...jobInput(),
+      publish: true,
+    });
     expect(refusedPost.status).toBe(402);
     expect(
-      (await owner.api<{ items: unknown[] }>("GET", "/v1/salon/jobs")).body.items,
+      (await owner.api<{ items: unknown[] }>("GET", owner.at("/jobs"))).body.items,
     ).toHaveLength(before);
 
     // A mock checkout (local only) gives a credit.
-    const checkout = await owner.api<{ url: string }>("POST", "/v1/salon/billing/checkout", {
+    const checkout = await owner.api<{ url: string }>("POST", owner.at("/billing/checkout"), {
       kind: "single_listing",
     });
     expect(checkout.status).toBe(200);
@@ -177,12 +215,12 @@ describe("posting and publishing", () => {
     await owner.api("POST", `/v1/dev/checkout/${ref}`, { outcome: "paid" });
     const billing = await owner.api<{ listingCredits: number; payments: { status: string }[] }>(
       "GET",
-      "/v1/salon/billing",
+      owner.at("/billing"),
     );
     expect(billing.body.listingCredits).toBe(1);
     expect(billing.body.payments[0]?.status).toBe("paid");
     expect(
-      (await owner.api<SalonJob>("POST", `/v1/salon/jobs/${third.id}/publish`)).body.paidVia,
+      (await owner.api<SalonJob>("POST", owner.at(`/jobs/${third.id}/publish`))).body.paidVia,
     ).toBe("credit");
   });
 
@@ -191,23 +229,24 @@ describe("posting and publishing", () => {
     const a = await salonOwner(app);
     const b = await salonOwner(app);
     const job = await postJob(a.owner);
-    expect((await b.owner.api("GET", `/v1/salon/jobs/${job.id}`)).status).toBe(404);
+    expect((await b.owner.api("GET", b.owner.at(`/jobs/${job.id}`))).status).toBe(404);
     expect(
-      (await b.owner.api("PATCH", `/v1/salon/jobs/${job.id}`, { title: "Hijacked job" })).status,
+      (await b.owner.api("PATCH", b.owner.at(`/jobs/${job.id}`), { title: "Hijacked job" })).status,
     ).toBe(404);
-    expect((await b.owner.api("POST", `/v1/salon/jobs/${job.id}/close`)).status).toBe(404);
-    expect((await b.owner.api("GET", `/v1/salon/jobs/${job.id}/applicants`)).status).toBe(404);
+    expect((await b.owner.api("POST", b.owner.at(`/jobs/${job.id}/close`))).status).toBe(404);
+    expect((await b.owner.api("GET", b.owner.at(`/jobs/${job.id}/applicants`))).status).toBe(404);
     const seeker = await app.person("NoSalon");
-    expect((await seeker.api("GET", "/v1/salon/jobs")).status).toBe(404);
+    expect((await seeker.api("GET", `/v1/employer/salons/${a.salon.id}/jobs`)).status).toBe(404);
+    expect((await seeker.api("GET", "/v1/employer/salons/sln_nonsense")).status).toBe(404);
   });
 
   it("changes a job, moving its address", async () => {
     const app = createTestApp();
     const { owner } = await salonOwner(app);
     const job = await postJob(owner, { title: "Junior Stylist" });
-    const bad = await owner.api("PATCH", `/v1/salon/jobs/${job.id}`, { payMin: 50, payMax: 40 });
+    const bad = await owner.api("PATCH", owner.at(`/jobs/${job.id}`), { payMin: 50, payMax: 40 });
     expect(bad.status).toBe(400);
-    const changed = await owner.api<SalonJob>("PATCH", `/v1/salon/jobs/${job.id}`, {
+    const changed = await owner.api<SalonJob>("PATCH", owner.at(`/jobs/${job.id}`), {
       title: "Senior Stylist",
     });
     expect(changed.status).toBe(200);
@@ -241,7 +280,7 @@ describe("applicants", () => {
         candidateId: string;
         verification: { level: number; references: { identity?: string } };
       }[];
-    }>("GET", `/v1/salon/jobs/${jobA.id}/applicants`);
+    }>("GET", a.owner.at(`/jobs/${jobA.id}/applicants`));
     expect(list.status).toBe(200);
     expect(list.body.items).toHaveLength(1);
     const [applicant] = list.body.items;
@@ -250,7 +289,7 @@ describe("applicants", () => {
     expect(applicant?.verification.references.identity).toMatch(/^SSV-/);
     const again = await a.owner.api<{ items: { isNew: boolean }[] }>(
       "GET",
-      `/v1/salon/jobs/${jobA.id}/applicants`,
+      a.owner.at(`/jobs/${jobA.id}/applicants`),
     );
     expect(again.body.items[0]?.isNew).toBe(false);
 
@@ -260,20 +299,23 @@ describe("applicants", () => {
       contact: { email: string; phone: string };
       profile: { firstName: string };
       applications: { jobId: string }[];
-    }>("GET", `/v1/salon/candidates/${candidateId}`);
+    }>("GET", a.owner.at(`/candidates/${candidateId}`));
     expect(full.status).toBe(200);
     expect(full.body.contact).toEqual({ email: seeker.email, phone: "+61412345678" });
     expect(full.body.applications.map((x) => x.jobId)).toEqual([jobA.id]);
-    expect((await b.owner.api("GET", `/v1/salon/candidates/${candidateId}`)).status).toBe(404);
+    expect((await b.owner.api("GET", b.owner.at(`/candidates/${candidateId}`))).status).toBe(404);
     // Nor can a salon move another salon's applications along.
     expect(
-      (await b.owner.api("PATCH", `/v1/salon/applications/${applicant?.id}`, { status: "hired" }))
-        .status,
+      (
+        await b.owner.api("PATCH", b.owner.at(`/applications/${applicant?.id}`), {
+          status: "hired",
+        })
+      ).status,
     ).toBe(404);
 
     const shortlisted = await a.owner.api<{ status: string }>(
       "PATCH",
-      `/v1/salon/applications/${applicant?.id}`,
+      a.owner.at(`/applications/${applicant?.id}`),
       { status: "shortlisted" },
     );
     expect(shortlisted.body.status).toBe("shortlisted");
@@ -282,7 +324,7 @@ describe("applicants", () => {
       expect.stringContaining("Update on your application"),
     ]);
     // The same status again tells nobody.
-    await a.owner.api("PATCH", `/v1/salon/applications/${applicant?.id}`, {
+    await a.owner.api("PATCH", a.owner.at(`/applications/${applicant?.id}`), {
       status: "shortlisted",
     });
     expect(app.sent.filter((m) => m.to === seeker.email)).toHaveLength(1);
@@ -300,10 +342,10 @@ describe("applicants", () => {
     expect((await mobile.api("POST", `/v1/jobs/${job.id}/apply`, {})).status).toBe(201);
     const list = await owner.api<{ items: { id: string }[] }>(
       "GET",
-      `/v1/salon/jobs/${job.id}/applicants`,
+      owner.at(`/jobs/${job.id}/applicants`),
     );
     const before = app.sent.filter((m) => m.to === mobile.smsTo).length;
-    await owner.api("PATCH", `/v1/salon/applications/${list.body.items[0]?.id}`, {
+    await owner.api("PATCH", owner.at(`/applications/${list.body.items[0]?.id}`), {
       status: "interview",
     });
     const texts = app.sent.filter((m) => m.to === mobile.smsTo);
@@ -323,7 +365,7 @@ describe("applicants", () => {
     await fine.api("POST", `/v1/jobs/${job.id}/apply`, {});
     const before = await owner.api<{ items: { candidateId: string }[] }>(
       "GET",
-      `/v1/salon/jobs/${job.id}/applicants`,
+      owner.at(`/jobs/${job.id}/applicants`),
     );
     expect(before.body.items).toHaveLength(2);
 
@@ -332,7 +374,7 @@ describe("applicants", () => {
     );
     const after = await owner.api<{ items: unknown[]; job: { applicants: number } }>(
       "GET",
-      `/v1/salon/jobs/${job.id}/applicants`,
+      owner.at(`/jobs/${job.id}/applicants`),
     );
     expect(after.body.items).toHaveLength(1);
     expect(after.body.job.applicants).toBe(1);
@@ -343,7 +385,7 @@ describe("applicants", () => {
       (
         await owner.api(
           "GET",
-          `/v1/salon/candidates/${encodeId("user", bannedUser[0]?.id as string)}`,
+          owner.at(`/candidates/${encodeId("user", bannedUser[0]?.id as string)}`),
         )
       ).status,
     ).toBe(404);

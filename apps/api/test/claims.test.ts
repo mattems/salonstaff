@@ -2,7 +2,7 @@ import { claims, salonsFor } from "@salonstaff/db";
 import { decodeId, encodeId, uuidv7 } from "@salonstaff/shared";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { postJob, randomAbn, salonOwner, testSuburb, uid } from "./fixtures";
+import { asSalon, postJob, randomAbn, salonOwner, testSuburb, uid } from "./fixtures";
 import { createTestApp, query, withDb } from "./helpers";
 
 async function listing(options: { email?: string; abn?: string | null } = {}) {
@@ -82,16 +82,27 @@ describe("claiming a directory listing", () => {
     expect(confirmed.body.claim.status).toBe("approved");
     expect(confirmed.body.salon.id).toBe(salonId);
     expect(confirmed.body.salon.entitlement.via).toBe("free_period");
-    const me = await claimant.api<{ role: string; salon: { id: string } }>("GET", "/v1/me");
-    expect(me.body).toMatchObject({ role: "employer", salon: { id: salonId } });
+    const me = await claimant.api<{ role: string; salons: { id: string; role: string }[] }>(
+      "GET",
+      "/v1/me",
+    );
+    expect(me.body).toMatchObject({ role: "employer", salons: [{ id: salonId, role: "owner" }] });
     // Single use.
     expect((await claimant.api("POST", `/v1/claims/verify/${token}`)).status).toBe(400);
-    // Claimed now: nobody else can start one, and it can post jobs.
+    // Its owner has nothing more to claim; someone else still can (D-11). It can post jobs.
+    expect(
+      (await claimant.api("POST", `/v1/salons/${salonId}/claims`, claimBody(salon.abn as string)))
+        .status,
+    ).toBe(409);
     expect(
       (await stranger.api("POST", `/v1/salons/${salonId}/claims`, claimBody(salon.abn as string)))
         .status,
-    ).toBe(409);
-    await postJob(claimant, { suburb: salon.suburb, state: "QLD", postcode: "4005" });
+    ).toBe(201);
+    await postJob(asSalon(claimant, salonId), {
+      suburb: salon.suburb,
+      state: "QLD",
+      postcode: "4005",
+    });
     const page = await claimant.api<{ claimable: boolean; jobs: unknown[] }>(
       "GET",
       `/v1/salons/by-path?path=/salons/qld/${salon.suburbSlug}/${salon.slug}`,
@@ -127,7 +138,13 @@ describe("claiming a directory listing", () => {
       claims(db).approve(decodeId("claim", a.body.id) as string, staffId, "Checked the ABN"),
     );
     expect(decision.claim.status).toBe("approved");
-    expect(decision.salon.ownerId).not.toBeNull();
+    expect(decision.salon.claimedAt).not.toBeNull();
+    expect(decision.otherOwners).toEqual([]);
+    expect(
+      await query(
+        sql`select role from salon_members where salon_id = ${salon.id} and user_id = (select id from users where email = ${first.email})`,
+      ),
+    ).toEqual([{ role: "owner" }]);
     expect(decision.contact?.email).toBe(first.email);
     // The other open claim on it is closed.
     expect((await second.api<Claim>("GET", `/v1/salons/${salonId}/claims/mine`)).body.status).toBe(
@@ -159,17 +176,56 @@ describe("claiming a directory listing", () => {
     expect((await third.api<{ role: string }>("GET", "/v1/me")).body.role).toBe("seeker");
   });
 
-  it("refuses a person who already manages a salon", async () => {
+  it("lets someone who already runs a salon claim another listing", async () => {
     const app = createTestApp();
-    const { owner } = await salonOwner(app);
-    const salon = await listing();
-    const refused = await owner.api<{ code: string; detail: string }>(
+    const { owner, salon: own } = await salonOwner(app);
+    const salon = await listing({ abn: null });
+    const started = await owner.api<Claim>(
       "POST",
       `/v1/salons/${encodeId("salon", salon.id)}/claims`,
-      claimBody(salon.abn as string),
+      claimBody(randomAbn()),
     );
-    expect(refused.status).toBe(409);
-    expect(refused.body.detail).toContain("already manages");
+    expect(started.status).toBe(201);
+    await withDb((db) =>
+      claims(db).approve(decodeId("claim", started.body.id) as string, uuidv7()),
+    );
+    const mine = await owner.api<{ items: { id: string }[] }>("GET", "/v1/employer/salons");
+    expect(mine.body.items.map((s) => s.id)).toEqual([own.id, encodeId("salon", salon.id)]);
+  });
+
+  it("lets someone claim a listing that already has an owner, telling the owner", async () => {
+    const app = createTestApp();
+    const salon = await listing({ abn: null });
+    const salonId = encodeId("salon", salon.id);
+    const original = await app.person("Original");
+    const first = await original.api<Claim>(
+      "POST",
+      `/v1/salons/${salonId}/claims`,
+      claimBody(randomAbn()),
+    );
+    const firstDecision = await withDb((db) =>
+      claims(db).approve(decodeId("claim", first.body.id) as string, uuidv7()),
+    );
+    const freeUntil = firstDecision.salon.freeUntil;
+
+    const successor = await app.person("Successor");
+    const second = await successor.api<Claim>(
+      "POST",
+      `/v1/salons/${salonId}/claims`,
+      claimBody(firstDecision.salon.abn as string),
+    );
+    expect(second.status).toBe(201);
+    const decision = await withDb((db) =>
+      claims(db).approve(decodeId("claim", second.body.id) as string, uuidv7()),
+    );
+    // Both are owners now; the listing keeps the terms it had.
+    expect(decision.otherOwners).toEqual([{ email: original.email, phoneNumber: null }]);
+    expect(decision.salon.freeUntil).toEqual(freeUntil);
+    const team = await successor.api<{ members: { role: string; you: boolean }[] }>(
+      "GET",
+      `/v1/employer/salons/${salonId}/team`,
+    );
+    expect(team.body.members.map((m) => m.role)).toEqual(["owner", "owner"]);
   });
 
   it("returns a claimed listing to the directory when its owner deletes their account", async () => {
@@ -185,9 +241,9 @@ describe("claiming a directory listing", () => {
       claims(db).approve(decodeId("claim", started.body.id) as string, uuidv7()),
     );
     expect((await person.api("DELETE", "/v1/me")).status).toBe(200);
-    const rows = await query<{ owner_id: string | null }>(
-      sql`select owner_id from salons where id = ${salon.id}`,
-    );
-    expect(rows).toEqual([{ owner_id: null }]);
+    expect(await query(sql`select claimed_at, source from salons where id = ${salon.id}`)).toEqual([
+      { claimed_at: null, source: "directory" },
+    ]);
+    expect(await query(sql`select 1 from salon_members where salon_id = ${salon.id}`)).toEqual([]);
   });
 });

@@ -10,14 +10,18 @@ import type {
   Education,
   Experience,
   FullProfile,
+  Invite,
   Job,
   JobWithSalon,
   PageOf,
   PortfolioItem,
   Salon,
   SalonJob,
+  SalonRole,
   SeekerProfile,
+  TeamMember,
 } from "@salonstaff/db";
+import { isClaimed } from "@salonstaff/db";
 import {
   encodeId,
   entitlementOf,
@@ -136,8 +140,8 @@ export const salonSummaryJson = (env: Env, salon: Salon) => ({
   suburb: salon.suburb,
   state: salon.state,
   logoUrl: mediaUrl(env, salon.logoKey),
-  verified: salon.ownerId !== null && salon.abnStatus === "verified",
-  claimed: salon.ownerId !== null,
+  verified: isClaimed(salon) && salon.abnStatus === "verified",
+  claimed: isClaimed(salon),
 });
 
 export const jobSummaryJson = (env: Env, { job, salon }: JobWithSalon) => ({
@@ -180,6 +184,7 @@ export const salonJobJson = (env: Env, salon: Salon, job: SalonJob) => ({
   paidVia: job.paidVia,
   applicants: job.applicants,
   newApplicants: job.newApplicants,
+  notifyUserIds: job.notifyUserIds?.map((id) => encodeId("user", id)) ?? null,
   createdAt: job.createdAt.toISOString(),
   updatedAt: job.updatedAt.toISOString(),
 });
@@ -191,7 +196,7 @@ export function entitlementJson(salon: Salon) {
     : { ok: false, via: null, reason: entitlement.reason };
 }
 
-export const mySalonJson = (env: Env, salon: Salon) => ({
+export const mySalonJson = (env: Env, salon: Salon, role: SalonRole) => ({
   id: encodeId("salon", salon.id),
   name: salon.name,
   slug: salon.slug,
@@ -219,6 +224,24 @@ export const mySalonJson = (env: Env, salon: Salon) => ({
   claimedAt: iso(salon.claimedAt),
   createdAt: salon.createdAt.toISOString(),
   entitlement: entitlementJson(salon),
+  role,
+});
+
+export const teamMemberJson = (member: TeamMember, you: string) => ({
+  userId: encodeId("user", member.userId),
+  name: member.name,
+  email: realEmail(member.email),
+  role: member.role,
+  joinedAt: member.joinedAt.toISOString(),
+  you: member.userId === you,
+});
+
+export const teamInviteJson = (invite: Invite) => ({
+  id: encodeId("invite", invite.id),
+  email: invite.email,
+  role: invite.role,
+  expiresAt: invite.expiresAt.toISOString(),
+  createdAt: invite.createdAt.toISOString(),
 });
 
 export const directorySalonJson = (env: Env, { salon, liveJobs, distanceKm }: DirectoryEntry) => ({

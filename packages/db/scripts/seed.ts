@@ -286,7 +286,7 @@ async function seedSalons(db: Db): Promise<number> {
       "Demo Owner",
       "employer",
     );
-    if (await salonsFor(db).ownedBy(owner.id)) continue;
+    if ((await salonsFor(db).ofUser(owner.id)).length > 0) continue;
     if (!isValidAbn(s.abn)) throw new Error(`The demo ABN for ${s.name} doesn't pass the checksum`);
     const input = salonSchema.parse({
       name: s.name,

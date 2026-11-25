@@ -410,13 +410,19 @@ jobsRoutes.openapi(
       );
     }
     const application = await me.apply(row.job.id, input, userActor(c, session.user.id));
-    notify(c, await salonScope(db, row.salon.id).ownerContact(), {
-      subject: `New verified applicant for ${row.job.title}`,
-      title: `New applicant: ${row.job.title}`,
-      body: `Someone with a verified ID applied for "${row.job.title}". Their profile, verification ID and contact details are waiting for you.`,
-      action: "Review applicants",
-      url: appUrl(c, `/employer/jobs/${encodeId("job", row.job.id)}`),
-    });
+    const team = await salonScope(db, row.salon.id).applicationContacts(row.job);
+    for (const contact of team) {
+      notify(c, contact, {
+        subject: `New verified applicant for ${row.job.title}`,
+        title: `New applicant: ${row.job.title}`,
+        body: `Someone with a verified ID applied for "${row.job.title}" at ${row.salon.name}. Their profile, verification ID and contact details are waiting for you.`,
+        action: "Review applicants",
+        url: appUrl(
+          c,
+          `/employer/${encodeId("salon", row.salon.id)}/jobs/${encodeId("job", row.job.id)}`,
+        ),
+      });
+    }
     return c.json(
       {
         id: encodeId("application", application.id),

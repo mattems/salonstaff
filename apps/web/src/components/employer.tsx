@@ -9,16 +9,18 @@ import {
   salonSchema,
 } from "@salonstaff/shared";
 import { Badge } from "@salonstaff/ui/components/badge";
-import { redirect } from "@tanstack/react-router";
-import type { ReactNode } from "react";
+import { Checkbox } from "@salonstaff/ui/components/checkbox";
+import { Label } from "@salonstaff/ui/components/label";
+import { type ReactNode, useId, useState } from "react";
 import type { z } from "zod";
 import type { Schemas } from "@/lib/api";
 import { formatDate } from "@/lib/format";
-import type { Me } from "@/lib/session";
 import { AppLink } from "./app-link";
 import {
   CheckboxField,
+  CheckboxGroup,
   type FieldErrors,
+  formList,
   formText,
   parse,
   SelectField,
@@ -28,12 +30,6 @@ import {
 import { Notice } from "./page";
 
 type Salon = Schemas["MySalon"];
-
-/** For loaders under /employer: someone without a salon starts with onboarding. */
-export function requireOwnSalon(me: Me) {
-  if (!me.salon) throw redirect({ to: "/employer/onboarding" });
-  return me.salon;
-}
 
 export function SalonStatusBanner({ salon }: { salon: Pick<Salon, "status" | "statusReason"> }) {
   if (salon.status === "active") return null;
@@ -55,10 +51,12 @@ export function SalonStatusBanner({ salon }: { salon: Pick<Salon, "status" | "st
 
 /** How the salon can publish right now (D-05). */
 export function EntitlementSummary({
+  salonId,
   entitlement,
   freeUntil,
   listingCredits,
 }: {
+  salonId: string;
   entitlement: Schemas["Entitlement"];
   freeUntil: string | null;
   listingCredits: number;
@@ -74,7 +72,7 @@ export function EntitlementSummary({
   return (
     <>
       Your free period has ended. To publish a job,{" "}
-      <AppLink href="/employer/billing" className="underline">
+      <AppLink href={`/employer/${salonId}/billing`} className="underline">
         buy a listing or start the Salon Plan
       </AppLink>
       .
@@ -324,3 +322,50 @@ export function JobFields({
     </div>
   );
 }
+
+/**
+ * Who on the team is emailed about new applications for a job (D-11): everyone (including people
+ * who join later), or the people ticked. Read back with `readNotify`.
+ */
+export function NotifyFields({
+  team,
+  value,
+}: {
+  team: Schemas["TeamMember"][];
+  /** The job's `notifyUserIds`: null is everyone. */
+  value?: string[] | null | undefined;
+}) {
+  const [everyone, setEveryone] = useState(value == null);
+  const id = useId();
+  return (
+    <fieldset className="grid gap-2">
+      <legend className="mb-1 font-medium text-sm">Email new applications to</legend>
+      <div className="flex items-center gap-2">
+        <Checkbox
+          id={id}
+          name="notifyEveryone"
+          checked={everyone}
+          onCheckedChange={(checked) => setEveryone(checked === true)}
+        />
+        <Label htmlFor={id} className="font-normal">
+          Everyone on the team, including people who join later
+        </Label>
+      </div>
+      {!everyone && (
+        <CheckboxGroup
+          label="Only these people"
+          name="notify"
+          options={team.map((m) => ({
+            value: m.userId,
+            label: `${m.name || m.email || "Someone"}${m.you ? " (you)" : ""}`,
+          }))}
+          defaultValues={value ?? team.filter((m) => m.you).map((m) => m.userId)}
+        />
+      )}
+    </fieldset>
+  );
+}
+
+/** The job form's choice of who hears about applications: null is everyone. */
+export const readNotify = (form: FormData): string[] | null =>
+  form.get("notifyEveryone") ? null : formList(form, "notify");

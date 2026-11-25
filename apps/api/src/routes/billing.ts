@@ -15,7 +15,14 @@ import { isLocal } from "../lib/auth-config";
 import { appUrl } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
-import { EntitlementSchema, errors, json, jsonBody, UrlResponse } from "../lib/schemas";
+import {
+  EntitlementSchema,
+  errors,
+  json,
+  jsonBody,
+  SalonParams,
+  UrlResponse,
+} from "../lib/schemas";
 import { requireSalon } from "../lib/session";
 import {
   billingOn,
@@ -77,19 +84,21 @@ const billingOff = () =>
 billingRoutes.openapi(
   createRoute({
     method: "get",
-    path: "/v1/salon/billing",
+    path: "/v1/employer/salons/{salonId}/billing",
     summary: "Your salon's billing",
     description:
-      "Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.",
+      "Owners only. Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.",
     tags: TAGS,
+    request: { params: SalonParams },
     responses: {
       200: json(BillingSchema, "Billing"),
       401: errors[401],
-      404: problemResponse("No salon yet"),
+      403: problemResponse("Managers can't see billing"),
+      404: problemResponse("Not one of your salons"),
     },
   }),
   async (c) => {
-    const { salon, scope } = await requireSalon(c);
+    const { salon, scope } = await requireSalon(c, c.req.valid("param").salonId, "owner");
     const payments = await scope.payments(10);
     return c.json(
       {
@@ -126,29 +135,31 @@ billingRoutes.openapi(
 billingRoutes.openapi(
   createRoute({
     method: "post",
-    path: "/v1/salon/billing/checkout",
+    path: "/v1/employer/salons/{salonId}/billing/checkout",
     summary: "Buy a listing or start the Salon Plan",
-    description: `Returns a checkout \`url\` (Stripe Checkout; locally a mock page). A single listing ($${PRICING.singleListingCents / 100}, GST included) adds one credit that publishes a job for ${PRICING.listingDurationDays} days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.`,
+    description: `Owners only. Returns a checkout \`url\` (Stripe Checkout; locally a mock page). A single listing ($${PRICING.singleListingCents / 100}, GST included) adds one credit that publishes a job for ${PRICING.listingDurationDays} days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.`,
     tags: TAGS,
-    request: jsonBody(
-      z.object({ kind: z.enum(["single_listing", "salon_plan"]) }).openapi("Checkout"),
-    ),
+    request: {
+      params: SalonParams,
+      ...jsonBody(z.object({ kind: z.enum(["single_listing", "salon_plan"]) }).openapi("Checkout")),
+    },
     responses: {
       200: json(UrlResponse, "Where to pay"),
       400: errors[400],
       401: errors[401],
-      404: problemResponse("No salon yet, or billing is off"),
+      403: problemResponse("Only owners buy listings"),
+      404: problemResponse("Not one of your salons, or billing is off"),
       409: problemResponse("Already on the Salon Plan"),
     },
   }),
   async (c) => {
-    const { salon, scope, actor } = await requireSalon(c);
+    const { salon, scope, actor } = await requireSalon(c, c.req.valid("param").salonId, "owner");
     const { kind } = c.req.valid("json");
     if (!billingOn(c.env) && !mockAllowed(c)) throw billingOff();
     if (kind === "salon_plan" && isSubscribed(salon)) {
       throw new ApiError("conflict", {
         detail: "You're already on the Salon Plan",
-        hint: "Manage it with POST /v1/salon/billing/portal.",
+        hint: "Manage it with POST /v1/employer/salons/{salonId}/billing/portal.",
       });
     }
     const paymentKind: PaymentKind =
@@ -159,7 +170,8 @@ billingRoutes.openapi(
           : "salon_plan";
     const amountCents =
       kind === "single_listing" ? PRICING.singleListingCents : planPriceCents(salon.founding);
-    if (c.get("dryRun")) return c.json({ url: appUrl(c, "/employer/billing") }, 200);
+    if (c.get("dryRun"))
+      return c.json({ url: appUrl(c, `/employer/${c.req.valid("param").salonId}/billing`) }, 200);
 
     if (!billingOn(c.env)) {
       const ref = `mock_${randomBase62(12)}`;
@@ -167,7 +179,10 @@ billingRoutes.openapi(
         { kind: paymentKind, amountCents, provider: "mock", checkoutRef: ref },
         actor,
       );
-      return c.json({ url: appUrl(c, `/dev/mock-checkout?ref=${ref}`) }, 200);
+      return c.json(
+        { url: appUrl(c, `/dev/mock-checkout?ref=${ref}&salon=${c.req.valid("param").salonId}`) },
+        200,
+      );
     }
 
     let customerId = salon.stripeCustomerId;
@@ -194,8 +209,8 @@ billingRoutes.openapi(
             ? "Salon Plan (founding salon price)"
             : "Salon Plan (unlimited listings)",
       metadata: { paymentId: payment.id, salonId: salon.id, kind: paymentKind },
-      successUrl: appUrl(c, "/employer/billing?status=success"),
-      cancelUrl: appUrl(c, "/employer/billing?status=cancelled"),
+      successUrl: appUrl(c, `/employer/${c.req.valid("param").salonId}/billing?status=success`),
+      cancelUrl: appUrl(c, `/employer/${c.req.valid("param").salonId}/billing?status=cancelled`),
     });
     await scope.setCheckoutRef(payment.id, session.id);
     return c.json({ url: session.url }, 200);
@@ -205,32 +220,35 @@ billingRoutes.openapi(
 billingRoutes.openapi(
   createRoute({
     method: "post",
-    path: "/v1/salon/billing/portal",
+    path: "/v1/employer/salons/{salonId}/billing/portal",
     summary: "Manage your plan and invoices",
     description:
-      "Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.",
+      "Owners only. Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.",
     tags: TAGS,
+    request: { params: SalonParams },
     responses: {
       200: json(UrlResponse, "The billing portal"),
       401: errors[401],
-      404: problemResponse("No salon yet, or billing is off"),
+      403: problemResponse("Only owners buy listings"),
+      404: problemResponse("Not one of your salons, or billing is off"),
       409: problemResponse("Nothing bought yet"),
     },
   }),
   async (c) => {
-    const { salon } = await requireSalon(c);
+    const { salon } = await requireSalon(c, c.req.valid("param").salonId, "owner");
     if (!billingOn(c.env)) throw billingOff();
     if (!salon.stripeCustomerId) {
       throw new ApiError("conflict", {
         detail: "There's nothing to manage yet",
-        hint: "Buy a listing or start the Salon Plan with POST /v1/salon/billing/checkout first.",
+        hint: "Buy a listing or start the Salon Plan with POST /v1/employer/salons/{salonId}/billing/checkout first.",
       });
     }
-    if (c.get("dryRun")) return c.json({ url: appUrl(c, "/employer/billing") }, 200);
+    if (c.get("dryRun"))
+      return c.json({ url: appUrl(c, `/employer/${c.req.valid("param").salonId}/billing`) }, 200);
     const url = await billingPortalUrl(
       c.env,
       salon.stripeCustomerId,
-      appUrl(c, "/employer/billing"),
+      appUrl(c, `/employer/${c.req.valid("param").salonId}/billing`),
     );
     return c.json({ url }, 200);
   },

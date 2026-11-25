@@ -117,6 +117,7 @@ const UserDetail = z
         status: z.string(),
         source: z.enum(["owner", "directory"]),
         path: z.string(),
+        role: z.enum(["owner", "manager"]),
       }),
     ),
     flags: z.array(Flag),
@@ -283,7 +284,7 @@ admin.openapi(
           job: { id: encodeId("job", a.job.id), title: a.job.title, path: jobPath(a.job) },
           salon: { id: encodeId("salon", a.salon.id), name: a.salon.name },
         })),
-        salons: d.salons.map((s) => ({
+        salons: d.salons.map(({ salon: s, role }) => ({
           id: encodeId("salon", s.id),
           name: s.name,
           suburb: s.suburb,
@@ -291,6 +292,7 @@ admin.openapi(
           status: s.status,
           source: s.source,
           path: salonPath(s),
+          role,
         })),
         flags: d.flags.map(flagJson),
         active_sessions: d.activeSessions,

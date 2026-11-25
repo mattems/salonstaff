@@ -123,14 +123,16 @@ describe("a job seeker's profile", () => {
     const pastId = past.body.experience[0]?.id as string;
     expect((await other.api("DELETE", `/v1/me/experience/${pastId}`)).status).toBe(404);
 
-    const whoami = await me.api<{ name: string; role: string; profile: unknown; salon: unknown }>(
-      "GET",
-      "/v1/me",
-    );
+    const whoami = await me.api<{
+      name: string;
+      role: string;
+      profile: unknown;
+      salons: unknown[];
+    }>("GET", "/v1/me");
     expect(whoami.body.name).toMatch(/^Sam Tester/);
     expect(whoami.body.role).toBe("seeker");
     expect(whoami.body.profile).not.toBeNull();
-    expect(whoami.body.salon).toBeNull();
+    expect(whoami.body.salons).toEqual([]);
   });
 
   it("uploads a photo and portfolio pictures to the media bucket", async () => {

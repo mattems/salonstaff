@@ -7,174 +7,75 @@ import {
   CardHeader,
   CardTitle,
 } from "@salonstaff/ui/components/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@salonstaff/ui/components/table";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { AppLink } from "@/components/app-link";
-import {
-  AbnBadge,
-  EntitlementSummary,
-  requireOwnSalon,
-  SalonStatusBanner,
-} from "@/components/employer";
-import { EmptyState, PageHeader } from "@/components/page";
+import { PageHeader } from "@/components/page";
 import { api, unwrap } from "@/lib/api";
-import { formatDate } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
+/** Your salons (D-11). With none you start by adding one; with one you go straight to it. */
 export const Route = createFileRoute("/employer/")({
   beforeLoad: ({ context }) => {
-    requireOwnSalon(context.me);
+    const [only, ...more] = context.me.salons;
+    if (!only) throw redirect({ to: "/employer/onboarding" });
+    if (more.length === 0)
+      throw redirect({ to: "/employer/$salonId", params: { salonId: only.id } });
   },
-  loader: async () => {
-    const [salon, jobs] = await Promise.all([api.GET("/v1/salon"), api.GET("/v1/salon/jobs")]);
-    return { salon: unwrap(salon), jobs: unwrap(jobs).items };
-  },
-  head: () => privatePage("Your salon"),
-  component: Dashboard,
+  loader: async () => unwrap(await api.GET("/v1/employer/salons")).items,
+  head: () => privatePage("Your salons"),
+  component: Salons,
 });
 
-const JOB_STATUS = {
-  draft: "Draft",
-  published: "Live",
-  expired: "Expired",
-  closed: "Closed",
-} as const;
+const ROLE = { owner: "Owner", manager: "Manager" } as const;
 
-function Dashboard() {
-  const { salon, jobs } = Route.useLoaderData();
+function Salons() {
+  const salons = Route.useLoaderData();
   return (
     <div className="space-y-6">
       <PageHeader
-        title={salon.name}
-        description={
-          <>
-            {salon.suburb} {salon.state} ·{" "}
-            <AppLink href={salon.path} className="underline">
-              Your public page
-            </AppLink>
-          </>
-        }
+        title="Your salons"
         actions={
-          salon.status === "active" && (
-            <Button asChild>
-              <Link to="/employer/jobs/new">Post a job</Link>
-            </Button>
-          )
+          <Button asChild>
+            <Link to="/employer/onboarding">Add a salon</Link>
+          </Button>
         }
       />
-      <SalonStatusBanner salon={salon} />
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Listings</CardTitle>
-            <CardDescription>
-              <EntitlementSummary
-                entitlement={salon.entitlement}
-                freeUntil={salon.freeUntil}
-                listingCredits={salon.listingCredits}
-              />
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild size="sm" variant="outline">
-              <Link to="/employer/billing" search={{}}>
-                Billing
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Business</CardTitle>
-            <CardDescription className="space-y-1">
-              <AbnBadge salon={salon} />
-              {salon.founding && <p>Founding salon: your Salon Plan price is locked in.</p>}
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <Card size="sm">
-          <CardHeader>
-            <CardTitle>Applicants</CardTitle>
-            <CardDescription>
-              {jobs.reduce((sum, job) => sum + job.applicants, 0)} in total,{" "}
-              {jobs.reduce((sum, job) => sum + job.newApplicants, 0)} new
-            </CardDescription>
-          </CardHeader>
-        </Card>
-      </div>
-
-      {jobs.length === 0 ? (
-        <EmptyState
-          title="No jobs yet"
-          description="Post your first job: it goes live straight away."
-          action={
-            salon.status === "active" && (
-              <Button asChild>
-                <Link to="/employer/jobs/new">Post a job</Link>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {salons.map((salon) => (
+          <Card key={salon.id} size="sm">
+            <CardHeader>
+              <CardTitle className="flex flex-wrap items-center gap-2">
+                <Link
+                  to="/employer/$salonId"
+                  params={{ salonId: salon.id }}
+                  className="hover:underline"
+                >
+                  {salon.name}
+                </Link>
+                <Badge variant="outline">{ROLE[salon.role]}</Badge>
+                {salon.status !== "active" && <Badge variant="destructive">{salon.status}</Badge>}
+              </CardTitle>
+              <CardDescription>
+                {salon.suburb} {salon.state}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/employer/$salonId" params={{ salonId: salon.id }}>
+                  Open
+                </Link>
               </Button>
-            )
-          }
-        />
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle>Your jobs</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Applicants</TableHead>
-                  <TableHead>Live until</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobs.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell>
-                      <Link
-                        to="/employer/jobs/$id"
-                        params={{ id: job.id }}
-                        className="font-medium hover:underline"
-                      >
-                        {job.title}
-                      </Link>
-                      <span className="block text-muted-foreground text-xs">
-                        {job.suburb} {job.state}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={job.status === "published" ? "default" : "outline"}>
-                        {JOB_STATUS[job.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {job.applicants}
-                      {job.newApplicants > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {job.newApplicants} new
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {job.status === "published" ? formatDate(job.expiresAt) : "–"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      <p className="text-muted-foreground text-sm">
+        Already in the directory?{" "}
+        <AppLink href="/salons" className="underline">
+          Find your salon
+        </AppLink>{" "}
+        and claim it to add it here.
+      </p>
     </div>
   );
 }

@@ -267,7 +267,7 @@ describe("deleting a person", () => {
     const rows = await withDb((db) =>
       db.select().from(schema.salons).where(eq(schema.salons.id, claimed.id)),
     );
-    expect(rows[0]).toMatchObject({ ownerId: null, claimedAt: null });
+    expect(rows[0]).toMatchObject({ claimedAt: null, source: "directory" });
     expect(
       await withDb((db) => db.select().from(schema.salons).where(eq(schema.salons.id, made.id))),
     ).toEqual([]);

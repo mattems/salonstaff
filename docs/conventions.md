@@ -10,13 +10,18 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 - Errors: `throw new ApiError(code, { detail, hint })`, always with a hint. Add new codes to `packages/shared/src/errors.ts`.
 - IDs: `encodeId` on the way out, `decodeId` on the way in (null → `not_found`).
 - Who's calling: `await c.get("session")()`. Wrong role → `forbidden`; nobody → `unauthenticated`.
+- Salon routes are `/v1/employer/salons/{salonId}/…` and start with `requireSalon(c, salonId, "manager" | "owner")`:
+  not on the team → `not_found`, a manager doing an owner's job → `forbidden` (D-11).
 - Every change: `recordAudit` in the same transaction. Honour `c.get("dryRun")`. `Idempotency-Key` works on any `POST`.
 - Notifications never fail a request: log and carry on. People without an email get an SMS.
 - After changing a route: `bun run api:types`.
 
 ## Data (`packages/db`)
 - No table imports outside `packages/db`. Scopes: `publicSite`, `seeker(db, userId)`, `salonScope(db, salonId)`,
-  `claims`, `checks`, `backOffice` (behind `requireStaff` only), `housekeeping` (the cron only).
+  `salonTeam(db, salonId)`, `invites`, `claims`, `checks`, `backOffice` (behind `requireStaff` only),
+  `housekeeping` (the cron only).
+- Who manages a salon is `salon_members` (D-11); `salons.owner_id` is deprecated, never read or written.
+  Claimed means `isClaimed`/`claimed()` (made by its owner, or `claimed_at` set).
 - Migrations: `bun db:generate -- --name <name>`; forward only, expand then contract.
 - `latitude`/`longitude` on salons and jobs are set by the database (trigger `set_coordinates`, D-10) from
   `localities`/`postcodes`; never write them from code.

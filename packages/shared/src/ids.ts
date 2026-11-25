@@ -12,6 +12,7 @@ export const ID_PREFIXES = {
   application: "app",
   check: "chk",
   claim: "clm",
+  invite: "inv",
   flag: "flg",
   payment: "pay",
   experience: "exp",

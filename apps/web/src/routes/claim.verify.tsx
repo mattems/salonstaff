@@ -47,7 +47,9 @@ function ConfirmClaim() {
                 You can post jobs now, free during your launch period.
               </Notice>
               <Button asChild>
-                <Link to="/employer">Go to your dashboard</Link>
+                <Link to="/employer/$salonId" params={{ salonId: done.salon.id }}>
+                  Go to your dashboard
+                </Link>
               </Button>
             </>
           ) : (

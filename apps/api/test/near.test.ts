@@ -117,7 +117,7 @@ describe("near me", () => {
     expect(fallback?.latitude).toBeCloseTo(-33.88, 1);
 
     // Moving the salon moves its coordinates.
-    const moved = await owner.api("PATCH", "/v1/salon", { suburb: "Newcastle", postcode: "2300" });
+    const moved = await owner.api("PATCH", owner.at(), { suburb: "Newcastle", postcode: "2300" });
     expect(moved.status).toBe(200);
     const after = await where("salons", salon.id);
     expect(after?.latitude).toBeCloseTo(-32.93, 1);

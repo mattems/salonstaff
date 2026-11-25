@@ -25,7 +25,7 @@ describe("the job feed", () => {
     const live = await postJob(owner, { suburb, role: "barber", title: `Barber ${uid()}` });
     const draft = await postJob(owner, { suburb }, false);
     const closed = await postJob(owner, { suburb });
-    await owner.api("POST", `/v1/salon/jobs/${closed.id}/close`);
+    await owner.api("POST", owner.at(`/jobs/${closed.id}/close`));
     const suburbSlug = live.path.split("/")[3];
 
     const feed = await get<{
@@ -119,7 +119,7 @@ describe("resolving public addresses", () => {
     expect(ad.body).toMatchObject({ kind: "job", closed: false, noindex: false, viewer: null });
     expect(ad.body.job.id).toBe(live.id);
 
-    await owner.api("POST", `/v1/salon/jobs/${closing.id}/close`);
+    await owner.api("POST", owner.at(`/jobs/${closing.id}/close`));
     const closed = await get<{ closed: boolean; noindex: boolean; similar: { id: string }[] }>(
       app,
       `/v1/jobs/by-path?path=${closing.path}`,
@@ -197,7 +197,7 @@ describe("the sitemap", () => {
     const { owner, salon } = await salonOwner(app, { suburb });
     const live = await postJob(owner, { suburb, role: "nail_technician" });
     const closed = await postJob(owner, { suburb });
-    await owner.api("POST", `/v1/salon/jobs/${closed.id}/close`);
+    await owner.api("POST", owner.at(`/jobs/${closed.id}/close`));
     const hidden = await salonOwner(app, { suburb: testSuburb() });
     const hiddenJob = await postJob(hidden.owner, { suburb: testSuburb() });
     await query(sql`update salons set status = 'removed' where name = ${hidden.salon.name}`);

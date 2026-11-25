@@ -67,4 +67,6 @@ export * from "./public-site";
 export * from "./salon";
 export * from "./seeker";
 export * from "./staff-office";
+export * from "./team";
 export type { Job, JobWithSalon, PageOf, Salon } from "./visibility";
+export { isClaimed } from "./visibility";

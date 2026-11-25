@@ -5,6 +5,17 @@ import { APP_ORIGIN, codeFor, type createTestApp } from "./helpers";
 
 type App = ReturnType<typeof createTestApp>;
 export type Person = Awaited<ReturnType<App["person"]>>;
+
+/** Someone on a salon's team, with `at(path)` for that salon's employer routes. */
+export type SalonPerson = Person & { salonId: string; at: (path?: string) => string };
+
+/** The employer routes of one salon (D-11). */
+export const salonRoute = (salonId: string, path = "") => `/v1/employer/salons/${salonId}${path}`;
+
+/** Points a person's `at(path)` at one of their salons. */
+export function asSalon(person: Person, salonId: string): SalonPerson {
+  return Object.assign(person, { salonId, at: (path = "") => salonRoute(salonId, path) });
+}
 /** Anyone who can send requests as themselves. */
 export interface Caller {
   api<T = Record<string, unknown>>(
@@ -96,6 +107,7 @@ export interface MySalon {
   slug: string;
   freeUntil: string | null;
   listingCredits: number;
+  role: "owner" | "manager";
   entitlement: { ok: boolean; via: string | null; reason: string | null };
 }
 
@@ -113,10 +125,10 @@ export const salonInput = (overrides: Record<string, unknown> = {}) => ({
 
 /** An employer with their own salon. */
 export async function salonOwner(app: App, overrides: Record<string, unknown> = {}) {
-  const owner = await app.person("Owner", { role: "employer" });
-  const created = await owner.api<MySalon>("POST", "/v1/salon", salonInput(overrides));
+  const person = await app.person("Owner", { role: "employer" });
+  const created = await person.api<MySalon>("POST", "/v1/employer/salons", salonInput(overrides));
   expect(created.status).toBe(201);
-  return { owner, salon: created.body };
+  return { owner: asSalon(person, created.body.id), salon: created.body };
 }
 
 export interface SalonJob {
@@ -146,11 +158,11 @@ export const jobInput = (overrides: Record<string, unknown> = {}) => ({
 
 /** Posts (and by default publishes) a job as the owner. */
 export async function postJob(
-  owner: Person,
+  owner: SalonPerson,
   overrides: Record<string, unknown> = {},
   publish = true,
 ) {
-  const posted = await owner.api<SalonJob>("POST", "/v1/salon/jobs", {
+  const posted = await owner.api<SalonJob>("POST", owner.at("/jobs"), {
     ...jobInput(overrides),
     publish,
   });

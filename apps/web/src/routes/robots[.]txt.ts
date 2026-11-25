@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { absolute } from "@/lib/seo";
 
 /** Private and transactional pages stay out of search engines; everything public is in. */
-const DISALLOW = ["/account", "/employer", "/sign-in", "/claim", "/api", "/dev"];
+const DISALLOW = ["/account", "/employer", "/sign-in", "/claim", "/invite", "/api", "/dev"];
 
 export const Route = createFileRoute("/robots.txt")({
   server: {

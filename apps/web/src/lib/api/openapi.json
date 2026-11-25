@@ -70,16 +70,12 @@
           "verification": {
             "$ref": "#/components/schemas/Verification"
           },
-          "salon": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/OwnSalonSummary"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The salon you manage, if any."
+          "salons": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OwnSalonSummary"
+            },
+            "description": "The salons you're on the team of, in the order you joined them."
           }
         },
         "required": [
@@ -91,7 +87,7 @@
           "createdAt",
           "profile",
           "verification",
-          "salon"
+          "salons"
         ]
       },
       "SeekerProfile": {
@@ -316,9 +312,14 @@
           "status": {
             "type": "string",
             "enum": ["active", "suspended", "removed"]
+          },
+          "role": {
+            "type": "string",
+            "enum": ["owner", "manager"],
+            "description": "Your role on the salon's team."
           }
         },
-        "required": ["id", "name", "path", "status"]
+        "required": ["id", "name", "path", "status", "role"]
       },
       "Problem": {
         "type": "object",
@@ -1225,6 +1226,11 @@
           },
           "entitlement": {
             "$ref": "#/components/schemas/Entitlement"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["owner", "manager"],
+            "description": "Your role. Managers handle jobs and applicants; owners also change the salon's details, billing and team."
           }
         },
         "required": [
@@ -1254,7 +1260,8 @@
           "listingCredits",
           "claimedAt",
           "createdAt",
-          "entitlement"
+          "entitlement",
+          "role"
         ]
       },
       "Entitlement": {
@@ -1274,6 +1281,18 @@
           }
         },
         "required": ["ok", "via", "reason"]
+      },
+      "MySalons": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MySalon"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "SalonJobs": {
         "type": "object",
@@ -1309,6 +1328,13 @@
               "newApplicants": {
                 "type": "integer"
               },
+              "notifyUserIds": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "string"
+                },
+                "description": "Who on the team is emailed about new applications. Null: everyone, including people who join later."
+              },
               "createdAt": {
                 "type": "string",
                 "format": "date-time",
@@ -1325,6 +1351,7 @@
               "paidVia",
               "applicants",
               "newApplicants",
+              "notifyUserIds",
               "createdAt",
               "updatedAt"
             ]
@@ -1432,6 +1459,14 @@
                 "type": "boolean",
                 "default": false,
                 "description": "Publish straight away (uses the free period, the plan or a credit)."
+              },
+              "notifyUserIds": {
+                "type": ["array", "null"],
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 100,
+                "description": "Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later."
               }
             }
           }
@@ -1517,6 +1552,14 @@
           "requireQualification": {
             "type": "boolean",
             "default": false
+          },
+          "notifyUserIds": {
+            "type": ["array", "null"],
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "description": "Who on the team is emailed about new applications: their `userId`s from GET /v1/employer/salons/{salonId}/team. Null (the default) is everyone, including people who join later."
           }
         }
       },
@@ -1743,6 +1786,159 @@
           }
         },
         "required": ["email", "phone"]
+      },
+      "Team": {
+        "type": "object",
+        "properties": {
+          "members": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamMember"
+            },
+            "description": "Owners first."
+          },
+          "invites": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TeamInvite"
+            },
+            "description": "Sent and not yet accepted."
+          }
+        },
+        "required": ["members", "invites"]
+      },
+      "TeamMember": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "email": {
+            "type": ["string", "null"]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          },
+          "joinedAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "you": {
+            "type": "boolean"
+          }
+        },
+        "required": ["userId", "name", "email", "role", "joinedAt", "you"]
+      },
+      "SalonRole": {
+        "type": "string",
+        "enum": ["owner", "manager"]
+      },
+      "TeamInvite": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "inv_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "email": {
+            "type": "string"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          },
+          "expiresAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "email", "role", "expiresAt", "createdAt"]
+      },
+      "NewInvite": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "format": "email"
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          }
+        },
+        "required": ["email", "role"]
+      },
+      "InviteCancelled": {
+        "type": "object",
+        "properties": {
+          "cancelled": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["cancelled"]
+      },
+      "RoleChange": {
+        "type": "object",
+        "properties": {
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          }
+        },
+        "required": ["role"]
+      },
+      "MemberRemoved": {
+        "type": "object",
+        "properties": {
+          "removed": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["removed"]
+      },
+      "InvitePreview": {
+        "type": "object",
+        "properties": {
+          "salon": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "suburb": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "suburb", "state"]
+          },
+          "role": {
+            "$ref": "#/components/schemas/SalonRole"
+          },
+          "invitedBy": {
+            "type": ["string", "null"]
+          },
+          "email": {
+            "type": "string"
+          },
+          "expiresAt": {
+            "type": "string"
+          }
+        },
+        "required": ["salon", "role", "invitedBy", "email", "expiresAt"]
       },
       "SalonList": {
         "type": "object",
@@ -2166,7 +2362,7 @@
     "/v1/me": {
       "get": {
         "summary": "Who you are",
-        "description": "Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salon you manage (if any).",
+        "description": "Your account, your job seeker profile (if you've made one), your verification summary with the verification IDs of passed checks, and the salons you manage.",
         "tags": ["Me"],
         "responses": {
           "200": {
@@ -3976,10 +4172,10 @@
         }
       }
     },
-    "/v1/salon": {
+    "/v1/employer/salons": {
       "post": {
-        "summary": "Create your salon",
-        "description": "Onboarding. The ABN is checksum-checked, then looked up on the Australian Business Register. If the business is already in the directory (an unclaimed listing with that ABN), claim it instead: the 409's `hint` names its claim page. New salons list jobs free for 90 days, and the first 200 keep founding pricing. Your account becomes an employer account.",
+        "summary": "Add a salon",
+        "description": "You become its owner; an account can have any number of salons (a group's locations). The ABN is checksum-checked, then looked up on the Australian Business Register. If the business is already in the directory (an unclaimed listing with that ABN), claim it instead: the 409's `hint` names its claim page. New salons list jobs free for 90 days, and the first 200 keep founding pricing. Your account becomes an employer account.",
         "tags": ["Salon"],
         "requestBody": {
           "required": true,
@@ -4069,7 +4265,7 @@
             }
           },
           "409": {
-            "description": "You already manage a salon, or the business's listing should be claimed",
+            "description": "The business's listing should be claimed instead",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4081,9 +4277,49 @@
         }
       },
       "get": {
-        "summary": "Your salon",
-        "description": "Its details, public `path`, launch terms and whether it can publish a job now (`entitlement`).",
+        "summary": "Your salons",
+        "description": "Every salon you're on the team of, with your role there, in the order you joined.",
         "tags": ["Salon"],
+        "responses": {
+          "200": {
+            "description": "Your salons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySalons"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}": {
+      "get": {
+        "summary": "One of your salons",
+        "description": "Its details, public `path`, launch terms, whether it can publish a job now (`entitlement`) and your `role`.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Your salon",
@@ -4106,7 +4342,7 @@
             }
           },
           "404": {
-            "description": "No salon yet",
+            "description": "Not one of your salons",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4118,9 +4354,20 @@
         }
       },
       "patch": {
-        "summary": "Change your salon's details",
-        "description": "Send only what changes; a blank or null website, Instagram or about clears it. A new name, suburb or state gives the salon (and its jobs) a new address; the old ones redirect. A new ABN is checked again.",
+        "summary": "Change a salon's details",
+        "description": "Owners only. Send only what changes; a blank or null website, Instagram or about clears it. A new name, suburb or state gives the salon (and its jobs) a new address; the old ones redirect. A new ABN is checked again.",
         "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4207,8 +4454,18 @@
               }
             }
           },
+          "403": {
+            "description": "Only owners change a salon's details",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "No salon yet",
+            "description": "Not one of your salons",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4220,11 +4477,22 @@
         }
       }
     },
-    "/v1/salon/jobs": {
+    "/v1/employer/salons/{salonId}/jobs": {
       "get": {
-        "summary": "Your salon's jobs",
+        "summary": "A salon's jobs",
         "description": "Newest first, drafts included, with how many people applied and how many are new.",
         "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Your jobs",
@@ -4247,7 +4515,7 @@
             }
           },
           "404": {
-            "description": "No salon yet",
+            "description": "Not one of your salons",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4262,6 +4530,17 @@
         "summary": "Post a job",
         "description": "Saved as a draft, or published for 30 days with `publish: true`. Publishing uses the free period, then the Salon Plan, then a listing credit; with none of those it's refused (`listing_needed`) and nothing is saved.",
         "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -4324,7 +4603,7 @@
             }
           },
           "404": {
-            "description": "No salon yet",
+            "description": "Not one of your salons",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4336,11 +4615,20 @@
         }
       }
     },
-    "/v1/salon/jobs/{id}": {
+    "/v1/employer/salons/{salonId}/jobs/{id}": {
       "get": {
         "summary": "One of your jobs",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4389,6 +4677,15 @@
         "description": "Send only what changes. A new title, suburb or state gives a published ad a new address; the old one redirects.",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4453,12 +4750,21 @@
         }
       }
     },
-    "/v1/salon/jobs/{id}/publish": {
+    "/v1/employer/salons/{salonId}/jobs/{id}/publish": {
       "post": {
         "summary": "Publish or relist a job",
         "description": "Live for 30 days from now. Uses the free period, then the Salon Plan, then a listing credit (taken in the same step). A job that's already live is left alone and nothing is charged.",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4523,12 +4829,21 @@
         }
       }
     },
-    "/v1/salon/jobs/{id}/close": {
+    "/v1/employer/salons/{salonId}/jobs/{id}/close": {
       "post": {
         "summary": "Close a job",
         "description": "Stops applications. The ad keeps its address, marked closed.",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4573,12 +4888,21 @@
         }
       }
     },
-    "/v1/salon/jobs/{id}/applicants": {
+    "/v1/employer/salons/{salonId}/jobs/{id}/applicants": {
       "get": {
         "summary": "Who applied for a job",
         "description": "Newest first, with each person's profile summary and verification. Opening the list marks new applications as viewed (`isNew` says which were new).",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4623,12 +4947,21 @@
         }
       }
     },
-    "/v1/salon/applications/{id}": {
+    "/v1/employer/salons/{salonId}/applications/{id}": {
       "patch": {
         "summary": "Move an application along",
         "description": "The applicant is told (email, or SMS for a mobile-only account) when it becomes shortlisted, interview, hired or declined.",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4700,12 +5033,21 @@
         }
       }
     },
-    "/v1/salon/candidates/{userId}": {
+    "/v1/employer/salons/{salonId}/candidates/{userId}": {
       "get": {
         "summary": "A candidate's full profile",
         "description": "Only for someone who applied to one of your jobs: their full profile, verification, contact details and their applications to your salon.",
         "tags": ["Salon"],
         "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
           {
             "schema": {
               "type": "string",
@@ -4739,6 +5081,481 @@
           },
           "404": {
             "description": "Nobody with that ID applied to your salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/team": {
+      "get": {
+        "summary": "A salon's team",
+        "description": "Its owners and managers, and invites not yet accepted. Owners change the salon's details, billing and team; managers handle jobs and applicants.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/team/invites": {
+      "post": {
+        "summary": "Invite someone to the team",
+        "description": "Owners only. Emails them a link that lasts 7 days; they sign in or sign up however they like and accept it. Inviting the same address again replaces the earlier invite.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewInvite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TeamInvite"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners invite people",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "They're already on the team",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/team/invites/{inviteId}": {
+      "delete": {
+        "summary": "Cancel an invite",
+        "description": "Owners only. The emailed link stops working.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "inv_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "inviteId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InviteCancelled"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners cancel invites",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/team/{userId}": {
+      "patch": {
+        "summary": "Change someone's role",
+        "description": "Owners only. A salon keeps at least one owner.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RoleChange"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The team",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Team"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners change roles",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That would leave the salon without an owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Take someone off the team, or leave",
+        "description": "Owners can take anyone off; anyone can take themselves off (leave). A salon's last owner can't go: make someone else an owner first.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Gone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MemberRemoved"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only owners take other people off",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That would leave the salon without an owner",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/invites/{token}": {
+      "get": {
+        "summary": "What an invite is for",
+        "description": "The salon and role an emailed invite link offers, to show before accepting.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "q2f…"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invite",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvitePreview"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link is invalid or has expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/invites/{token}/accept": {
+      "post": {
+        "summary": "Accept an invite",
+        "description": "Sign in first, with any account. You join the salon's team (a manager invited as an owner becomes one) and your account becomes an employer account. The link is then used up.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "q2f…"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The salon you joined",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MySalon"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The link is invalid or has expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4949,7 +5766,7 @@
     "/v1/salons/{id}/claims": {
       "post": {
         "summary": "Claim a directory listing",
-        "description": "The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with `method: email` we send a link to the listing's own email (it lasts 48 hours; `sentTo` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with `method: review`, staff check it. An approved claim makes the listing yours, with the free period and founding pricing of a new salon.",
+        "description": "The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with `method: email` we send a link to the listing's own email (it lasts 48 hours; `sentTo` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with `method: review`, staff check it. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.",
         "tags": ["Directory"],
         "parameters": [
           {
@@ -5014,7 +5831,7 @@
             }
           },
           "409": {
-            "description": "Already claimed, the ABN doesn't match, or you already manage a salon",
+            "description": "You already own it, or the ABN doesn't match",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5029,7 +5846,7 @@
     "/v1/claims/verify/{token}": {
       "post": {
         "summary": "Confirm a claim from its emailed link",
-        "description": "Sign in as the person who started the claim first. Completes the claim: the listing becomes your salon and your account an employer account.",
+        "description": "Sign in as the person who started the claim first. Completes the claim: you become an owner of the listing and your account an employer account.",
         "tags": ["Directory"],
         "parameters": [
           {
@@ -5206,11 +6023,22 @@
         }
       }
     },
-    "/v1/salon/billing": {
+    "/v1/employer/salons/{salonId}/billing": {
       "get": {
         "summary": "Your salon's billing",
-        "description": "Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.",
+        "description": "Owners only. Whether you can publish now and how (free period, Salon Plan or credits), your prices, plan, and recent payments.",
         "tags": ["Billing"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "Billing",
@@ -5232,8 +6060,18 @@
               }
             }
           },
+          "403": {
+            "description": "Managers can't see billing",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "No salon yet",
+            "description": "Not one of your salons",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5245,11 +6083,22 @@
         }
       }
     },
-    "/v1/salon/billing/checkout": {
+    "/v1/employer/salons/{salonId}/billing/checkout": {
       "post": {
         "summary": "Buy a listing or start the Salon Plan",
-        "description": "Returns a checkout `url` (Stripe Checkout; locally a mock page). A single listing ($49, GST included) adds one credit that publishes a job for 30 days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.",
+        "description": "Owners only. Returns a checkout `url` (Stripe Checkout; locally a mock page). A single listing ($49, GST included) adds one credit that publishes a job for 30 days. The Salon Plan is monthly with unlimited listings. What you bought arrives once the payment is confirmed.",
         "tags": ["Billing"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "requestBody": {
           "required": true,
           "content": {
@@ -5291,8 +6140,18 @@
               }
             }
           },
+          "403": {
+            "description": "Only owners buy listings",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "No salon yet, or billing is off",
+            "description": "Not one of your salons, or billing is off",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5314,11 +6173,22 @@
         }
       }
     },
-    "/v1/salon/billing/portal": {
+    "/v1/employer/salons/{salonId}/billing/portal": {
       "post": {
         "summary": "Manage your plan and invoices",
-        "description": "Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.",
+        "description": "Owners only. Returns a Stripe billing portal `url`: change or cancel the Salon Plan, see invoices.",
         "tags": ["Billing"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
         "responses": {
           "200": {
             "description": "The billing portal",
@@ -5340,8 +6210,18 @@
               }
             }
           },
+          "403": {
+            "description": "Only owners buy listings",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "404": {
-            "description": "No salon yet, or billing is off",
+            "description": "Not one of your salons, or billing is off",
             "content": {
               "application/problem+json": {
                 "schema": {

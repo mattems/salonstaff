@@ -1,30 +1,27 @@
 import { Card, CardContent } from "@salonstaff/ui/components/card";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
-import {
-  AbnBadge,
-  readSalonForm,
-  requireOwnSalon,
-  SalonFields,
-  SalonStatusBanner,
-} from "@/components/employer";
+import { AbnBadge, readSalonForm, SalonFields, SalonStatusBanner } from "@/components/employer";
 import { FormMessage, SubmitButton, useAction } from "@/components/form";
 import { PageHeader } from "@/components/page";
 import { api, unwrap } from "@/lib/api";
 import { privatePage } from "@/lib/seo";
 import { forgetMe } from "@/lib/session";
 
-export const Route = createFileRoute("/employer/settings")({
-  beforeLoad: ({ context }) => {
-    requireOwnSalon(context.me);
+export const Route = createFileRoute("/employer/$salonId/settings")({
+  beforeLoad: ({ context, params }) => {
+    if (context.salon.role !== "owner") {
+      throw redirect({ to: "/employer/$salonId", params: { salonId: params.salonId } });
+    }
   },
-  loader: async () => unwrap(await api.GET("/v1/salon")),
+  loader: ({ context }) => context.salon,
   head: () => privatePage("Salon details"),
   component: Settings,
 });
 
 function Settings() {
   const salon = Route.useLoaderData();
+  const salonId = salon.id;
   const action = useAction();
   const router = useRouter();
   return (
@@ -48,7 +45,12 @@ function Settings() {
                 instagram: salonForm.instagram ?? null,
                 about: salonForm.about ?? null,
               };
-              unwrap(await api.PATCH("/v1/salon", { body }));
+              unwrap(
+                await api.PATCH("/v1/employer/salons/{salonId}", {
+                  params: { path: { salonId } },
+                  body,
+                }),
+              );
               forgetMe();
               toast.success("Saved");
               await router.invalidate();

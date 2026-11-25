@@ -52,6 +52,10 @@ the `staff` table, and dangerous changes need a staff passkey (D-06). Locally a 
 - **Directory and claims (D-04):** staff import salons (CSV); owners claim with a matching ABN plus a link
   sent to the listing's business email, or staff approval.
   The CSVs come from `tools/directory` (D-09): Overture Maps places, ABS suburbs, ABNs from the ABR.
+- **Salon teams (D-11):** an account can run any number of salons, and a salon has owners and managers
+  (`salon_members`), added by emailed invite or by claiming. Managers handle jobs and applicants; owners also
+  the salon's details, billing and team. The API is `/v1/employer/salons/{salonId}/…`; each job picks who is
+  emailed about applications.
 - **Near me (D-10):** jobs and salons have the coordinates of their suburb's centre, set by a database
   trigger; searches filter by distance from the browser's (rounded) location or a postcode.
 - **URLs (D-07):** `/jobs/{state}/{suburb}/{title}-{salon}`, `/salons/{state}/{suburb}/{salon}`, landing

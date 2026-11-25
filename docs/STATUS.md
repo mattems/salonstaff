@@ -15,8 +15,8 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - `packages/auth`: Better Auth with Google, Apple, email code, SMS code, bearer. Banned people can't sign in.
 - `packages/email`: Resend/Mailpit sender, sign-in code and notice templates.
 - `apps/api`: `/v1` (account and profile, checks, jobs + apply/save, salon onboarding, jobs, applicants, candidates,
-  directory + claims, billing + Stripe webhook, sitemap data, local mock identity/checkout) and `/admin/v1` (overview,
-  checks and claims queues, people, salons, jobs, payments, directory import, staff, passkeys, audit log). 104 tests.
+  directory + claims, salon teams and invites, billing + Stripe webhook, sitemap data, local mock identity/checkout) and `/admin/v1` (overview,
+  checks and claims queues, people, salons, jobs, payments, directory import, staff, passkeys, audit log). 118 tests.
 - `apps/admin`: the admin portal from kaybee, trimmed, with all Salon Staff pages (basic shadcn).
 - `apps/web`: the website (TanStack Start on a Worker, basic shadcn, no design yet): SEO job/salon/landing pages with
   canonical tags, JSON-LD, 301s and `/sitemap.xml`; sign-in (Google, Apple, email code, mobile code, local dev login);
@@ -31,10 +31,19 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   nearest first, with distances; "Hiring now" on the directory. Places are at their suburb's centre (ABS),
   set by a database trigger; `localities`/`postcodes` loaded by migration 0002.
 
+- Several salons per account, and salon teams (D-11): owners and managers (`salon_members`), emailed invites
+  (7 days), promote/remove/leave (a salon keeps an owner), claims of more listings and of owned listings (the
+  owners are emailed), and per-job choice of who hears about applications. API under
+  `/v1/employer/salons/{salonId}/…` (the singular `/v1/salon/*` is gone); website `/employer/{salonId}/…`
+  with a salon switcher, a Team page and `/invite`; admin shows each salon's team. Migration 0004 copied
+  owners into `salon_members`.
+
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
 ### Known issues
+- Not yet tried in a browser: the multi-salon employer pages, switcher, Team page and invite page
+  (API tests cover the flows).
 - Not yet tried for real: Google/Apple sign-in, Twilio SMS, Stripe, Stripe Identity, ABR lookup (all need keys),
   and a deploy.
 - Not yet tried on PlanetScale: migration 0003 creates a PL/pgSQL trigger function (plain Postgres; should work).
@@ -50,6 +59,7 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   phones and emails from salons' own websites, reviewed before anything changes.
 
 ### Not done yet
+- Drop `salons.owner_id` in a later migration, once deployed code no longer reads it (D-11).
 - Nothing runs on GitHub while developing locally: CI only runs when a deploy calls it (none yet). Run
   `bun run ci` before merging. To check pull requests on GitHub again, add `pull_request:` to `.github/workflows/ci.yml`.
 - Directory pages don't yet credit the directory's data sources (Overture, ABS, ABR); needed before importing

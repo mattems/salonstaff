@@ -5,12 +5,14 @@ import { privatePage } from "@/lib/seo";
 
 interface MockSearch {
   ref?: string | undefined;
+  salon?: string | undefined;
 }
 
 /** Local only: stands in for Stripe Checkout. */
 export const Route = createFileRoute("/dev/mock-checkout")({
   validateSearch: (search: Record<string, unknown>): MockSearch => ({
     ref: typeof search.ref === "string" ? search.ref : undefined,
+    salon: typeof search.salon === "string" ? search.salon : undefined,
   }),
   loader: requireLocal,
   head: () => privatePage("Mock checkout"),
@@ -18,7 +20,7 @@ export const Route = createFileRoute("/dev/mock-checkout")({
 });
 
 function MockCheckout() {
-  const { ref } = Route.useSearch();
+  const { ref, salon } = Route.useSearch();
   const navigate = useNavigate();
   const finish = (outcome: "paid" | "cancelled") => async () => {
     unwrap(
@@ -28,7 +30,8 @@ function MockCheckout() {
       }),
     );
     await navigate({
-      to: "/employer/billing",
+      to: "/employer/$salonId/billing",
+      params: { salonId: salon ?? "" },
       search: { status: outcome === "paid" ? "success" : "cancelled" },
     });
   };

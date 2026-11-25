@@ -137,10 +137,10 @@ describe("claims", () => {
     );
     expect(approved.status).toBe(200);
     expect(approved.body.status).toBe("approved");
-    const [row] = await withDb((db) =>
-      db.select().from(schema.salons).where(eq(schema.salons.id, salon.id)),
+    const team = await withDb((db) =>
+      db.select().from(schema.salonMembers).where(eq(schema.salonMembers.salonId, salon.id)),
     );
-    expect(row?.ownerId).toBe(claimant.uuid);
+    expect(team).toMatchObject([{ userId: claimant.uuid, role: "owner" }]);
     expect(await auditFor(claim.id, "claim.approved")).toHaveLength(1);
     expect(
       (await admin(support, "POST", `/claims/${encodeId("claim", claim.id)}/approve`, {})).status,
@@ -159,10 +159,10 @@ describe("claims", () => {
       note: "Couldn't confirm with the salon",
     });
     expect(rejected.body.status).toBe("rejected");
-    const [row] = await withDb((db) =>
-      db.select().from(schema.salons).where(eq(schema.salons.id, salon.id)),
+    const team = await withDb((db) =>
+      db.select().from(schema.salonMembers).where(eq(schema.salonMembers.salonId, salon.id)),
     );
-    expect(row?.ownerId).toBeNull();
+    expect(team).toEqual([]);
     expect((await auditFor(claim.id, "claim.rejected"))[0]?.reason).toBe(
       "Couldn't confirm with the salon",
     );
