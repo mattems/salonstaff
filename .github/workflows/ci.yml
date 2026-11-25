@@ -2,14 +2,10 @@ name: CI
 
 # A deploy workflow can call this one before it deploys, once there is one.
 #
-# On pull requests it is paused to save Actions minutes, the secret scan too: `bun run ci` runs
-# the same checks locally. To run it on pull requests again,
-# with no change to this file:
-#   gh variable set RUN_CI_ON_PULL_REQUESTS --body true
-# and to pause it again: gh variable delete RUN_CI_ON_PULL_REQUESTS
-# A merge to main never runs it: the commits were checked on the pull request or locally.
+# Nothing runs on GitHub while Salon Staff is developed locally: no checks on pull requests or
+# merges, the secret scan included. `bun run ci` runs the same checks locally. To check pull
+# requests on GitHub again, add `pull_request:` under `on:`.
 on:
-  pull_request:
   workflow_call:
 
 concurrency:
@@ -24,7 +20,6 @@ jobs:
   # A pull request that only touches documentation skips the tests.
   changes:
     name: What changed
-    if: github.event_name != 'pull_request' || vars.RUN_CI_ON_PULL_REQUESTS == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -109,7 +104,6 @@ jobs:
 
   secrets:
     name: Secret scan
-    if: github.event_name != 'pull_request' || vars.RUN_CI_ON_PULL_REQUESTS == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
