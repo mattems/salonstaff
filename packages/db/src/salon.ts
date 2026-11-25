@@ -272,6 +272,16 @@ export function salonsFor(db: Db) {
   };
 }
 
+/**
+ * What can change on a salon: what an owner changes in their settings, plus the contact details
+ * staff keep up to date on directory listings (D-04), any of which they can clear.
+ */
+export type SalonChanges = Partial<Omit<SalonUpdate, "phone">> & {
+  phone?: string | null | undefined;
+  email?: string | null | undefined;
+  address?: string | null | undefined;
+};
+
 export function salonScope(db: Db, salonId: string) {
   const salonRow = async (tx: Executor = db, lock = false) => {
     const query = tx.select().from(salons).where(eq(salons.id, salonId));
@@ -303,7 +313,7 @@ export function salonScope(db: Db, salonId: string) {
      * Changes the salon's details. A new name, suburb or state gives it a new address, and the
      * old one redirects; its jobs' addresses (which carry the salon's name) follow.
      */
-    async update(input: SalonUpdate, abn: AbnCheck | null, actor: Actor): Promise<Salon> {
+    async update(input: SalonChanges, abn: AbnCheck | null, actor: Actor): Promise<Salon> {
       return retryOnSlugClash(() =>
         db.transaction(async (tx) => {
           const before = await salonRow(tx, true);

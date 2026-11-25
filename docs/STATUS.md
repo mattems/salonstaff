@@ -31,6 +31,9 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   nearest first, with distances; "Hiring now" on the directory. Places are at their suburb's centre (ABS),
   set by a database trigger; `localities`/`postcodes` loaded by migration 0002.
 
+- Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
+  `salons:moderate`); a new place redirects, as when an owner changes it.
+
 ### Known issues
 - Not yet tried for real: Google/Apple sign-in, Twilio SMS, Stripe, Stripe Identity, ABR lookup (all need keys),
   and a deploy.

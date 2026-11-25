@@ -1,8 +1,16 @@
+import { AU_STATES } from "@salonstaff/shared";
 import { CardTable } from "@salonstaff/ui/card-table";
 import { Alert, AlertDescription, AlertTitle } from "@salonstaff/ui/components/alert";
 import { Badge } from "@salonstaff/ui/components/badge";
 import { Input } from "@salonstaff/ui/components/input";
 import { Label } from "@salonstaff/ui/components/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@salonstaff/ui/components/select";
 import {
   Table,
   TableBody,
@@ -11,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@salonstaff/ui/components/table";
+import { Textarea } from "@salonstaff/ui/components/textarea";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
@@ -71,6 +80,113 @@ function NumberField(props: {
   );
 }
 
+const DETAIL_FIELDS = [
+  { key: "name", label: "Name" },
+  { key: "address", label: "Street address" },
+  { key: "suburb", label: "Suburb" },
+  { key: "postcode", label: "Postcode" },
+  { key: "phone", label: "Phone" },
+  { key: "email", label: "Business email", hint: "Claim links for an unclaimed listing go here." },
+  { key: "website", label: "Website" },
+  { key: "instagram", label: "Instagram" },
+] as const;
+type DetailKey = (typeof DETAIL_FIELDS)[number]["key"] | "state" | "about";
+
+/** The details a listing shows, as the edit form starts them. */
+function detailsOf(d: SalonDetail): Record<DetailKey, string> {
+  return {
+    name: d.salon.name,
+    address: d.address ?? "",
+    suburb: d.salon.suburb,
+    state: d.salon.state,
+    postcode: d.salon.postcode,
+    phone: d.phone ?? "",
+    email: d.email ?? "",
+    website: d.website ?? "",
+    instagram: d.instagram ?? "",
+    about: d.about ?? "",
+  };
+}
+
+/**
+ * Edits a salon's details, for fixing a directory listing (a wrong suburb, an old address).
+ * Sends only what changed; a blank optional field clears it.
+ */
+function EditDetails({ d }: { d: SalonDetail }) {
+  const [values, setValues] = useState(() => detailsOf(d));
+  const set = (key: DetailKey, value: string) => setValues((v) => ({ ...v, [key]: value }));
+  const changed = () => {
+    const before = detailsOf(d);
+    return Object.fromEntries(
+      Object.entries(values)
+        .map(([key, value]) => [key, value.trim()] as const)
+        .filter(([key, value]) => value !== before[key as DetailKey]),
+    );
+  };
+  return (
+    <ActionDialog
+      label="Edit details"
+      title={`Edit ${d.salon.name}`}
+      description={
+        d.salon.owner
+          ? "Its owner can change these in their settings too. A new name, suburb or state gives it a new web address; the old one redirects."
+          : "A new name, suburb or state gives it a new web address; the old one redirects. Leave an optional field blank to clear it."
+      }
+      confirm="Save"
+      run={async () =>
+        unwrap(
+          await api.PATCH("/admin/v1/salons/{id}", {
+            params: { path: { id: d.salon.id } },
+            body: changed(),
+          }),
+        )
+      }
+      done="Details saved"
+    >
+      <div className="grid gap-3 sm:grid-cols-2">
+        {DETAIL_FIELDS.map((field) => (
+          <div
+            key={field.key}
+            className={`flex flex-col gap-1.5 ${field.key === "name" || field.key === "address" ? "sm:col-span-2" : ""}`}
+          >
+            <Label htmlFor={`edit-${field.key}`}>{field.label}</Label>
+            <Input
+              id={`edit-${field.key}`}
+              value={values[field.key]}
+              onChange={(event) => set(field.key, event.target.value)}
+            />
+            {"hint" in field ? <p className="text-muted-foreground text-xs">{field.hint}</p> : null}
+          </div>
+        ))}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="edit-state">State</Label>
+          <Select value={values.state} onValueChange={(value) => set("state", value)}>
+            <SelectTrigger id="edit-state">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {AU_STATES.map((state) => (
+                <SelectItem key={state.value} value={state.value}>
+                  {state.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-col gap-1.5 sm:col-span-2">
+          <Label htmlFor="edit-about">About</Label>
+          <Textarea
+            id="edit-about"
+            value={values.about}
+            onChange={(event) => set("about", event.target.value)}
+            rows={3}
+          />
+        </div>
+      </div>
+    </ActionDialog>
+  );
+}
+
 function Actions({ d }: { d: SalonDetail }) {
   const me = useQuery(meQuery).data;
   const navigate = useNavigate();
@@ -99,6 +215,14 @@ function Actions({ d }: { d: SalonDetail }) {
 
   return (
     <>
+      {moderate ? (
+        <Panel
+          title="Details"
+          description="Fix its name, place or contact details, for example a wrong suburb from an import."
+        >
+          <EditDetails key={`${salon.id}-${d.salon.path}`} d={d} />
+        </Panel>
+      ) : null}
       {moderate ? (
         <Panel
           title="Business status"

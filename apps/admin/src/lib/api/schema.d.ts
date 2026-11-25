@@ -1660,7 +1660,54 @@ export interface paths {
     };
     options?: never;
     head?: never;
-    patch?: never;
+    /**
+     * Change a salon's details
+     * @description Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["AdminSalonChanges"];
+        };
+      };
+      responses: {
+        /** @description The salon, changed */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["AdminSalon"];
+          };
+        };
+        /** @description Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`) */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Nothing with that ID */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
     trace?: never;
   };
   "/admin/v1/salons/{id}/status": {
@@ -4061,6 +4108,19 @@ export interface components {
       /** @enum {string} */
       status: "pending" | "paid" | "failed";
       created_at: string;
+    };
+    AdminSalonChanges: {
+      name?: string;
+      suburb?: string;
+      /** @enum {string} */
+      state?: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+      postcode?: string;
+      address?: string | null;
+      phone?: string | null;
+      email?: string | null;
+      website?: string | null;
+      instagram?: string | null;
+      about?: string | null;
     };
     AdminListingInput: {
       name: string;

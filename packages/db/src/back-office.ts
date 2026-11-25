@@ -32,6 +32,7 @@ import {
 import { type Actor, type Executor, recordAudit } from "./audit";
 import type { Db } from "./index";
 import { contains } from "./like";
+import { type SalonChanges, salonScope } from "./salon";
 import {
   applications,
   jobs,
@@ -925,6 +926,18 @@ export function backOffice(db: Db) {
           });
           return row as AdminSalon;
         });
+      },
+
+      /**
+       * Changes a salon's details, as its owner would in their settings: a new name, suburb or
+       * state gives it a new address and the old one redirects. Recorded as the staff member's.
+       */
+      async updateDetails(
+        salon: AdminSalon,
+        changes: SalonChanges,
+        actor: Actor,
+      ): Promise<AdminSalon> {
+        return (await salonScope(db, salon.id).update(changes, null, actor)) as AdminSalon;
       },
 
       /** Detaches the owner: the salon becomes an unclaimed directory listing anyone can claim. */
