@@ -3041,6 +3041,53 @@
         },
         "required": ["id", "salon", "kind", "amount_cents", "provider", "status", "created_at"]
       },
+      "AdminSalonChanges": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 2,
+            "maxLength": 200
+          },
+          "suburb": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"]
+          },
+          "postcode": {
+            "type": "string",
+            "pattern": "^\\d{4}$"
+          },
+          "address": {
+            "type": ["string", "null"],
+            "maxLength": 300
+          },
+          "phone": {
+            "type": ["string", "null"],
+            "maxLength": 40
+          },
+          "email": {
+            "type": ["string", "null"],
+            "maxLength": 254
+          },
+          "website": {
+            "type": ["string", "null"],
+            "maxLength": 300
+          },
+          "instagram": {
+            "type": ["string", "null"],
+            "maxLength": 100
+          },
+          "about": {
+            "type": ["string", "null"],
+            "maxLength": 2000
+          }
+        }
+      },
       "AdminListingInput": {
         "type": "object",
         "properties": {
@@ -5231,6 +5278,63 @@
                     }
                   },
                   "required": ["deleted"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "patch": {
+        "summary": "Change a salon's details",
+        "description": "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSalonChanges"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The salon, changed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSalon"
                 }
               }
             }

@@ -9,7 +9,7 @@ export const STAFF_PERMISSIONS = [
   "users:ban",
   "users:delete",
   "salons:read",
-  // Suspending, removing and reinstating a business, its ABN status and owner.
+  // Suspending, removing and reinstating a business; its details, ABN status and owner.
   "salons:moderate",
   "salons:delete",
   // Listing credits, the free period and founding pricing.

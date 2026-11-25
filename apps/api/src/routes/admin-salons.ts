@@ -601,6 +601,63 @@ admin.openapi(
   },
 );
 
+/** Optional text a change can clear: left out keeps it, blank or `null` clears it. */
+const clearable = (max: number) =>
+  z
+    .string()
+    .trim()
+    .max(max)
+    .nullable()
+    .optional()
+    .transform((v) => (v === undefined ? undefined : v || null));
+
+const SalonChanges = z
+  .object({
+    name: z.string().trim().min(2).max(200).optional(),
+    suburb: z.string().trim().min(1).max(100).optional(),
+    state: z.enum(AU_STATE_VALUES).optional(),
+    postcode: z
+      .string()
+      .trim()
+      .regex(/^\d{4}$/, "A 4-digit postcode")
+      .optional(),
+    address: clearable(300),
+    phone: clearable(40),
+    email: clearable(254)
+      .refine((v) => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), "Not an email address")
+      .transform((v) => (v ? v.toLowerCase() : v)),
+    website: clearable(300),
+    instagram: clearable(100),
+    about: clearable(2000),
+  })
+  .openapi("AdminSalonChanges");
+
+admin.openapi(
+  createRoute({
+    method: "patch",
+    path: `${LIST}/{id}`,
+    summary: "Change a salon's details",
+    description:
+      "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing.",
+    tags: ["Admin"],
+    request: { params: IdParams, body: body(SalonChanges) },
+    responses: { 200: ok(Salon, "The salon, changed"), ...errors, ...notFound },
+  }),
+  async (c) => {
+    const { data, actor } = await requireStaff(c, "salons:moderate");
+    const salon = await findSalon(c, data);
+    const changes = c.req.valid("json");
+    if (c.get("dryRun")) {
+      const given = Object.entries(changes).filter(([, value]) => value !== undefined);
+      return c.json(await salonRow(data, { ...salon, ...Object.fromEntries(given) }), 200);
+    }
+    return c.json(
+      await salonRow(data, await data.salons.updateDetails(salon, changes, actor)),
+      200,
+    );
+  },
+);
+
 // ---------------------------------------------------------------------------
 // The directory
 // ---------------------------------------------------------------------------

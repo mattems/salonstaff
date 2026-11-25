@@ -1,6 +1,6 @@
 import { env } from "cloudflare:test";
 import { schema } from "@salonstaff/db";
-import { encodeId, formatAbn } from "@salonstaff/shared";
+import { decodeId, encodeId, formatAbn } from "@salonstaff/shared";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createTestApp, withDb } from "./helpers";
@@ -235,6 +235,51 @@ describe("the directory", () => {
         })
       ).status,
     ).toBe(400);
+  });
+
+  it("changes a listing's details: a new place redirects, and cleared fields go", async () => {
+    const support = await staffMember("support");
+    const readonly = await staffMember("readonly");
+    const name = `Placeholder ${crypto.randomUUID().slice(0, 6)}`;
+    const added = await admin<Salon & { path: string }>(support, "POST", "/directory/listings", {
+      name,
+      suburb: "ACT Remainder - Tuggeranong",
+      state: "ACT",
+      postcode: "2900",
+      phone: "0262000000",
+      website: "https://placeholder.example",
+    });
+    expect(added.status).toBe(201);
+    const path = `/salons/${added.body.id}`;
+
+    expect((await admin(readonly, "PATCH", path, { suburb: "Greenway" })).status).toBe(403);
+    expect((await admin(support, "PATCH", path, { email: "not an email" })).status).toBe(400);
+    expect((await admin(support, "PATCH", path, { postcode: "29" })).status).toBe(400);
+    expect((await admin(support, "PATCH", path, { name: "" })).status).toBe(400);
+
+    const changed = await admin<Salon & { path: string; suburb: string; postcode: string }>(
+      support,
+      "PATCH",
+      path,
+      { suburb: "Greenway", address: "25 Reed St", email: "Hi@Placeholder.Example", phone: "" },
+    );
+    expect(changed.status).toBe(200);
+    expect(changed.body).toMatchObject({ suburb: "Greenway", postcode: "2900" });
+    expect(changed.body.path).toMatch(/^\/salons\/act\/greenway\/placeholder-/);
+
+    const detail = await admin<Body>(support, "GET", path);
+    expect(detail.body).toMatchObject({
+      address: "25 Reed St",
+      email: "hi@placeholder.example",
+      phone: null,
+      website: "https://placeholder.example",
+    });
+    // The old address redirects to the new one.
+    const old = await (await call(`/v1/salons/by-path?path=${added.body.path}`)).json();
+    expect(old).toMatchObject({ kind: "redirect", redirect: changed.body.path });
+
+    const [entry] = await auditFor(decodeId("salon", added.body.id) as string, "salon.updated");
+    expect(entry).toMatchObject({ actorType: "staff" });
   });
 
   it("imports a CSV and reports what it added, skipped and why", async () => {
