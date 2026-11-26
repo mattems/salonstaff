@@ -706,6 +706,110 @@
         },
         "required": ["deleted"]
       },
+      "EmailCodeSent": {
+        "type": "object",
+        "properties": {
+          "sentTo": {
+            "type": "string",
+            "example": "olive@example.com"
+          }
+        },
+        "required": ["sentTo"]
+      },
+      "SignInMethods": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": ["string", "null"],
+            "description": "Codes by email go here. Null for an account made with a mobile number."
+          },
+          "phoneNumber": {
+            "type": ["string", "null"],
+            "description": "Codes by SMS go here."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "enum": ["google", "apple"]
+                },
+                "label": {
+                  "type": "string",
+                  "example": "Google"
+                },
+                "available": {
+                  "type": "boolean",
+                  "description": "False when this site isn't set up for it yet."
+                },
+                "connected": {
+                  "type": "boolean"
+                },
+                "connectedAt": {
+                  "type": ["string", "null"],
+                  "format": "date-time"
+                }
+              },
+              "required": ["provider", "label", "available", "connected", "connectedAt"]
+            }
+          }
+        },
+        "required": ["email", "phoneNumber", "providers"]
+      },
+      "SignInSessions": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignInSession"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "SignInSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "ses_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "device": {
+            "type": "string",
+            "example": "Chrome on macOS"
+          },
+          "ipAddress": {
+            "type": ["string", "null"]
+          },
+          "signedInAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated at most once a day as the session is used."
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The device making this request."
+          }
+        },
+        "required": ["id", "device", "ipAddress", "signedInAt", "lastActiveAt", "current"]
+      },
+      "SignedOut": {
+        "type": "object",
+        "properties": {
+          "signedOut": {
+            "type": "integer",
+            "description": "How many devices."
+          }
+        },
+        "required": ["signedOut"]
+      },
       "Checks": {
         "type": "object",
         "properties": {

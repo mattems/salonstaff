@@ -51,7 +51,7 @@ bun run deploy  # production (docs/runbooks/first-deploy.md)
 
 ## Rules that apply everywhere
 
-- **Data access goes through scopes in `packages/db`** (`publicSite`, `seeker`, `salonScope`,
+- **Data access goes through scopes in `packages/db`** (`publicSite`, `seeker`, `signIns`, `salonScope`,
   `claims`, `checks`, `backOffice` behind the staff gate, `housekeeping` in the cron). The API never
   imports tables; a test enforces it.
 - **Rules that decide things are pure functions with table tests** in `packages/shared`

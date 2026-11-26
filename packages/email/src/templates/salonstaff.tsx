@@ -15,16 +15,24 @@ const code = {
 };
 const paragraph = { color: "#3f3f46", fontSize: "14px", lineHeight: "22px", margin: "0 0 12px" };
 
-/** The six-digit sign-in (or sign-up) code. */
+/**
+ * The six-digit sign-in (or sign-up) code, or with `purpose: "change-email"` the code that makes
+ * this the account's new address.
+ */
 export async function signInCodeEmail(props: {
   to: string;
   code: string;
   expiresInMinutes: number;
+  purpose?: "sign-in" | "change-email";
 }): Promise<EmailMessage> {
-  const title = `Your ${BRAND.name} code`;
-  const body = `Enter this code to sign in. It expires in ${props.expiresInMinutes} minutes.`;
-  const footer =
-    "If you didn't ask for this code, ignore this email: nobody can sign in without it.";
+  const changing = props.purpose === "change-email";
+  const title = changing ? `Confirm your new ${BRAND.name} email` : `Your ${BRAND.name} code`;
+  const body = changing
+    ? `Enter this code to make this your ${BRAND.name} email address. It expires in ${props.expiresInMinutes} minutes.`
+    : `Enter this code to sign in. It expires in ${props.expiresInMinutes} minutes.`;
+  const footer = changing
+    ? "If you didn't ask for this, ignore this email: nothing changes without the code."
+    : "If you didn't ask for this code, ignore this email: nobody can sign in without it.";
   return {
     to: props.to,
     subject: `${props.code} is your ${BRAND.name} code`,

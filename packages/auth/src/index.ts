@@ -6,7 +6,7 @@
  *  - Google, Apple
  *  - a 6-digit code by email (emailOTP)
  *  - a 6-digit code by SMS (phoneNumber, sent with Twilio)
- * There are no passwords. Mobile apps use the bearer plugin: the session token in a header.
+ * There are no passwords. Changing the account's email sends a code to the new address first. Mobile apps use the bearer plugin: the session token in a header.
  */
 import { type Db, schema } from "@salonstaff/db";
 import { BRAND, LIMITS, uuidv7 } from "@salonstaff/shared";
@@ -25,6 +25,10 @@ export const PHONE_EMAIL_DOMAIN = `phone.${BRAND.slug}.invalid`;
 export const isStandInEmail = (email: string) => email.endsWith(`@${PHONE_EMAIL_DOMAIN}`);
 
 const DAY_SECONDS = 24 * 60 * 60;
+
+/** The other ways in, besides an email or SMS code. */
+export const SOCIAL_PROVIDERS = ["google", "apple"] as const;
+export type SocialProvider = (typeof SOCIAL_PROVIDERS)[number];
 
 export interface OAuthCredentials {
   clientId: string;
@@ -46,10 +50,17 @@ export interface AuthConfig {
   google?: OAuthCredentials | undefined;
   /** `clientSecret` is the short-lived JWT from `appleClientSecret`. */
   apple?: (OAuthCredentials & { appBundleIdentifier?: string | undefined }) | undefined;
-  sendEmailCode: (message: { email: string; code: string }) => Promise<void>;
+  /** `change-email` when the code proves a new address for the account. */
+  sendEmailCode: (message: {
+    email: string;
+    code: string;
+    purpose: "sign-in" | "change-email";
+  }) => Promise<void>;
   sendSmsCode: (message: { phoneNumber: string; code: string }) => Promise<void>;
   /** Called once an account exists, for the audit log. */
   onSignUp?: ((person: { userId: string }) => Promise<void>) | undefined;
+  /** Called when Google or Apple is connected to an account, for the audit log. */
+  onLink?: ((event: { userId: string; provider: string }) => Promise<void>) | undefined;
   /** Called each time a session starts, for the audit log. */
   onSignIn?: ((event: { userId: string; ip: string | null }) => Promise<void>) | undefined;
 }
@@ -88,9 +99,15 @@ export function createAuth(config: AuthConfig) {
         expiresIn: codeTtl,
         allowedAttempts: LIMITS.otpMaxAttempts,
         storeOTP: "hashed",
-        sendVerificationOTP: async ({ email, otp }) => {
-          await config.sendEmailCode({ email, code: otp });
+        sendVerificationOTP: async ({ email, otp, type }) => {
+          await config.sendEmailCode({
+            email,
+            code: otp,
+            purpose: type === "change-email" ? "change-email" : "sign-in",
+          });
         },
+        // The API's /v1/me/email routes call these (they audit it and tell the old address).
+        changeEmail: { enabled: true },
       }),
       phoneNumber({
         otpLength: 6,
@@ -117,7 +134,13 @@ export function createAuth(config: AuthConfig) {
     },
 
     account: {
-      accountLinking: { enabled: true, trustedProviders: ["google", "apple"] },
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ["google", "apple"],
+        // Connecting Google or Apple from the account page: its address needn't be the account's
+        // (a mobile-only account has none, and people use a different Gmail for work).
+        allowDifferentEmails: true,
+      },
     },
 
     session: {
@@ -126,6 +149,15 @@ export function createAuth(config: AuthConfig) {
     },
 
     databaseHooks: {
+      account: {
+        create: {
+          after: async (account) => {
+            if (SOCIAL_PROVIDERS.includes(account.providerId as SocialProvider)) {
+              await config.onLink?.({ userId: account.userId, provider: account.providerId });
+            }
+          },
+        },
+      },
       user: {
         create: {
           before: async (user) => ({
@@ -210,6 +242,67 @@ export async function getSession(auth: Auth, headers: Headers): Promise<CurrentS
   };
 }
 
+/** Why an email change was refused, in words the API can turn into its own errors. */
+export type EmailChangeProblem =
+  | "same"
+  | "invalid_code"
+  | "expired"
+  | "too_many_attempts"
+  | "in_use";
+
+export type EmailChangeResult =
+  | { ok: true; headers: Headers }
+  | { ok: false; problem: EmailChangeProblem };
+
+function emailChangeProblem(error: unknown): EmailChangeProblem | null {
+  if (!(error instanceof APIError)) return null;
+  const body = (error.body ?? {}) as { code?: string; message?: string };
+  const said = `${body.code ?? ""} ${body.message ?? error.message}`.toLowerCase();
+  if (said.includes("expired")) return "expired";
+  if (said.includes("too many")) return "too_many_attempts";
+  if (said.includes("invalid otp") || said.includes("invalid_otp")) return "invalid_code";
+  if (said.includes("already in use")) return "in_use";
+  if (said.includes("is the same")) return "same";
+  return null;
+}
+
+async function changing(run: () => Promise<Headers>): Promise<EmailChangeResult> {
+  try {
+    return { ok: true, headers: await run() };
+  } catch (error) {
+    const problem = emailChangeProblem(error);
+    if (problem) return { ok: false, problem };
+    throw error;
+  }
+}
+
+/**
+ * Step one of changing the signed-in person's email: a code to the new address. When the
+ * address already belongs to another account nothing is sent, and the answer is the same, so
+ * nobody can find out who has an account.
+ */
+export function requestEmailChange(auth: Auth, headers: Headers, newEmail: string) {
+  return changing(async () => {
+    await auth.api.requestEmailChangeEmailOTP({ headers, body: { newEmail } });
+    return new Headers();
+  });
+}
+
+/**
+ * Step two: the code from the new address. On success the account's email is the new one
+ * (verified); `headers` carries the refreshed session cookie to pass on.
+ */
+export function confirmEmailChange(auth: Auth, headers: Headers, newEmail: string, code: string) {
+  return changing(async () => {
+    const result = await auth.api.changeEmailEmailOTP({
+      headers,
+      body: { newEmail, otp: code },
+      returnHeaders: true,
+    });
+    return result.headers;
+  });
+}
+
 /**
  * Sign in with Apple's client secret: a JWT signed with your Apple key, valid for up to six
  * months. Made fresh when the API starts handling sign-ins, so nobody has to rotate it by hand.
@@ -239,6 +332,8 @@ export async function appleClientSecret(options: {
 export async function signInWithoutCode(
   config: AuthConfig,
   person: { email: string; name: string; role: "seeker" | "employer" },
+  /** Kept with the session, as a real sign-in keeps them, for "Where you're signed in". */
+  device: { ipAddress?: string | undefined; userAgent?: string | undefined } = {},
 ): Promise<string> {
   const auth = createAuth(config);
   const context = await auth.$context;
@@ -252,7 +347,10 @@ export async function signInWithoutCode(
       { email, name: person.name, emailVerified: true, role: person.role },
       { method: "email-otp" },
     ));
-  const session = await context.internalAdapter.createSession(user.id);
+  const session = await context.internalAdapter.createSession(user.id, false, {
+    ipAddress: device.ipAddress ?? "",
+    userAgent: device.userAgent ?? "",
+  });
   const { name: cookieName, attributes } = context.authCookies.sessionToken;
   // Signed the way the library signs it, so it reads this cookie as its own.
   const value = `${session.token}.${await makeSignature(session.token, context.secret)}`;

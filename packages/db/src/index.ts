@@ -66,6 +66,7 @@ export { contains } from "./like";
 export * from "./public-site";
 export * from "./salon";
 export * from "./seeker";
+export * from "./sign-ins";
 export * from "./staff-office";
 export * from "./team";
 export type { Job, JobWithSalon, PageOf, Salon } from "./visibility";

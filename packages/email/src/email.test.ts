@@ -9,6 +9,17 @@ describe("emails", () => {
     expect(mail.text).toContain("123456");
   });
 
+  it("says what a code for a new email address is for", async () => {
+    const mail = await signInCodeEmail({
+      to: "a@b.test",
+      code: "654321",
+      expiresInMinutes: 10,
+      purpose: "change-email",
+    });
+    expect(mail.subject).toContain("654321");
+    expect(mail.text).toContain("make this your Salon Staff email address");
+  });
+
   it("links notices in both versions", async () => {
     const mail = await noticeEmail({
       to: "a@b.test",

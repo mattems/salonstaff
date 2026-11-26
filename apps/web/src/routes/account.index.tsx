@@ -24,6 +24,7 @@ import { Progress } from "@salonstaff/ui/components/progress";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { type ReactNode, useState } from "react";
 import { toast } from "sonner";
+import { AccountSecurity, loadAccountSecurity } from "@/components/account-security";
 import { AppLink } from "@/components/app-link";
 import { DeleteAccountButton } from "@/components/delete-account";
 import {
@@ -54,8 +55,11 @@ export const Route = createFileRoute("/account/")({
     next: safeNext(search.next),
   }),
   loader: async () => {
-    const full = orNull(await api.GET("/v1/me/profile"));
-    return { full };
+    const [full, security] = await Promise.all([
+      api.GET("/v1/me/profile").then(orNull),
+      loadAccountSecurity(),
+    ]);
+    return { full, security };
   },
   head: () => privatePage("Your profile"),
   component: AccountPage,
@@ -71,7 +75,7 @@ function useRefresh() {
 }
 
 function AccountPage() {
-  const { full } = Route.useLoaderData();
+  const { full, security } = Route.useLoaderData();
   const { me } = Route.useRouteContext();
   const { next } = Route.useSearch();
   return (
@@ -118,6 +122,7 @@ function AccountPage() {
           </div>
         </>
       )}
+      <AccountSecurity {...security} />
       <DeleteAccount />
     </div>
   );

@@ -3267,6 +3267,50 @@ export interface components {
       /** @enum {boolean} */
       deleted: true;
     };
+    EmailCodeSent: {
+      /** @example olive@example.com */
+      sentTo: string;
+    };
+    SignInMethods: {
+      /** @description Codes by email go here. Null for an account made with a mobile number. */
+      email: string | null;
+      /** @description Codes by SMS go here. */
+      phoneNumber: string | null;
+      providers: {
+        /** @enum {string} */
+        provider: "google" | "apple";
+        /** @example Google */
+        label: string;
+        /** @description False when this site isn't set up for it yet. */
+        available: boolean;
+        connected: boolean;
+        /** Format: date-time */
+        connectedAt: string | null;
+      }[];
+    };
+    SignInSessions: {
+      items: components["schemas"]["SignInSession"][];
+    };
+    SignInSession: {
+      /** @example ses_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /** @example Chrome on macOS */
+      device: string;
+      ipAddress: string | null;
+      /** Format: date-time */
+      signedInAt: string;
+      /**
+       * Format: date-time
+       * @description Updated at most once a day as the session is used.
+       */
+      lastActiveAt: string;
+      /** @description The device making this request. */
+      current: boolean;
+    };
+    SignedOut: {
+      /** @description How many devices. */
+      signedOut: number;
+    };
     Checks: {
       verification: components["schemas"]["Verification"];
       checks: components["schemas"]["Check"][];

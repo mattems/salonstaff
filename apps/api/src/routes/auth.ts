@@ -1,5 +1,5 @@
 import { AUTH_PATH, signInWithoutCode } from "@salonstaff/auth";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import type { AppEnv } from "../env";
 import { authConfig, isLocal } from "../lib/auth-config";
 
@@ -13,6 +13,30 @@ const LIMITED = new Set([
 ]);
 
 /**
+ * Better Auth endpoints with an audited /v1/me route instead: changing the email (/v1/me/email),
+ * the name (PATCH /v1/me), sessions (/v1/me/sessions) and disconnecting Google or Apple
+ * (/v1/me/sign-in-methods). `update-user` would also let someone set their own role.
+ */
+const HIDDEN = new Set([
+  "/email-otp/request-email-change",
+  "/email-otp/change-email",
+  "/change-email",
+  "/update-user",
+  "/list-sessions",
+  "/revoke-session",
+  "/revoke-sessions",
+  "/revoke-other-sessions",
+  "/unlink-account",
+]);
+
+/** Sending and checking codes share one per-IP limit, wherever they're asked for. */
+export async function withinCodeLimit(c: Context<AppEnv>): Promise<boolean> {
+  if (c.env.ENVIRONMENT === "local" && c.env.RATE_LIMITS === "off") return true;
+  const key = `auth:${c.req.header("CF-Connecting-IP") ?? "unknown"}`;
+  return (await c.env.AUTH_RATE_LIMITER.limit({ key })).success;
+}
+
+/**
  * Local development only: sign in as a demo person without a code. Anywhere else it 404s.
  * The springboard lists the demo accounts.
  */
@@ -22,11 +46,11 @@ auth.post(`${AUTH_PATH}/dev-login`, async (c) => {
   const role = body.role === "employer" ? "employer" : "seeker";
   const email =
     body.email ?? (role === "employer" ? "owner1@salonstaff.test" : "seeker@salonstaff.test");
-  const cookie = await signInWithoutCode(await authConfig(c, await c.get("db")()), {
-    email,
-    name: "",
-    role,
-  });
+  const cookie = await signInWithoutCode(
+    await authConfig(c, await c.get("db")()),
+    { email, name: "", role },
+    { ipAddress: c.req.header("CF-Connecting-IP"), userAgent: c.req.header("User-Agent") },
+  );
   c.header("Set-Cookie", cookie, { append: true });
   return c.json({ signed_in: true });
 });
@@ -38,18 +62,12 @@ auth.post(`${AUTH_PATH}/dev-login`, async (c) => {
  */
 auth.on(["GET", "POST"], `${AUTH_PATH}/*`, async (c) => {
   const rest = new URL(c.req.url).pathname.slice(AUTH_PATH.length);
-  if (c.req.method === "POST" && LIMITED.has(rest)) {
-    const key = `auth:${c.req.header("CF-Connecting-IP") ?? "unknown"}`;
-    const allowed =
-      c.env.ENVIRONMENT === "local" && c.env.RATE_LIMITS === "off"
-        ? true
-        : (await c.env.AUTH_RATE_LIMITER.limit({ key })).success;
-    if (!allowed)
-      return c.json(
-        { code: "rate_limited", message: "Too many attempts. Wait a minute and try again." },
-        429,
-      );
-  }
+  if (HIDDEN.has(rest)) return c.notFound();
+  if (c.req.method === "POST" && LIMITED.has(rest) && !(await withinCodeLimit(c)))
+    return c.json(
+      { code: "rate_limited", message: "Too many attempts. Wait a minute and try again." },
+      429,
+    );
   const config = await authConfig(c, await c.get("db")());
   const publicUrl = new URL(`${config.baseUrl}${rest}${new URL(c.req.url).search}`);
   const handler = await c.get("auth")();

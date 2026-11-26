@@ -8,6 +8,7 @@ import {
 } from "@salonstaff/ui/components/card";
 import { createFileRoute, Link, redirect, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
+import { AccountSecurity, loadAccountSecurity } from "@/components/account-security";
 import { DeleteAccountButton } from "@/components/delete-account";
 import { FormMessage, formText, SubmitButton, TextField, useAction } from "@/components/form";
 import { PageHeader } from "@/components/page";
@@ -15,12 +16,16 @@ import { api, unwrap } from "@/lib/api";
 import { privatePage } from "@/lib/seo";
 import { forgetMe } from "@/lib/session";
 
-/** An employer's own account: their name, how they sign in, their salons, deleting it. */
+/**
+ * An employer's own account: their name, email and other ways they sign in, where they're signed
+ * in, their salons, deleting it.
+ */
 export const Route = createFileRoute("/employer/account")({
   beforeLoad: ({ context }) => {
     // A job seeker's account is their profile.
     if (context.me.role !== "employer") throw redirect({ to: "/account" });
   },
+  loader: () => loadAccountSecurity(),
   head: () => privatePage("Your account"),
   component: Account,
 });
@@ -29,6 +34,7 @@ const ROLE = { owner: "Owner", manager: "Manager" } as const;
 
 function Account() {
   const { me } = Route.useRouteContext();
+  const security = Route.useLoaderData();
   const router = useRouter();
   const action = useAction();
   return (
@@ -65,14 +71,7 @@ function Account() {
           </form>
         </CardContent>
       </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>How you sign in</CardTitle>
-          <CardDescription>
-            {[me.email, me.phoneNumber].filter(Boolean).join(" · ") || "Google or Apple"}
-          </CardDescription>
-        </CardHeader>
-      </Card>
+      <AccountSecurity {...security} />
       <Card>
         <CardHeader>
           <CardTitle>Your salons</CardTitle>

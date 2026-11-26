@@ -1,6 +1,7 @@
 export * from "./brand";
 export * from "./constants";
 export * from "./crypto";
+export * from "./devices";
 export * from "./errors";
 export * from "./ids";
 export * from "./rules";

@@ -57,7 +57,8 @@ export const meRoutes = createRouter();
 
 const TAGS = ["Me"];
 
-function meJson(c: Context<AppEnv>, account: Account) {
+/** The `Me` answer for an account. */
+export function meJson(c: Context<AppEnv>, account: Account) {
   const { user, profile, checks, salons } = account;
   return {
     id: encodeId("user", user.id),
