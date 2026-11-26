@@ -56,10 +56,13 @@ export async function noticeEmail(props: {
   action: string;
   url: string;
   footer?: string;
+  /** Where replies go (D-13: a salon's message goes back to the person who sent it). */
+  replyTo?: string;
 }): Promise<EmailMessage> {
   const footer = props.footer ?? `You received this because you have a ${BRAND.name} account.`;
   return {
     to: props.to,
+    ...(props.replyTo ? { replyTo: props.replyTo } : {}),
     subject: props.subject,
     html: await render(
       <Message

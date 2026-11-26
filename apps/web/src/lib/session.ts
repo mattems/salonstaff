@@ -59,7 +59,11 @@ export const isClaimPath = (path: string) =>
 export function landingAfterSignIn(me: Me, next: string | undefined, as?: string): string {
   if (next && isClaimPath(next)) return next;
   if (me.role === "employer" || as === "employer") {
-    if (me.salons.length === 0) return "/employer/onboarding";
+    // A new salon owner adds their salon first, then goes back where they were.
+    if (me.salons.length === 0)
+      return next
+        ? `/employer/onboarding?next=${encodeURIComponent(next)}`
+        : "/employer/onboarding";
     return next ?? "/employer";
   }
   if (!me.profile) return next ? `/account?next=${encodeURIComponent(next)}` : "/account";

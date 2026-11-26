@@ -7,14 +7,18 @@ import {
   ApiError,
   type ApplicationStatus,
   type AuState,
+  type ContactLimit,
+  contactLimitReached,
   type Entitlement,
   entitlementOf,
   isFoundingSlot,
   type JobInput,
   jobBaseSlug,
   PRICING,
+  type SalonAccess,
   type SalonInput,
   type SalonUpdate,
+  salonAccessTo,
   slugify,
   type VerificationStatus,
 } from "@salonstaff/shared";
@@ -25,10 +29,13 @@ import type { Db } from "./index";
 import {
   applications,
   jobs,
+  type ProfileContactKind,
   payments,
+  profileContacts,
   type SalonRole,
   salonMembers,
   salons,
+  seekerHiddenSalons,
   seekerProfiles,
   users,
 } from "./schema";
@@ -65,9 +72,26 @@ export interface Applicant {
 
 export interface Candidate extends FullProfile {
   contact: Contact;
+  /** What this salon may do (D-13): never includes the contact details themselves. */
+  access: SalonAccess;
   /** Their applications to this salon's jobs. */
   applications: (Application & { jobTitle: string })[];
 }
+
+/** An address we can send to: not a mobile-only account's stand-in (`….invalid`, RFC 2606). */
+const deliverable = (email: string) => !/\.invalid$/i.test(email);
+
+const CONTACT_LIMIT_DETAIL: Record<ContactLimit, string> = {
+  salon_messages: "Your salon has sent today's limit of messages",
+  salon_reveals: "Your salon has viewed today's limit of numbers",
+  same_person: "You've already messaged this person today",
+};
+
+const notFoundCandidate = () =>
+  new ApiError("not_found", {
+    detail: "No profile you can see has that ID",
+    hint: "Open a job's applicants, or a profile shared with you, and use its `candidateId`.",
+  });
 
 /** A salon someone is on the team of, with their role there. */
 export interface MySalon {
@@ -319,6 +343,52 @@ export function salonScope(db: Db, salonId: string) {
     const [row] = lock ? await query.for("update") : await query;
     if (!row) throw notFoundJob();
     return row;
+  };
+
+  /**
+   * What this salon may do with a person's profile (D-13), or null for nobody (no profile, or
+   * banned). Pass `tx` to read inside a transaction.
+   */
+  const accessOf = async (
+    userId: string,
+    tx: Executor = db,
+  ): Promise<{ access: SalonAccess; contact: Contact; applied: boolean } | null> => {
+    const [person] = await tx
+      .select({
+        email: users.email,
+        phoneNumber: users.phoneNumber,
+        suspendedAt: users.suspendedAt,
+        visibility: seekerProfiles.visibility,
+        contactBy: seekerProfiles.contactBy,
+        hidden: seekerHiddenSalons.salonId,
+      })
+      .from(users)
+      .innerJoin(seekerProfiles, eq(seekerProfiles.userId, users.id))
+      .leftJoin(
+        seekerHiddenSalons,
+        and(eq(seekerHiddenSalons.userId, users.id), eq(seekerHiddenSalons.salonId, salonId)),
+      )
+      .where(eq(users.id, userId));
+    if (!person || person.suspendedAt) return null;
+    const [applied] = await tx
+      .select({ id: applications.id })
+      .from(applications)
+      .innerJoin(jobs, eq(jobs.id, applications.jobId))
+      .where(and(eq(applications.seekerId, userId), eq(jobs.salonId, salonId)))
+      .limit(1);
+    const access = salonAccessTo({
+      visibility: person.visibility,
+      applied: Boolean(applied),
+      hiddenFromSalon: person.hidden !== null,
+      contactBy: person.contactBy,
+      hasEmail: deliverable(person.email),
+      hasMobile: Boolean(person.phoneNumber),
+    });
+    return {
+      access,
+      contact: { email: person.email, phoneNumber: person.phoneNumber },
+      applied: Boolean(applied),
+    };
   };
 
   return {
@@ -685,35 +755,116 @@ export function salonScope(db: Db, salonId: string) {
       });
     },
 
-    /** A person's full profile, only if they applied to one of this salon's jobs (and aren't banned). */
+    access: (userId: string) => accessOf(userId),
+
+    /**
+     * A person's full profile, if this salon may see it (D-13): they applied to one of its jobs,
+     * or their profile is open to salons and not hidden from this one. Never a banned person.
+     */
     async candidate(userId: string): Promise<Candidate | null> {
-      const applied = await db
-        .select({ application: applications, jobTitle: jobs.title })
-        .from(applications)
-        .innerJoin(jobs, eq(jobs.id, applications.jobId))
-        .innerJoin(users, eq(users.id, applications.seekerId))
-        .where(
-          and(
-            eq(applications.seekerId, userId),
-            eq(jobs.salonId, salonId),
-            isNull(users.suspendedAt),
-          ),
-        )
-        .orderBy(desc(applications.createdAt));
-      if (applied.length === 0) return null;
-      const [profile, [user]] = await Promise.all([
+      const found = await accessOf(userId);
+      if (!found?.access.view) return null;
+      const [profile, applied] = await Promise.all([
         fullProfileOf(db, userId),
         db
-          .select({ email: users.email, phoneNumber: users.phoneNumber })
-          .from(users)
-          .where(eq(users.id, userId)),
+          .select({ application: applications, jobTitle: jobs.title })
+          .from(applications)
+          .innerJoin(jobs, eq(jobs.id, applications.jobId))
+          .where(and(eq(applications.seekerId, userId), eq(jobs.salonId, salonId)))
+          .orderBy(desc(applications.createdAt)),
       ]);
-      if (!profile || !user) return null;
+      if (!profile) return null;
       return {
         ...profile,
-        contact: user,
+        contact: found.contact,
+        access: found.access,
         applications: applied.map((r) => ({ ...r.application, jobTitle: r.jobTitle })),
       };
+    },
+
+    /**
+     * Records a message to a person, or a reveal of their number, within the salon's daily caps
+     * (D-13). Returns where to send the message, or the number. A second reveal of the same
+     * number within a day isn't counted again.
+     */
+    async contact(
+      userId: string,
+      kind: ProfileContactKind,
+      input: { message?: string; senderId: string },
+      actor: Actor,
+    ): Promise<{ contact: Contact; firstName: string }> {
+      return db.transaction(async (tx) => {
+        // One salon's contacts happen one at a time, so two at once can't both pass the caps.
+        const [salon] = await tx.select().from(salons).where(eq(salons.id, salonId)).for("update");
+        if (salon?.status !== "active") {
+          throw new ApiError("forbidden", {
+            detail: "This salon can't contact job seekers right now",
+            hint: "Contact support if you think this is a mistake.",
+          });
+        }
+        const found = await accessOf(userId, tx);
+        if (!found?.access.view) throw notFoundCandidate();
+        if (!found.access[kind]) {
+          throw new ApiError("conflict", {
+            detail:
+              kind === "message"
+                ? "This person doesn't take messages"
+                : "This person doesn't share their number",
+            hint:
+              kind === "message"
+                ? "Call them instead, if their profile shows a number."
+                : "Send them a message instead.",
+          });
+        }
+        const dayAgo = new Date(Date.now() - DAY_MS);
+        const today = (extra: SQL) =>
+          tx
+            .select({ n: count() })
+            .from(profileContacts)
+            .where(
+              and(
+                eq(profileContacts.salonId, salonId),
+                eq(profileContacts.kind, kind),
+                gt(profileContacts.createdAt, dayAgo),
+                extra,
+              ),
+            )
+            .then(([row]) => row?.n ?? 0);
+        const [salonToday, personToday] = await Promise.all([
+          today(sql`true`),
+          today(eq(profileContacts.seekerId, userId)),
+        ]);
+        const [profile] = await tx
+          .select({ firstName: seekerProfiles.firstName })
+          .from(seekerProfiles)
+          .where(eq(seekerProfiles.userId, userId));
+        const result = { contact: found.contact, firstName: profile?.firstName ?? "" };
+        if (kind === "phone" && personToday > 0) return result;
+        const limit = contactLimitReached({ kind, salonToday, personToday });
+        if (limit) {
+          throw new ApiError("rate_limited", {
+            detail: CONTACT_LIMIT_DETAIL[limit],
+            hint: "Try again tomorrow.",
+          });
+        }
+        const [row] = await tx
+          .insert(profileContacts)
+          .values({
+            seekerId: userId,
+            salonId,
+            senderId: input.senderId,
+            kind,
+            message: input.message ?? null,
+          })
+          .returning({ id: profileContacts.id });
+        await recordAudit(tx, actor, {
+          action: kind === "message" ? "profile.messaged" : "profile.number_revealed",
+          targetType: "user",
+          targetId: userId,
+          after: { salonId, contactId: row?.id },
+        });
+        return result;
+      });
     },
 
     /**

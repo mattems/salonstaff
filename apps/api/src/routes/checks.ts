@@ -16,7 +16,7 @@ import {
   UrlResponse,
   VerificationSchema,
 } from "../lib/schemas";
-import { requireSeeker } from "../lib/session";
+import { idFrom, requireSeeker } from "../lib/session";
 import { deleteUploads, inspectUpload, requireUploadAllowance, storeUpload } from "../lib/storage";
 import { createIdentitySession } from "../lib/stripe";
 import { verificationJson } from "../lib/views";
@@ -36,6 +36,10 @@ const CheckSchema = z
     status: CheckStatusSchema,
     reference: z.string().nullable().openapi({ description: "The verification ID, once passed." }),
     title: z.string().nullable().openapi({ description: "A qualification's name." }),
+    educationId: z.string().nullable().openapi({
+      example: "edu_01k6q2x8h4f7tbn3m9vz5cdr0e",
+      description: "The education entry a qualification check is for, while it's on your profile.",
+    }),
     createdAt: z.string(),
     decidedAt: z.string().nullable(),
   })
@@ -51,6 +55,7 @@ const checkJson = (row: Check) => ({
   status: row.status,
   reference: row.status === "verified" ? row.reference : null,
   title: typeof row.result.title === "string" ? row.result.title : null,
+  educationId: row.educationId ? encodeId("education", row.educationId) : null,
   createdAt: row.createdAt.toISOString(),
   decidedAt: row.decidedAt?.toISOString() ?? null,
 });
@@ -212,12 +217,12 @@ checksRoutes.openapi(
     path: "/v1/me/checks/qualification",
     summary: "Send a qualification for checking",
     description:
-      "A certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) and the qualification's `title`, e.g. Cert III in Hairdressing. The certificate is kept privately only until staff decide, then deleted.",
+      "The certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) for one of your education entries (`educationId`, from GET /v1/me/profile). Staff check it against the entry's qualification, institution and year; once passed, the entry shows as verified on your profile. The certificate is kept privately only until staff decide, then deleted. One check at a time per entry.",
     tags: TAGS,
     request: formBody(
       z.object({
         file: z.instanceof(File).openapi({ type: "string", format: "binary" }),
-        title: z.string().trim().min(2, "Enter the qualification's name").max(120),
+        educationId: z.string().openapi({ example: "edu_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
       }),
     ),
     responses: {
@@ -225,14 +230,21 @@ checksRoutes.openapi(
       400: errors[400],
       401: errors[401],
       403: errors[403],
-      409: problemResponse("A qualification is already waiting for review"),
+      404: problemResponse("No such education entry"),
+      409: problemResponse("This qualification is already waiting for review, or verified"),
       413: problemResponse("Too large"),
       415: problemResponse("Not a PDF or image"),
     },
   }),
   async (c) => {
     const session = await requireSeeker(c);
-    const { file, title } = c.req.valid("form");
+    const { file } = c.req.valid("form");
+    const educationId = idFrom(
+      "education",
+      c.req.valid("form").educationId,
+      "education entry",
+      "Add the qualification to your education (POST /v1/me/education), then send its `id`.",
+    );
     if (c.get("dryRun")) {
       await inspectUpload(file, ["image", "pdf"]);
       return c.json(await checksJson(c, session.user.id), 201);
@@ -242,7 +254,7 @@ checksRoutes.openapi(
     try {
       await checks(await c.get("db")()).submitQualification(
         session.user.id,
-        { title, documentKey: key },
+        { educationId, documentKey: key },
         userActor(c, session.user.id),
       );
     } catch (error) {

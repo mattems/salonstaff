@@ -293,15 +293,20 @@ describe("applicants", () => {
     );
     expect(again.body.items[0]?.isNew).toBe(false);
 
-    // The candidate's full profile and contact details: only for the salon they applied to.
+    // A hidden profile: only the salon they applied to sees it (D-13), and how it can contact them,
+    // never their address or number in the profile itself.
+    expect(
+      (await seeker.api("PATCH", "/v1/me/profile/settings", { visibility: "hidden" })).status,
+    ).toBe(200);
     const candidateId = applicant?.candidateId as string;
     const full = await a.owner.api<{
-      contact: { email: string; phone: string };
+      contact: { message: boolean; phone: boolean };
       profile: { firstName: string };
       applications: { jobId: string }[];
     }>("GET", a.owner.at(`/candidates/${candidateId}`));
     expect(full.status).toBe(200);
-    expect(full.body.contact).toEqual({ email: seeker.email, phone: "+61412345678" });
+    expect(full.body.contact).toEqual({ message: true, phone: false });
+    expect(JSON.stringify(full.body)).not.toContain(seeker.email);
     expect(full.body.applications.map((x) => x.jobId)).toEqual([jobA.id]);
     expect((await b.owner.api("GET", b.owner.at(`/candidates/${candidateId}`))).status).toBe(404);
     // Nor can a salon move another salon's applications along.
@@ -350,7 +355,7 @@ describe("applicants", () => {
     });
     const texts = app.sent.filter((m) => m.to === mobile.smsTo);
     expect(texts).toHaveLength(before + 1);
-    expect(texts.at(-1)?.text).toContain("/account/applications");
+    expect(texts.at(-1)?.text).toContain("/applications");
     const me = await mobile.api<{ email: string | null; phoneNumber: string }>("GET", "/v1/me");
     expect(me.body).toMatchObject({ email: null, phoneNumber: mobile.phoneNumber });
   });

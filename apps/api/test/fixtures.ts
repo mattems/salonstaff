@@ -63,7 +63,6 @@ export function form(
 export const profileInput = (overrides: Record<string, unknown> = {}) => ({
   firstName: "Sam",
   lastName: `Tester${uid()}`,
-  phone: "0412 345 678",
   headline: "Colourist who loves blondes",
   suburb: "Surry Hills",
   state: "NSW",

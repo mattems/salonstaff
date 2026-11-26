@@ -76,6 +76,10 @@
               "$ref": "#/components/schemas/OwnSalonSummary"
             },
             "description": "The salons you're on the team of, in the order you joined them."
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts)."
           }
         },
         "required": [
@@ -87,7 +91,8 @@
           "createdAt",
           "profile",
           "verification",
-          "salons"
+          "salons",
+          "unreadMessages"
         ]
       },
       "SeekerProfile": {
@@ -98,9 +103,6 @@
           },
           "lastName": {
             "type": "string"
-          },
-          "phone": {
-            "type": ["string", "null"]
           },
           "headline": {
             "type": ["string", "null"]
@@ -147,10 +149,10 @@
           "yearsExperience": {
             "type": "integer"
           },
-          "qualifications": {
+          "instagram": {
             "type": ["string", "null"]
           },
-          "instagram": {
+          "tiktok": {
             "type": ["string", "null"]
           },
           "rightToWork": {
@@ -207,14 +209,18 @@
           "travelKm": {
             "type": ["integer", "null"]
           },
-          "payExpectation": {
-            "type": ["string", "null"]
+          "payMin": {
+            "type": ["number", "null"],
+            "description": "The least they'd take, per `payPeriod`. Null: not saying."
+          },
+          "payPeriod": {
+            "type": "string",
+            "enum": ["hour", "week", "year"]
           }
         },
         "required": [
           "firstName",
           "lastName",
-          "phone",
           "headline",
           "about",
           "suburb",
@@ -222,8 +228,8 @@
           "postcode",
           "roles",
           "yearsExperience",
-          "qualifications",
           "instagram",
+          "tiktok",
           "rightToWork",
           "openToWork",
           "photoUrl",
@@ -233,7 +239,8 @@
           "employmentTypes",
           "availableFrom",
           "travelKm",
-          "payExpectation"
+          "payMin",
+          "payPeriod"
         ]
       },
       "Verification": {
@@ -283,6 +290,16 @@
           },
           "qualificationTitle": {
             "type": ["string", "null"]
+          },
+          "rightToWorkBasis": {
+            "type": ["string", "null"],
+            "enum": ["citizen", "permanent_resident", "visa", null],
+            "description": "Once right to work is verified: the basis staff checked."
+          },
+          "rightToWorkCheckedVia": {
+            "type": ["string", "null"],
+            "example": "VEVO",
+            "description": "Once right to work is verified: how (`VEVO` for a visa, else `ID document`)."
           }
         },
         "required": [
@@ -293,7 +310,9 @@
           "references",
           "nameMatched",
           "identityVerifiedAt",
-          "qualificationTitle"
+          "qualificationTitle",
+          "rightToWorkBasis",
+          "rightToWorkCheckedVia"
         ]
       },
       "OwnSalonSummary": {
@@ -380,35 +399,21 @@
         },
         "required": ["name"]
       },
-      "FullProfile": {
-        "type": "object",
-        "properties": {
-          "profile": {
-            "$ref": "#/components/schemas/SeekerProfile"
+      "MyProfile": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FullProfile"
           },
-          "experience": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Experience"
-            }
-          },
-          "education": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Education"
-            }
-          },
-          "portfolio": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PortfolioItem"
-            }
-          },
-          "verification": {
-            "$ref": "#/components/schemas/Verification"
+          {
+            "type": "object",
+            "properties": {
+              "settings": {
+                "$ref": "#/components/schemas/ProfileSettings"
+              }
+            },
+            "required": ["settings"]
           }
-        },
-        "required": ["profile", "experience", "education", "portfolio", "verification"]
+        ]
       },
       "Experience": {
         "type": "object",
@@ -458,13 +463,28 @@
             "type": "string"
           },
           "institution": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "year": {
             "type": ["integer", "null"]
+          },
+          "verification": {
+            "type": ["object", "null"],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "reference": {
+                "type": ["string", "null"],
+                "description": "The verification ID (`SSV-…`) once passed. Not on share pages."
+              }
+            },
+            "required": ["status", "reference"],
+            "description": "The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent."
           }
         },
-        "required": ["id", "qualification", "institution", "year"]
+        "required": ["id", "qualification", "institution", "year", "verification"]
       },
       "PortfolioItem": {
         "type": "object",
@@ -481,6 +501,142 @@
           }
         },
         "required": ["id", "imageUrl", "caption"]
+      },
+      "Endorsement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "end_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "refereeName": {
+            "type": "string"
+          },
+          "refereeTitle": {
+            "type": ["string", "null"],
+            "example": "Salon owner"
+          },
+          "salonName": {
+            "type": ["string", "null"],
+            "description": "Where they worked together."
+          },
+          "relationship": {
+            "type": ["string", "null"],
+            "enum": ["managed", "worked_with", "trained", "client", null]
+          },
+          "body": {
+            "type": "string"
+          },
+          "writtenAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "onSalonStaff": {
+            "type": ["object", "null"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "path"],
+            "description": "The salon whose team the referee is on here, when they wrote it. Their email address proved it."
+          },
+          "contact": {
+            "type": ["object", "null"],
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "phone": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["email", "phone"],
+            "description": "How to reach the referee: only for a salon the person applied to, and only if the referee agreed."
+          }
+        },
+        "required": [
+          "id",
+          "refereeName",
+          "refereeTitle",
+          "salonName",
+          "relationship",
+          "body",
+          "writtenAt",
+          "onSalonStaff",
+          "contact"
+        ]
+      },
+      "ProfileSettings": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "enum": ["public", "salons", "hidden"],
+            "description": "`public`: salons can find you and your share link works. `salons`: salons can find you. `hidden`: only salons you apply to."
+          },
+          "contactBy": {
+            "type": "string",
+            "enum": ["both", "email", "phone"]
+          },
+          "shareCode": {
+            "type": ["string", "null"],
+            "example": "k7x2m9qd4h"
+          },
+          "sharePath": {
+            "type": ["string", "null"],
+            "example": "/p/k7x2m9qd4h",
+            "description": "Your share page on the website. Null unless your profile is public."
+          }
+        },
+        "required": ["visibility", "contactBy", "shareCode", "sharePath"]
+      },
+      "FullProfile": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/SeekerProfile"
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experience"
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioItem"
+            }
+          },
+          "endorsements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Endorsement"
+            }
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "profile",
+          "experience",
+          "education",
+          "portfolio",
+          "endorsements",
+          "verification"
+        ]
       },
       "ProfilePhoto": {
         "type": "object",
@@ -706,12 +862,260 @@
         },
         "required": ["deleted"]
       },
+      "HiddenSalons": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HiddenSalon"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "HiddenSalon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          }
+        },
+        "required": ["id", "name", "path", "suburb", "state"]
+      },
+      "HiddenFromSalon": {
+        "type": "object",
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": ["hidden"]
+      },
+      "ProfileContacts": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileContact"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "ProfileContact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["message", "phone"],
+            "description": "`message`: they sent you a message (emailed to you). `phone`: they looked at your number."
+          },
+          "message": {
+            "type": ["string", "null"]
+          },
+          "read": {
+            "type": "boolean",
+            "description": "You've seen it in your inbox."
+          },
+          "sender": {
+            "type": ["object", "null"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "email"],
+            "description": "Who sent a message, and where your reply goes (it's the message's reply-to)."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "salon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "path"]
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "You've hidden your profile from this salon."
+          }
+        },
+        "required": ["id", "kind", "message", "read", "sender", "createdAt", "salon", "hidden"]
+      },
+      "Unread": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "integer"
+          }
+        },
+        "required": ["unread"]
+      },
+      "ContactsRead": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "maxItems": 200
+          }
+        }
+      },
+      "MyEndorsements": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyEndorsement"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "MyEndorsement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "end_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["requested", "received", "shown", "hidden"],
+            "description": "`requested`: waiting for them to write it. `received`: written, waiting for you to show it. `shown` on your profile, or `hidden`."
+          },
+          "refereeName": {
+            "type": "string"
+          },
+          "refereeEmail": {
+            "type": "string"
+          },
+          "note": {
+            "type": ["string", "null"]
+          },
+          "linkExpiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "refereeTitle": {
+            "type": ["string", "null"]
+          },
+          "salonName": {
+            "type": ["string", "null"]
+          },
+          "relationship": {
+            "type": ["string", "null"],
+            "enum": ["managed", "worked_with", "trained", "client", null]
+          },
+          "body": {
+            "type": ["string", "null"]
+          },
+          "contactOk": {
+            "type": "boolean",
+            "description": "They agreed that salons you apply to may contact them."
+          },
+          "refereePhone": {
+            "type": ["string", "null"]
+          },
+          "onSalonStaff": {
+            "type": "boolean",
+            "description": "Their address is on a salon's team here: shown as such on your profile."
+          },
+          "writtenAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "refereeName",
+          "refereeEmail",
+          "note",
+          "linkExpiresAt",
+          "refereeTitle",
+          "salonName",
+          "relationship",
+          "body",
+          "contactOk",
+          "refereePhone",
+          "onSalonStaff",
+          "writtenAt",
+          "createdAt"
+        ]
+      },
+      "EndorsementShown": {
+        "type": "object",
+        "properties": {
+          "shown": {
+            "type": "boolean"
+          }
+        },
+        "required": ["shown"]
+      },
       "EmailCodeSent": {
         "type": "object",
         "properties": {
           "sentTo": {
             "type": "string",
             "example": "olive@example.com"
+          }
+        },
+        "required": ["sentTo"]
+      },
+      "MobileCodeSent": {
+        "type": "object",
+        "properties": {
+          "sentTo": {
+            "type": "string",
+            "example": "+61412345678"
           }
         },
         "required": ["sentTo"]
@@ -848,6 +1252,11 @@
             "type": ["string", "null"],
             "description": "A qualification's name."
           },
+          "educationId": {
+            "type": ["string", "null"],
+            "example": "edu_01k6q2x8h4f7tbn3m9vz5cdr0e",
+            "description": "The education entry a qualification check is for, while it's on your profile."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -855,7 +1264,16 @@
             "type": ["string", "null"]
           }
         },
-        "required": ["id", "kind", "status", "reference", "title", "createdAt", "decidedAt"]
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "reference",
+          "title",
+          "educationId",
+          "createdAt",
+          "decidedAt"
+        ]
       },
       "RedirectUrl": {
         "type": "object",
@@ -1850,7 +2268,7 @@
                 "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
               },
               "contact": {
-                "$ref": "#/components/schemas/Contact"
+                "$ref": "#/components/schemas/ContactOptions"
               },
               "applications": {
                 "type": "array",
@@ -1891,17 +2309,39 @@
           }
         ]
       },
-      "Contact": {
+      "ContactOptions": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": ["string", "null"]
+          "message": {
+            "type": "boolean",
+            "description": "You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you."
           },
           "phone": {
-            "type": ["string", "null"]
+            "type": "boolean",
+            "description": "You can see their mobile (POST …/candidates/{userId}/phone)."
           }
         },
-        "required": ["email", "phone"]
+        "required": ["message", "phone"]
+      },
+      "MessageSent": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["sent"]
+      },
+      "CandidatePhone": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+61412345678"
+          }
+        },
+        "required": ["phone"]
       },
       "Team": {
         "type": "object",
@@ -2309,6 +2749,273 @@
           }
         },
         "required": ["claim", "salon"]
+      },
+      "SharedProfile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Jess D."
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "headline": {
+                "type": ["string", "null"]
+              },
+              "about": {
+                "type": ["string", "null"]
+              },
+              "suburb": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                "example": "NSW"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "senior_stylist",
+                    "stylist",
+                    "junior_stylist",
+                    "apprentice_hair",
+                    "colourist",
+                    "barber",
+                    "beauty_therapist",
+                    "nail_technician",
+                    "lash_brow",
+                    "makeup_artist",
+                    "skin_therapist",
+                    "massage_spa",
+                    "apprentice_beauty",
+                    "salon_manager",
+                    "receptionist",
+                    "educator"
+                  ],
+                  "example": "colourist"
+                }
+              },
+              "yearsExperience": {
+                "type": "integer"
+              },
+              "instagram": {
+                "type": ["string", "null"]
+              },
+              "tiktok": {
+                "type": ["string", "null"]
+              },
+              "openToWork": {
+                "type": "boolean"
+              },
+              "photoUrl": {
+                "type": ["string", "null"]
+              },
+              "specialties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "brands": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "availableDays": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "employmentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "full_time",
+                    "part_time",
+                    "casual",
+                    "contract",
+                    "apprenticeship",
+                    "chair_rental"
+                  ]
+                }
+              },
+              "availableFrom": {
+                "type": ["string", "null"]
+              },
+              "travelKm": {
+                "type": ["integer", "null"]
+              }
+            },
+            "required": [
+              "firstName",
+              "headline",
+              "about",
+              "suburb",
+              "state",
+              "roles",
+              "yearsExperience",
+              "instagram",
+              "tiktok",
+              "openToWork",
+              "photoUrl",
+              "specialties",
+              "brands",
+              "availableDays",
+              "employmentTypes",
+              "availableFrom",
+              "travelKm"
+            ]
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experience"
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioItem"
+            }
+          },
+          "endorsements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Endorsement"
+            }
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "identity": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "rightToWork": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "qualification": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "0 not verified, 1 ID verified, 2 work-ready (ID and right to work)."
+              },
+              "rightToWorkBasis": {
+                "type": ["string", "null"],
+                "enum": ["citizen", "permanent_resident", "visa", null],
+                "description": "Once right to work is verified: the basis staff checked."
+              },
+              "rightToWorkCheckedVia": {
+                "type": ["string", "null"],
+                "example": "VEVO",
+                "description": "Once right to work is verified: how (`VEVO` for a visa, else `ID document`)."
+              }
+            },
+            "required": [
+              "identity",
+              "rightToWork",
+              "qualification",
+              "level",
+              "rightToWorkBasis",
+              "rightToWorkCheckedVia"
+            ]
+          },
+          "viewer": {
+            "type": ["object", "null"],
+            "properties": {
+              "salons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "candidateId": {
+                      "type": "string",
+                      "description": "Their ID in your salon's routes."
+                    },
+                    "contact": {
+                      "$ref": "#/components/schemas/ContactOptions"
+                    }
+                  },
+                  "required": ["id", "name", "candidateId", "contact"]
+                }
+              }
+            },
+            "required": ["salons"],
+            "description": "For someone signed in on a salon's team: each salon they can contact this person as. Null for anyone else."
+          }
+        },
+        "required": [
+          "name",
+          "profile",
+          "experience",
+          "education",
+          "portfolio",
+          "endorsements",
+          "verification",
+          "viewer"
+        ]
+      },
+      "EndorsementAsk": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Jess D.",
+            "description": "Who asked."
+          },
+          "photoUrl": {
+            "type": ["string", "null"]
+          },
+          "headline": {
+            "type": ["string", "null"]
+          },
+          "refereeName": {
+            "type": "string",
+            "description": "Your name, as they typed it."
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "What they said when asking."
+          }
+        },
+        "required": ["name", "photoUrl", "headline", "refereeName", "note"]
+      },
+      "EndorsementWritten": {
+        "type": "object",
+        "properties": {
+          "written": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["written"]
       },
       "Billing": {
         "type": "object",
@@ -2780,8 +3487,13 @@
               "last_name": {
                 "type": "string"
               },
-              "phone": {
-                "type": ["string", "null"]
+              "visibility": {
+                "type": "string",
+                "enum": ["public", "salons", "hidden"]
+              },
+              "contact_by": {
+                "type": "string",
+                "enum": ["both", "email", "phone"]
               },
               "headline": {
                 "type": ["string", "null"]
@@ -2813,6 +3525,9 @@
               "instagram": {
                 "type": ["string", "null"]
               },
+              "tiktok": {
+                "type": ["string", "null"]
+              },
               "photo_url": {
                 "type": ["string", "null"]
               }
@@ -2820,7 +3535,8 @@
             "required": [
               "first_name",
               "last_name",
-              "phone",
+              "visibility",
+              "contact_by",
               "headline",
               "suburb",
               "state",
@@ -2830,6 +3546,7 @@
               "right_to_work",
               "open_to_work",
               "instagram",
+              "tiktok",
               "photo_url"
             ]
           },

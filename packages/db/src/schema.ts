@@ -1,13 +1,17 @@
 import {
   type ApplicationStatus,
   type AuState,
+  type ContactBy,
   type EmploymentType,
+  type EndorsementRelationship,
   type JobRole,
   type PayPeriod,
+  type ProfileVisibility,
   type RightToWork,
   uuidv7,
   type VerificationStatus,
 } from "@salonstaff/shared";
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -148,7 +152,7 @@ export const seekerProfiles = pgTable("seeker_profiles", {
     .references(() => users.id, { onDelete: "cascade" }),
   firstName: text("first_name").notNull(),
   lastName: text("last_name").notNull(),
-  /** Contact number shown to salons the person applied to. */
+  /** Deprecated (D-13): salons see the account's verified mobile. Never read or written; drop later. */
   phone: text("phone"),
   headline: text("headline"),
   about: text("about"),
@@ -157,10 +161,18 @@ export const seekerProfiles = pgTable("seeker_profiles", {
   postcode: text("postcode").notNull(),
   roles: jsonb("roles").$type<JobRole[]>().notNull().default([]),
   yearsExperience: integer("years_experience").notNull().default(0),
+  /** Deprecated: qualifications are education entries now. Never read or written; drop later. */
   qualifications: text("qualifications"),
   instagram: text("instagram"),
+  tiktok: text("tiktok"),
   rightToWork: text("right_to_work").$type<RightToWork>().notNull(),
   openToWork: boolean("open_to_work").notNull().default(true),
+  /** Who sees the profile (D-13). */
+  visibility: text("visibility").$type<ProfileVisibility>().notNull().default("salons"),
+  /** How salons may contact them (D-13). */
+  contactBy: text("contact_by").$type<ContactBy>().notNull().default("both"),
+  /** Their share link's code (`/p/{code}`); works only while public. Made when first needed. */
+  shareCode: text("share_code").unique(),
   /** Object in the public media bucket. */
   photoKey: text("photo_key"),
   specialties: jsonb("specialties").$type<string[]>().notNull().default([]),
@@ -170,10 +182,99 @@ export const seekerProfiles = pgTable("seeker_profiles", {
   /** YYYY-MM-DD, or null for "now". */
   availableFrom: text("available_from"),
   travelKm: integer("travel_km"),
+  /** Deprecated (D-13): `payMin`/`payPeriod` replace it. Never read or written; drop later. */
   payExpectation: text("pay_expectation"),
+  /** The least they'd take, per `payPeriod`; null when they'd rather not say. */
+  payMin: doublePrecision("pay_min"),
+  payPeriod: text("pay_period").$type<PayPeriod>().notNull().default("hour"),
   createdAt: createdAt(),
   updatedAt: updatedAt(),
 });
+
+export type EndorsementStatus = "requested" | "received" | "shown" | "hidden";
+
+/**
+ * Endorsements (D-13). The job seeker asks a referee by email; the referee writes it through a
+ * one-time link (only its hash is kept). The job seeker shows or hides it, but can't change it.
+ */
+export const seekerEndorsements = pgTable(
+  "seeker_endorsements",
+  {
+    id: id(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status").$type<EndorsementStatus>().notNull().default("requested"),
+    /** Lowercase. One endorsement per referee address. */
+    refereeEmail: text("referee_email").notNull(),
+    /** As the job seeker typed it, then as the referee signed it. */
+    refereeName: text("referee_name").notNull(),
+    note: text("note"),
+    /** SHA-256 of the link's token; cleared once written. */
+    tokenHash: text("token_hash").unique(),
+    tokenExpiresAt: ts("token_expires_at"),
+    refereeTitle: text("referee_title"),
+    salonName: text("salon_name"),
+    relationship: text("relationship").$type<EndorsementRelationship>(),
+    body: text("body"),
+    contactOk: boolean("contact_ok").notNull().default(false),
+    refereePhone: text("referee_phone"),
+    /** A salon whose team the referee's address is on, when they wrote it. */
+    refereeSalonId: uuid("referee_salon_id").references(() => salons.id, { onDelete: "set null" }),
+    writtenAt: ts("written_at"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("seeker_endorsements_user_idx").on(table.userId, table.status),
+    uniqueIndex("seeker_endorsements_referee_idx").on(table.userId, table.refereeEmail),
+  ],
+);
+
+/** Salons a job seeker has hidden their profile from (D-13). Applying there still shows it. */
+export const seekerHiddenSalons = pgTable(
+  "seeker_hidden_salons",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    salonId: uuid("salon_id")
+      .notNull()
+      .references(() => salons.id, { onDelete: "cascade" }),
+    createdAt: createdAt(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.salonId] })],
+);
+
+export type ProfileContactKind = "message" | "phone";
+
+/**
+ * Every message a salon sent a job seeker through us and every time it revealed their number
+ * (D-13): for the job seeker to see, for the daily caps, and for spam reports.
+ */
+export const profileContacts = pgTable(
+  "profile_contacts",
+  {
+    id: id(),
+    seekerId: uuid("seeker_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    salonId: uuid("salon_id")
+      .notNull()
+      .references(() => salons.id, { onDelete: "cascade" }),
+    /** Who on the salon's team; null once they've deleted their account. */
+    senderId: uuid("sender_id").references(() => users.id, { onDelete: "set null" }),
+    kind: text("kind").$type<ProfileContactKind>().notNull(),
+    message: text("message"),
+    /** When the job seeker saw it in their inbox; null while unread. */
+    readAt: ts("read_at"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("profile_contacts_seeker_idx").on(table.seekerId, table.createdAt),
+    index("profile_contacts_unread_idx").on(table.seekerId).where(sql`${table.readAt} is null`),
+    index("profile_contacts_salon_idx").on(table.salonId, table.kind, table.createdAt),
+  ],
+);
 
 export const seekerExperience = pgTable(
   "seeker_experience",
@@ -203,7 +304,7 @@ export const seekerEducation = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     qualification: text("qualification").notNull(),
-    institution: text("institution").notNull(),
+    institution: text("institution"),
     year: integer("year"),
     createdAt: createdAt(),
   },
@@ -249,6 +350,10 @@ export const seekerChecks = pgTable(
     result: jsonb("result").$type<Record<string, unknown>>().notNull().default({}),
     /** A certificate in the private bucket, only until a decision is made. */
     documentKey: text("document_key"),
+    /** For a qualification: the education entry it verifies. Kept (null) if the entry is removed. */
+    educationId: uuid("education_id").references(() => seekerEducation.id, {
+      onDelete: "set null",
+    }),
     reviewedBy: uuid("reviewed_by"),
     reviewNote: text("review_note"),
     decidedAt: ts("decided_at"),
@@ -259,6 +364,7 @@ export const seekerChecks = pgTable(
     index("seeker_checks_user_idx").on(table.userId, table.kind),
     index("seeker_checks_provider_ref_idx").on(table.providerRef),
     index("seeker_checks_pending_idx").on(table.status, table.createdAt),
+    index("seeker_checks_education_idx").on(table.educationId),
   ],
 );
 

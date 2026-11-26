@@ -6,9 +6,13 @@ import { z } from "@hono/zod-openapi";
 import {
   APPLICATION_STATUS_VALUES,
   AU_STATE_VALUES,
+  CONTACT_BY_VALUES,
   EMPLOYMENT_TYPE_VALUES,
+  ENDORSEMENT_RELATIONSHIP_VALUES,
   JOB_ROLE_VALUES,
   PAY_PERIOD_VALUES,
+  PROFILE_VISIBILITY_VALUES,
+  RIGHT_TO_WORK_BASIS_VALUES,
   RIGHT_TO_WORK_VALUES,
   VERIFICATION_STATUSES,
 } from "@salonstaff/shared";
@@ -89,7 +93,10 @@ export const EmploymentTypeSchema = z.enum(EMPLOYMENT_TYPE_VALUES);
 export const PayPeriodSchema = z.enum(PAY_PERIOD_VALUES);
 export const ApplicationStatusSchema = z.enum(APPLICATION_STATUS_VALUES);
 export const CheckStatusSchema = z.enum(VERIFICATION_STATUSES);
-const Timestamp = z.string().openapi({ format: "date-time", example: "2026-11-25T03:00:00.000Z" });
+export const RightToWorkBasisSchema = z.enum(RIGHT_TO_WORK_BASIS_VALUES);
+export const Timestamp = z
+  .string()
+  .openapi({ format: "date-time", example: "2026-11-25T03:00:00.000Z" });
 
 // ---------------------------------------------------------------------------
 // People
@@ -119,6 +126,13 @@ export const VerificationSchema = z
       .openapi({ description: "Whether the name on the ID matched the profile when checked." }),
     identityVerifiedAt: Timestamp.nullable(),
     qualificationTitle: z.string().nullable(),
+    rightToWorkBasis: RightToWorkBasisSchema.nullable().openapi({
+      description: "Once right to work is verified: the basis staff checked.",
+    }),
+    rightToWorkCheckedVia: z.string().nullable().openapi({
+      example: "VEVO",
+      description: "Once right to work is verified: how (`VEVO` for a visa, else `ID document`).",
+    }),
   })
   .openapi("Verification");
 
@@ -126,7 +140,6 @@ export const SeekerProfileSchema = z
   .object({
     firstName: z.string(),
     lastName: z.string(),
-    phone: z.string().nullable(),
     headline: z.string().nullable(),
     about: z.string().nullable(),
     suburb: z.string(),
@@ -134,8 +147,8 @@ export const SeekerProfileSchema = z
     postcode: z.string(),
     roles: z.array(JobRoleSchema),
     yearsExperience: z.number().int(),
-    qualifications: z.string().nullable(),
     instagram: z.string().nullable(),
+    tiktok: z.string().nullable(),
     rightToWork: z.enum(RIGHT_TO_WORK_VALUES),
     openToWork: z.boolean(),
     photoUrl: z.string().nullable(),
@@ -145,7 +158,11 @@ export const SeekerProfileSchema = z
     employmentTypes: z.array(EmploymentTypeSchema),
     availableFrom: z.string().nullable(),
     travelKm: z.number().int().nullable(),
-    payExpectation: z.string().nullable(),
+    payMin: z
+      .number()
+      .nullable()
+      .openapi({ description: "The least they'd take, per `payPeriod`. Null: not saying." }),
+    payPeriod: PayPeriodSchema,
   })
   .openapi("SeekerProfile");
 
@@ -165,8 +182,20 @@ export const EducationSchema = z
   .object({
     id: z.string().openapi({ example: "edu_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
     qualification: z.string(),
-    institution: z.string(),
+    institution: z.string().nullable(),
     year: z.number().int().nullable(),
+    verification: z
+      .object({
+        status: CheckStatusSchema,
+        reference: z.string().nullable().openapi({
+          description: "The verification ID (`SSV-…`) once passed. Not on share pages.",
+        }),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent.",
+      }),
   })
   .openapi("Education");
 
@@ -178,15 +207,60 @@ export const PortfolioItemSchema = z
   })
   .openapi("PortfolioItem");
 
+export const EndorsementRelationshipSchema = z.enum(ENDORSEMENT_RELATIONSHIP_VALUES);
+
+export const EndorsementSchema = z
+  .object({
+    id: z.string().openapi({ example: "end_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    refereeName: z.string(),
+    refereeTitle: z.string().nullable().openapi({ example: "Salon owner" }),
+    salonName: z.string().nullable().openapi({ description: "Where they worked together." }),
+    relationship: EndorsementRelationshipSchema.nullable(),
+    body: z.string(),
+    writtenAt: Timestamp,
+    onSalonStaff: z.object({ name: z.string(), path: z.string() }).nullable().openapi({
+      description:
+        "The salon whose team the referee is on here, when they wrote it. Their email address proved it.",
+    }),
+    contact: z.object({ email: z.string(), phone: z.string().nullable() }).nullable().openapi({
+      description:
+        "How to reach the referee: only for a salon the person applied to, and only if the referee agreed.",
+    }),
+  })
+  .openapi("Endorsement");
+
 export const FullProfileSchema = z
   .object({
     profile: SeekerProfileSchema,
     experience: z.array(ExperienceSchema),
     education: z.array(EducationSchema),
     portfolio: z.array(PortfolioItemSchema),
+    endorsements: z.array(EndorsementSchema),
     verification: VerificationSchema,
   })
   .openapi("FullProfile");
+
+export const ProfileVisibilitySchema = z.enum(PROFILE_VISIBILITY_VALUES).openapi({
+  description:
+    "`public`: salons can find you and your share link works. `salons`: salons can find you. `hidden`: only salons you apply to.",
+});
+export const ContactBySchema = z.enum(CONTACT_BY_VALUES);
+
+export const ProfileSettingsSchema = z
+  .object({
+    visibility: ProfileVisibilitySchema,
+    contactBy: ContactBySchema,
+    shareCode: z.string().nullable().openapi({ example: "k7x2m9qd4h" }),
+    sharePath: z.string().nullable().openapi({
+      example: "/p/k7x2m9qd4h",
+      description: "Your share page on the website. Null unless your profile is public.",
+    }),
+  })
+  .openapi("ProfileSettings");
+
+export const MyProfileSchema = FullProfileSchema.extend({
+  settings: ProfileSettingsSchema,
+}).openapi("MyProfile");
 
 export const OwnSalonSummarySchema = z
   .object({
@@ -213,6 +287,10 @@ export const MeSchema = z
     verification: VerificationSchema,
     salons: z.array(OwnSalonSummarySchema).openapi({
       description: "The salons you're on the team of, in the order you joined them.",
+    }),
+    unreadMessages: z.number().int().openapi({
+      description:
+        "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts).",
     }),
   })
   .openapi("Me");
@@ -445,13 +523,21 @@ export const ApplicantSchema = z
   })
   .openapi("Applicant");
 
-export const ContactSchema = z
-  .object({ email: z.string().nullable(), phone: z.string().nullable() })
-  .openapi("Contact");
+export const ContactOptionsSchema = z
+  .object({
+    message: z.boolean().openapi({
+      description:
+        "You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you.",
+    }),
+    phone: z
+      .boolean()
+      .openapi({ description: "You can see their mobile (POST …/candidates/{userId}/phone)." }),
+  })
+  .openapi("ContactOptions");
 
 export const CandidateSchema = FullProfileSchema.extend({
   id: z.string().openapi({ example: "usr_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
-  contact: ContactSchema,
+  contact: ContactOptionsSchema,
   applications: z.array(
     z.object({
       id: z.string(),
@@ -462,6 +548,48 @@ export const CandidateSchema = FullProfileSchema.extend({
     }),
   ),
 }).openapi("Candidate");
+
+/** A profile through its share link (D-13): first name and last initial, no contact details. */
+export const SharedProfileSchema = z
+  .object({
+    name: z.string().openapi({ example: "Jess D." }),
+    profile: SeekerProfileSchema.omit({
+      lastName: true,
+      postcode: true,
+      rightToWork: true,
+      payMin: true,
+      payPeriod: true,
+    }),
+    experience: z.array(ExperienceSchema),
+    education: z.array(EducationSchema),
+    portfolio: z.array(PortfolioItemSchema),
+    endorsements: z.array(EndorsementSchema),
+    verification: VerificationSchema.pick({
+      identity: true,
+      rightToWork: true,
+      qualification: true,
+      level: true,
+      rightToWorkBasis: true,
+      rightToWorkCheckedVia: true,
+    }),
+    viewer: z
+      .object({
+        salons: z.array(
+          z.object({
+            id: z.string(),
+            name: z.string(),
+            candidateId: z.string().openapi({ description: "Their ID in your salon's routes." }),
+            contact: ContactOptionsSchema,
+          }),
+        ),
+      })
+      .nullable()
+      .openapi({
+        description:
+          "For someone signed in on a salon's team: each salon they can contact this person as. Null for anyone else.",
+      }),
+  })
+  .openapi("SharedProfile");
 
 // ---------------------------------------------------------------------------
 // The directory

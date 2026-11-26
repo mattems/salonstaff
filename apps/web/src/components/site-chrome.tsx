@@ -2,6 +2,7 @@
 import { BRAND } from "@salonstaff/shared";
 import { Button } from "@salonstaff/ui/components/button";
 import { Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { Bell } from "lucide-react";
 import { toast } from "sonner";
 import { authCall, errorMessage } from "@/lib/api";
 import { forgetMe, type Me } from "@/lib/session";
@@ -55,8 +56,9 @@ export function SiteHeader({ me }: { me: Me | null }) {
                 </>
               ) : (
                 <>
-                  <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex">
-                    <Link to="/account/applications">Applications</Link>
+                  <InboxBell unread={me.unreadMessages} />
+                  <Button asChild variant="ghost" size="sm">
+                    <Link to="/applications">Applications</Link>
                   </Button>
                   <Button asChild variant="ghost" size="sm">
                     <Link to="/account">Profile</Link>
@@ -82,6 +84,26 @@ export function SiteHeader({ me }: { me: Me | null }) {
         </div>
       </div>
     </header>
+  );
+}
+
+/** A job seeker's inbox, with how many salons' messages and number views they haven't seen. */
+function InboxBell({ unread }: { unread: number }) {
+  const label = unread > 0 ? `Inbox, ${unread} unread` : "Inbox";
+  return (
+    <Button asChild variant="ghost" size="icon-sm" className="relative">
+      <Link to="/inbox" aria-label={label} title={label}>
+        <Bell aria-hidden />
+        {unread > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 font-medium text-[10px] text-primary-foreground"
+            aria-hidden
+          >
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </Link>
+    </Button>
   );
 }
 

@@ -258,10 +258,10 @@ function emailChangeProblem(error: unknown): EmailChangeProblem | null {
   if (!(error instanceof APIError)) return null;
   const body = (error.body ?? {}) as { code?: string; message?: string };
   const said = `${body.code ?? ""} ${body.message ?? error.message}`.toLowerCase();
-  if (said.includes("expired")) return "expired";
+  if (said.includes("expired") || said.includes("otp not found")) return "expired";
   if (said.includes("too many")) return "too_many_attempts";
   if (said.includes("invalid otp") || said.includes("invalid_otp")) return "invalid_code";
-  if (said.includes("already in use")) return "in_use";
+  if (said.includes("already in use") || said.includes("already exists")) return "in_use";
   if (said.includes("is the same")) return "same";
   return null;
 }
@@ -300,6 +300,33 @@ export function confirmEmailChange(auth: Auth, headers: Headers, newEmail: strin
       returnHeaders: true,
     });
     return result.headers;
+  });
+}
+
+/**
+ * Step one of changing (or adding) the signed-in person's mobile (D-13): a code by SMS to the new
+ * number. The caller checks first that no other account has it.
+ */
+export function requestMobileChange(auth: Auth, phoneNumber: string) {
+  return changing(async () => {
+    await auth.api.sendPhoneNumberOTP({ body: { phoneNumber } });
+    return new Headers();
+  });
+}
+
+/** Step two: the code from the new number. On success the account's mobile is the new one, verified. */
+export function confirmMobileChange(
+  auth: Auth,
+  headers: Headers,
+  phoneNumber: string,
+  code: string,
+) {
+  return changing(async () => {
+    await auth.api.verifyPhoneNumber({
+      headers,
+      body: { phoneNumber, code, updatePhoneNumber: true },
+    });
+    return new Headers();
   });
 }
 

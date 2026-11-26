@@ -6,7 +6,7 @@
 import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { type Actor, recordAudit } from "./audit";
 import type { Db } from "./index";
-import { accounts, sessions } from "./schema";
+import { accounts, sessions, users } from "./schema";
 
 /** The other ways in, besides an email or SMS code (packages/auth's SOCIAL_PROVIDERS). */
 const PROVIDERS = ["google", "apple"];
@@ -118,6 +118,26 @@ export function signIns(db: Db, userId: string) {
         targetId: userId,
         before: { email: before },
         after: { email: after },
+      });
+    },
+
+    /** Whether another account signs in with this mobile (each number is on one account, D-08). */
+    async mobileTakenByOther(phoneNumber: string): Promise<boolean> {
+      const [row] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.phoneNumber, phoneNumber), ne(users.id, userId)));
+      return Boolean(row);
+    },
+
+    /** Better Auth has changed the mobile (D-13); this records it. */
+    async recordMobileChange(before: string | null, after: string, actor: Actor): Promise<void> {
+      await recordAudit(db, actor, {
+        action: "user.mobile_changed",
+        targetType: "user",
+        targetId: userId,
+        before: { phoneNumber: before },
+        after: { phoneNumber: after },
       });
     },
   };

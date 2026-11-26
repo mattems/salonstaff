@@ -9,6 +9,8 @@
 import {
   ApiError,
   nameMatches,
+  RIGHT_TO_WORK_BASIS_VALUES,
+  type RightToWorkBasis,
   type RightToWorkInput,
   type VerificationStatus,
   verificationLevel,
@@ -17,7 +19,7 @@ import {
 import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
 import { type Actor, recordAudit } from "./audit";
 import type { Db } from "./index";
-import { type CheckKind, seekerChecks, seekerProfiles, users } from "./schema";
+import { type CheckKind, seekerChecks, seekerEducation, seekerProfiles, users } from "./schema";
 
 export type Check = typeof seekerChecks.$inferSelect;
 
@@ -33,7 +35,15 @@ export interface CheckSummary {
   nameMatched: boolean | null;
   identityVerifiedAt: Date | null;
   qualificationTitle: string | null;
+  /** For a passed right-to-work check: the basis staff checked, and how (`VEVO`, `ID document`). */
+  rightToWorkBasis: RightToWorkBasis | null;
+  rightToWorkCheckedVia: string | null;
 }
+
+const basisOf = (value: unknown): RightToWorkBasis | null =>
+  (RIGHT_TO_WORK_BASIS_VALUES as readonly unknown[]).includes(value)
+    ? (value as RightToWorkBasis)
+    : null;
 
 /** Kinds staff decide. Identity is decided by the provider. */
 const REVIEWED: CheckKind[] = ["right_to_work", "qualification"];
@@ -75,7 +85,35 @@ export function summarise(rows: Check[]): CheckSummary {
     nameMatched: typeof id?.result.nameMatched === "boolean" ? id.result.nameMatched : null,
     identityVerifiedAt: id?.decidedAt ?? null,
     qualificationTitle: typeof qual?.result.title === "string" ? qual.result.title : null,
+    rightToWorkBasis: basisOf(rtw?.result.basis),
+    rightToWorkCheckedVia:
+      typeof rtw?.result.checkedVia === "string" ? rtw.result.checkedVia : null,
   };
+}
+
+/** Where a qualification check of one education entry is up to, from all their checks. */
+export interface EducationCheck {
+  status: VerificationStatus;
+  /** The verification ID, once passed. */
+  reference: string | null;
+}
+
+/** Each education entry's check: a pass beats a later failed retry, otherwise the newest. */
+export function educationChecks(rows: Check[]): Map<string, EducationCheck> {
+  const byEducation = new Map<string, Check>();
+  for (const row of [...rows].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())) {
+    if (row.kind !== "qualification" || !row.educationId) continue;
+    const existing = byEducation.get(row.educationId);
+    if (!existing || (existing.status !== "verified" && row.status === "verified")) {
+      byEducation.set(row.educationId, row);
+    }
+  }
+  return new Map(
+    [...byEducation].map(([id, row]) => [
+      id,
+      { status: row.status, reference: row.status === "verified" ? row.reference : null },
+    ]),
+  );
 }
 
 /** Summaries for several people at once (applicant lists). */
@@ -92,7 +130,10 @@ function minimalResult(check: Check): Record<string, unknown> {
     const basis = check.result.basis;
     return { basis, checkedVia: basis === "visa" ? "VEVO" : "ID document" };
   }
-  if (check.kind === "qualification") return { title: check.result.title };
+  if (check.kind === "qualification") {
+    const { title, institution, year } = check.result;
+    return { title, institution, year };
+  }
   return typeof check.result.nameMatched === "boolean"
     ? { nameMatched: check.result.nameMatched }
     : {};
@@ -232,15 +273,69 @@ export function checks(db: Db) {
       });
     },
 
-    /** A certificate in the PRIVATE bucket, kept only until staff decide. */
+    /**
+     * A certificate for one of their education entries, in the PRIVATE bucket only until staff
+     * decide. One check at a time per entry; a verified entry needs no more.
+     */
     async submitQualification(
       userId: string,
-      input: { title: string; documentKey: string },
+      input: { educationId: string; documentKey: string },
       actor: Actor,
     ): Promise<Check> {
-      return submitForReview(db, userId, "qualification", actor, {
-        result: { title: input.title },
-        documentKey: input.documentKey,
+      return db.transaction(async (tx) => {
+        const [education] = await tx
+          .select()
+          .from(seekerEducation)
+          .where(and(eq(seekerEducation.id, input.educationId), eq(seekerEducation.userId, userId)))
+          .for("update");
+        if (!education) {
+          throw new ApiError("not_found", {
+            detail: "You have no education entry with that ID",
+            hint: "Add the qualification to your education (POST /v1/me/education), then send its `id`.",
+          });
+        }
+        const existing = await tx
+          .select()
+          .from(seekerChecks)
+          .where(
+            and(eq(seekerChecks.educationId, education.id), eq(seekerChecks.kind, "qualification")),
+          );
+        if (existing.some((row) => OPEN.includes(row.status))) {
+          throw new ApiError("conflict", {
+            detail: "This qualification is already waiting for review",
+            hint: "Wait for the decision (usually within two business days) before sending another.",
+          });
+        }
+        if (existing.some((row) => row.status === "verified")) {
+          throw new ApiError("conflict", {
+            detail: "This qualification is already verified",
+            hint: "Nothing more is needed for it.",
+          });
+        }
+        const [row] = await tx
+          .insert(seekerChecks)
+          .values({
+            userId,
+            kind: "qualification",
+            provider: "manual",
+            status: "pending",
+            educationId: education.id,
+            documentKey: input.documentKey,
+            result: {
+              title: education.qualification,
+              institution: education.institution,
+              year: education.year,
+            },
+          })
+          .returning();
+        const check = row as Check;
+        await recordAudit(tx, actor, {
+          action: "check.submitted",
+          targetType: "check",
+          targetId: check.id,
+          after: { kind: "qualification", educationId: education.id },
+        });
+        return check;
       });
     },
 

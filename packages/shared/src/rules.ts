@@ -2,7 +2,13 @@
  * The rules that decide things, as pure functions with table tests. Change a rule here and
  * nowhere else: the API, web app and admin portal all call these.
  */
-import { PRICING, type VerificationStatus } from "./constants";
+import {
+  CONTACT_LIMITS,
+  type ContactBy,
+  PRICING,
+  type ProfileVisibility,
+  type VerificationStatus,
+} from "./constants";
 
 // ---------- ABN ----------
 
@@ -140,6 +146,70 @@ export function eligibilityOf(
   if (input.identity !== "verified") return no("verify");
   if (input.requireQualification && input.qualification !== "verified") return no("qualification");
   return { canApply: true };
+}
+
+// ---------- Job seeker profiles (D-13) ----------
+
+export interface SalonAccessInput {
+  visibility: ProfileVisibility;
+  /** They applied to one of this salon's jobs. */
+  applied: boolean;
+  /** They hid their profile from this salon. */
+  hiddenFromSalon: boolean;
+  contactBy: ContactBy;
+  /** The account has a real email to send messages to. */
+  hasEmail: boolean;
+  /** The account has a verified mobile to show. */
+  hasMobile: boolean;
+}
+
+export interface SalonAccess {
+  view: boolean;
+  /** Can send a message through us (emailed, reply-to the sender). */
+  message: boolean;
+  /** Can reveal their mobile. */
+  phone: boolean;
+}
+
+/**
+ * What a salon's team may do with a job seeker's profile. Applying always lets the salon in;
+ * otherwise a hidden profile, or one hidden from this salon, stays shut.
+ */
+export function salonAccessTo(input: SalonAccessInput): SalonAccess {
+  const view = input.applied || (input.visibility !== "hidden" && !input.hiddenFromSalon);
+  return {
+    view,
+    message: view && input.contactBy !== "phone" && input.hasEmail,
+    phone: view && input.contactBy !== "email" && input.hasMobile,
+  };
+}
+
+/** A share link works only while the profile is public. */
+export const shareLinkWorks = (visibility: ProfileVisibility) => visibility === "public";
+
+/** "Jess", "Taylor" → "Jess T.": the name on a share page. */
+export function publicName(firstName: string, lastName: string): string {
+  const initial = lastName.trim().charAt(0).toUpperCase();
+  return initial ? `${firstName.trim()} ${initial}.` : firstName.trim();
+}
+
+export type ContactLimit = "salon_messages" | "salon_reveals" | "same_person";
+
+/**
+ * Whether a salon has used up today's contact (D-13). `salonToday` counts the salon's messages or
+ * reveals in the last 24 hours; `personToday` its messages to this person.
+ */
+export function contactLimitReached(input: {
+  kind: "message" | "phone";
+  salonToday: number;
+  personToday: number;
+}): ContactLimit | null {
+  if (input.kind === "phone") {
+    return input.salonToday >= CONTACT_LIMITS.phoneRevealsPerDay ? "salon_reveals" : null;
+  }
+  if (input.personToday >= CONTACT_LIMITS.messagesPerPersonPerDay) return "same_person";
+  if (input.salonToday >= CONTACT_LIMITS.messagesPerDay) return "salon_messages";
+  return null;
 }
 
 // ---------- Claims ----------

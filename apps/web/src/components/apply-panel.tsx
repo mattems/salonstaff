@@ -29,7 +29,7 @@ function nextStep(blocker: string, jobPath: string): { label: string; href: stri
     case "qualification":
       return { label: "Verify now", href: "/account/verify" };
     case "applied":
-      return { label: "See your applications", href: "/account/applications" };
+      return { label: "See your applications", href: "/applications" };
     case "closed":
       return null;
     default:
@@ -77,7 +77,7 @@ function ForViewer({ job, viewer }: { job: Schemas["JobDetail"]; viewer: Viewer 
         <div className="space-y-2">
           <p className="font-medium">You've applied for this job.</p>
           <Button asChild variant="outline" className="w-full">
-            <Link to="/account/applications">See your applications</Link>
+            <Link to="/applications">See your applications</Link>
           </Button>
         </div>
       ) : viewer.canApply ? (

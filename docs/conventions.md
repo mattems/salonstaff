@@ -17,8 +17,8 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 - After changing a route: `bun run api:types`.
 
 ## Data (`packages/db`)
-- No table imports outside `packages/db`. Scopes: `publicSite`, `seeker(db, userId)`, `signIns(db, userId)`,
-  `salonScope(db, salonId)`,
+- No table imports outside `packages/db`. Scopes: `publicSite`, `publicProfiles` (share links and
+  referees' links), `seeker(db, userId)`, `signIns(db, userId)`, `salonScope(db, salonId)`,
   `salonTeam(db, salonId)`, `invites`, `claims`, `checks`, `backOffice` (behind `requireStaff` only),
   `housekeeping` (the cron only).
 - Who manages a salon is `salon_members` (D-11); `salons.owner_id` is deprecated, never read or written.
@@ -43,6 +43,15 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 - No design yet: plain shadcn, default theme. Matt designs it later.
 - Public pages are server-rendered with canonical tags, titles, descriptions and JSON-LD (D-07).
 - Links to public pages come from `packages/shared/src/urls.ts`.
+
+## Job seeker profiles (D-13)
+- Who may see or contact a profile is `salonAccessTo` in `packages/shared/src/rules.ts`; contact caps are
+  `CONTACT_LIMITS`. Salons get `contact: { message, phone }`, never an address or number in a profile:
+  messages go through us (reply-to the sender) and the number is revealed by request, both recorded.
+- Share pages and anything they return leave out the surname, postcode, work rights, pay and contact details.
+- The number salons see is the account's verified mobile. `seeker_profiles.phone`, `pay_expectation`
+  and `qualifications` are deprecated: never read or write them.
+- Qualifications are `seeker_education` rows; a qualification check names its entry (`education_id`).
 
 ## Verification (D-03)
 - Never store ID images or document numbers after a decision. Certificates live in the private bucket only until reviewed.

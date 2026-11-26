@@ -76,6 +76,10 @@
               "$ref": "#/components/schemas/OwnSalonSummary"
             },
             "description": "The salons you're on the team of, in the order you joined them."
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts)."
           }
         },
         "required": [
@@ -87,7 +91,8 @@
           "createdAt",
           "profile",
           "verification",
-          "salons"
+          "salons",
+          "unreadMessages"
         ]
       },
       "SeekerProfile": {
@@ -98,9 +103,6 @@
           },
           "lastName": {
             "type": "string"
-          },
-          "phone": {
-            "type": ["string", "null"]
           },
           "headline": {
             "type": ["string", "null"]
@@ -147,10 +149,10 @@
           "yearsExperience": {
             "type": "integer"
           },
-          "qualifications": {
+          "instagram": {
             "type": ["string", "null"]
           },
-          "instagram": {
+          "tiktok": {
             "type": ["string", "null"]
           },
           "rightToWork": {
@@ -207,14 +209,18 @@
           "travelKm": {
             "type": ["integer", "null"]
           },
-          "payExpectation": {
-            "type": ["string", "null"]
+          "payMin": {
+            "type": ["number", "null"],
+            "description": "The least they'd take, per `payPeriod`. Null: not saying."
+          },
+          "payPeriod": {
+            "type": "string",
+            "enum": ["hour", "week", "year"]
           }
         },
         "required": [
           "firstName",
           "lastName",
-          "phone",
           "headline",
           "about",
           "suburb",
@@ -222,8 +228,8 @@
           "postcode",
           "roles",
           "yearsExperience",
-          "qualifications",
           "instagram",
+          "tiktok",
           "rightToWork",
           "openToWork",
           "photoUrl",
@@ -233,7 +239,8 @@
           "employmentTypes",
           "availableFrom",
           "travelKm",
-          "payExpectation"
+          "payMin",
+          "payPeriod"
         ]
       },
       "Verification": {
@@ -283,6 +290,16 @@
           },
           "qualificationTitle": {
             "type": ["string", "null"]
+          },
+          "rightToWorkBasis": {
+            "type": ["string", "null"],
+            "enum": ["citizen", "permanent_resident", "visa", null],
+            "description": "Once right to work is verified: the basis staff checked."
+          },
+          "rightToWorkCheckedVia": {
+            "type": ["string", "null"],
+            "example": "VEVO",
+            "description": "Once right to work is verified: how (`VEVO` for a visa, else `ID document`)."
           }
         },
         "required": [
@@ -293,7 +310,9 @@
           "references",
           "nameMatched",
           "identityVerifiedAt",
-          "qualificationTitle"
+          "qualificationTitle",
+          "rightToWorkBasis",
+          "rightToWorkCheckedVia"
         ]
       },
       "OwnSalonSummary": {
@@ -380,35 +399,21 @@
         },
         "required": ["name"]
       },
-      "FullProfile": {
-        "type": "object",
-        "properties": {
-          "profile": {
-            "$ref": "#/components/schemas/SeekerProfile"
+      "MyProfile": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/FullProfile"
           },
-          "experience": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Experience"
-            }
-          },
-          "education": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/Education"
-            }
-          },
-          "portfolio": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PortfolioItem"
-            }
-          },
-          "verification": {
-            "$ref": "#/components/schemas/Verification"
+          {
+            "type": "object",
+            "properties": {
+              "settings": {
+                "$ref": "#/components/schemas/ProfileSettings"
+              }
+            },
+            "required": ["settings"]
           }
-        },
-        "required": ["profile", "experience", "education", "portfolio", "verification"]
+        ]
       },
       "Experience": {
         "type": "object",
@@ -458,13 +463,28 @@
             "type": "string"
           },
           "institution": {
-            "type": "string"
+            "type": ["string", "null"]
           },
           "year": {
             "type": ["integer", "null"]
+          },
+          "verification": {
+            "type": ["object", "null"],
+            "properties": {
+              "status": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "reference": {
+                "type": ["string", "null"],
+                "description": "The verification ID (`SSV-…`) once passed. Not on share pages."
+              }
+            },
+            "required": ["status", "reference"],
+            "description": "The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent."
           }
         },
-        "required": ["id", "qualification", "institution", "year"]
+        "required": ["id", "qualification", "institution", "year", "verification"]
       },
       "PortfolioItem": {
         "type": "object",
@@ -481,6 +501,142 @@
           }
         },
         "required": ["id", "imageUrl", "caption"]
+      },
+      "Endorsement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "end_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "refereeName": {
+            "type": "string"
+          },
+          "refereeTitle": {
+            "type": ["string", "null"],
+            "example": "Salon owner"
+          },
+          "salonName": {
+            "type": ["string", "null"],
+            "description": "Where they worked together."
+          },
+          "relationship": {
+            "type": ["string", "null"],
+            "enum": ["managed", "worked_with", "trained", "client", null]
+          },
+          "body": {
+            "type": "string"
+          },
+          "writtenAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "onSalonStaff": {
+            "type": ["object", "null"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "path"],
+            "description": "The salon whose team the referee is on here, when they wrote it. Their email address proved it."
+          },
+          "contact": {
+            "type": ["object", "null"],
+            "properties": {
+              "email": {
+                "type": "string"
+              },
+              "phone": {
+                "type": ["string", "null"]
+              }
+            },
+            "required": ["email", "phone"],
+            "description": "How to reach the referee: only for a salon the person applied to, and only if the referee agreed."
+          }
+        },
+        "required": [
+          "id",
+          "refereeName",
+          "refereeTitle",
+          "salonName",
+          "relationship",
+          "body",
+          "writtenAt",
+          "onSalonStaff",
+          "contact"
+        ]
+      },
+      "ProfileSettings": {
+        "type": "object",
+        "properties": {
+          "visibility": {
+            "type": "string",
+            "enum": ["public", "salons", "hidden"],
+            "description": "`public`: salons can find you and your share link works. `salons`: salons can find you. `hidden`: only salons you apply to."
+          },
+          "contactBy": {
+            "type": "string",
+            "enum": ["both", "email", "phone"]
+          },
+          "shareCode": {
+            "type": ["string", "null"],
+            "example": "k7x2m9qd4h"
+          },
+          "sharePath": {
+            "type": ["string", "null"],
+            "example": "/p/k7x2m9qd4h",
+            "description": "Your share page on the website. Null unless your profile is public."
+          }
+        },
+        "required": ["visibility", "contactBy", "shareCode", "sharePath"]
+      },
+      "FullProfile": {
+        "type": "object",
+        "properties": {
+          "profile": {
+            "$ref": "#/components/schemas/SeekerProfile"
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experience"
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioItem"
+            }
+          },
+          "endorsements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Endorsement"
+            }
+          },
+          "verification": {
+            "$ref": "#/components/schemas/Verification"
+          }
+        },
+        "required": [
+          "profile",
+          "experience",
+          "education",
+          "portfolio",
+          "endorsements",
+          "verification"
+        ]
       },
       "ProfilePhoto": {
         "type": "object",
@@ -706,12 +862,260 @@
         },
         "required": ["deleted"]
       },
+      "HiddenSalons": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HiddenSalon"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "HiddenSalon": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "path": {
+            "type": "string"
+          },
+          "suburb": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+            "example": "NSW"
+          }
+        },
+        "required": ["id", "name", "path", "suburb", "state"]
+      },
+      "HiddenFromSalon": {
+        "type": "object",
+        "properties": {
+          "hidden": {
+            "type": "boolean"
+          }
+        },
+        "required": ["hidden"]
+      },
+      "ProfileContacts": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProfileContact"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "ProfileContact": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["message", "phone"],
+            "description": "`message`: they sent you a message (emailed to you). `phone`: they looked at your number."
+          },
+          "message": {
+            "type": ["string", "null"]
+          },
+          "read": {
+            "type": "boolean",
+            "description": "You've seen it in your inbox."
+          },
+          "sender": {
+            "type": ["object", "null"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "email"],
+            "description": "Who sent a message, and where your reply goes (it's the message's reply-to)."
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "salon": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "path": {
+                "type": "string"
+              }
+            },
+            "required": ["id", "name", "path"]
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "You've hidden your profile from this salon."
+          }
+        },
+        "required": ["id", "kind", "message", "read", "sender", "createdAt", "salon", "hidden"]
+      },
+      "Unread": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "integer"
+          }
+        },
+        "required": ["unread"]
+      },
+      "ContactsRead": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "maxItems": 200
+          }
+        }
+      },
+      "MyEndorsements": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyEndorsement"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "MyEndorsement": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "end_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["requested", "received", "shown", "hidden"],
+            "description": "`requested`: waiting for them to write it. `received`: written, waiting for you to show it. `shown` on your profile, or `hidden`."
+          },
+          "refereeName": {
+            "type": "string"
+          },
+          "refereeEmail": {
+            "type": "string"
+          },
+          "note": {
+            "type": ["string", "null"]
+          },
+          "linkExpiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "refereeTitle": {
+            "type": ["string", "null"]
+          },
+          "salonName": {
+            "type": ["string", "null"]
+          },
+          "relationship": {
+            "type": ["string", "null"],
+            "enum": ["managed", "worked_with", "trained", "client", null]
+          },
+          "body": {
+            "type": ["string", "null"]
+          },
+          "contactOk": {
+            "type": "boolean",
+            "description": "They agreed that salons you apply to may contact them."
+          },
+          "refereePhone": {
+            "type": ["string", "null"]
+          },
+          "onSalonStaff": {
+            "type": "boolean",
+            "description": "Their address is on a salon's team here: shown as such on your profile."
+          },
+          "writtenAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": [
+          "id",
+          "status",
+          "refereeName",
+          "refereeEmail",
+          "note",
+          "linkExpiresAt",
+          "refereeTitle",
+          "salonName",
+          "relationship",
+          "body",
+          "contactOk",
+          "refereePhone",
+          "onSalonStaff",
+          "writtenAt",
+          "createdAt"
+        ]
+      },
+      "EndorsementShown": {
+        "type": "object",
+        "properties": {
+          "shown": {
+            "type": "boolean"
+          }
+        },
+        "required": ["shown"]
+      },
       "EmailCodeSent": {
         "type": "object",
         "properties": {
           "sentTo": {
             "type": "string",
             "example": "olive@example.com"
+          }
+        },
+        "required": ["sentTo"]
+      },
+      "MobileCodeSent": {
+        "type": "object",
+        "properties": {
+          "sentTo": {
+            "type": "string",
+            "example": "+61412345678"
           }
         },
         "required": ["sentTo"]
@@ -848,6 +1252,11 @@
             "type": ["string", "null"],
             "description": "A qualification's name."
           },
+          "educationId": {
+            "type": ["string", "null"],
+            "example": "edu_01k6q2x8h4f7tbn3m9vz5cdr0e",
+            "description": "The education entry a qualification check is for, while it's on your profile."
+          },
           "createdAt": {
             "type": "string"
           },
@@ -855,7 +1264,16 @@
             "type": ["string", "null"]
           }
         },
-        "required": ["id", "kind", "status", "reference", "title", "createdAt", "decidedAt"]
+        "required": [
+          "id",
+          "kind",
+          "status",
+          "reference",
+          "title",
+          "educationId",
+          "createdAt",
+          "decidedAt"
+        ]
       },
       "RedirectUrl": {
         "type": "object",
@@ -1850,7 +2268,7 @@
                 "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
               },
               "contact": {
-                "$ref": "#/components/schemas/Contact"
+                "$ref": "#/components/schemas/ContactOptions"
               },
               "applications": {
                 "type": "array",
@@ -1891,17 +2309,39 @@
           }
         ]
       },
-      "Contact": {
+      "ContactOptions": {
         "type": "object",
         "properties": {
-          "email": {
-            "type": ["string", "null"]
+          "message": {
+            "type": "boolean",
+            "description": "You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you."
           },
           "phone": {
-            "type": ["string", "null"]
+            "type": "boolean",
+            "description": "You can see their mobile (POST …/candidates/{userId}/phone)."
           }
         },
-        "required": ["email", "phone"]
+        "required": ["message", "phone"]
+      },
+      "MessageSent": {
+        "type": "object",
+        "properties": {
+          "sent": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["sent"]
+      },
+      "CandidatePhone": {
+        "type": "object",
+        "properties": {
+          "phone": {
+            "type": "string",
+            "example": "+61412345678"
+          }
+        },
+        "required": ["phone"]
       },
       "Team": {
         "type": "object",
@@ -2310,6 +2750,273 @@
         },
         "required": ["claim", "salon"]
       },
+      "SharedProfile": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Jess D."
+          },
+          "profile": {
+            "type": "object",
+            "properties": {
+              "firstName": {
+                "type": "string"
+              },
+              "headline": {
+                "type": ["string", "null"]
+              },
+              "about": {
+                "type": ["string", "null"]
+              },
+              "suburb": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                "example": "NSW"
+              },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "senior_stylist",
+                    "stylist",
+                    "junior_stylist",
+                    "apprentice_hair",
+                    "colourist",
+                    "barber",
+                    "beauty_therapist",
+                    "nail_technician",
+                    "lash_brow",
+                    "makeup_artist",
+                    "skin_therapist",
+                    "massage_spa",
+                    "apprentice_beauty",
+                    "salon_manager",
+                    "receptionist",
+                    "educator"
+                  ],
+                  "example": "colourist"
+                }
+              },
+              "yearsExperience": {
+                "type": "integer"
+              },
+              "instagram": {
+                "type": ["string", "null"]
+              },
+              "tiktok": {
+                "type": ["string", "null"]
+              },
+              "openToWork": {
+                "type": "boolean"
+              },
+              "photoUrl": {
+                "type": ["string", "null"]
+              },
+              "specialties": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "brands": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "availableDays": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "employmentTypes": {
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "full_time",
+                    "part_time",
+                    "casual",
+                    "contract",
+                    "apprenticeship",
+                    "chair_rental"
+                  ]
+                }
+              },
+              "availableFrom": {
+                "type": ["string", "null"]
+              },
+              "travelKm": {
+                "type": ["integer", "null"]
+              }
+            },
+            "required": [
+              "firstName",
+              "headline",
+              "about",
+              "suburb",
+              "state",
+              "roles",
+              "yearsExperience",
+              "instagram",
+              "tiktok",
+              "openToWork",
+              "photoUrl",
+              "specialties",
+              "brands",
+              "availableDays",
+              "employmentTypes",
+              "availableFrom",
+              "travelKm"
+            ]
+          },
+          "experience": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Experience"
+            }
+          },
+          "education": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Education"
+            }
+          },
+          "portfolio": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PortfolioItem"
+            }
+          },
+          "endorsements": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Endorsement"
+            }
+          },
+          "verification": {
+            "type": "object",
+            "properties": {
+              "identity": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "rightToWork": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "qualification": {
+                "type": "string",
+                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "0 not verified, 1 ID verified, 2 work-ready (ID and right to work)."
+              },
+              "rightToWorkBasis": {
+                "type": ["string", "null"],
+                "enum": ["citizen", "permanent_resident", "visa", null],
+                "description": "Once right to work is verified: the basis staff checked."
+              },
+              "rightToWorkCheckedVia": {
+                "type": ["string", "null"],
+                "example": "VEVO",
+                "description": "Once right to work is verified: how (`VEVO` for a visa, else `ID document`)."
+              }
+            },
+            "required": [
+              "identity",
+              "rightToWork",
+              "qualification",
+              "level",
+              "rightToWorkBasis",
+              "rightToWorkCheckedVia"
+            ]
+          },
+          "viewer": {
+            "type": ["object", "null"],
+            "properties": {
+              "salons": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "candidateId": {
+                      "type": "string",
+                      "description": "Their ID in your salon's routes."
+                    },
+                    "contact": {
+                      "$ref": "#/components/schemas/ContactOptions"
+                    }
+                  },
+                  "required": ["id", "name", "candidateId", "contact"]
+                }
+              }
+            },
+            "required": ["salons"],
+            "description": "For someone signed in on a salon's team: each salon they can contact this person as. Null for anyone else."
+          }
+        },
+        "required": [
+          "name",
+          "profile",
+          "experience",
+          "education",
+          "portfolio",
+          "endorsements",
+          "verification",
+          "viewer"
+        ]
+      },
+      "EndorsementAsk": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Jess D.",
+            "description": "Who asked."
+          },
+          "photoUrl": {
+            "type": ["string", "null"]
+          },
+          "headline": {
+            "type": ["string", "null"]
+          },
+          "refereeName": {
+            "type": "string",
+            "description": "Your name, as they typed it."
+          },
+          "note": {
+            "type": ["string", "null"],
+            "description": "What they said when asking."
+          }
+        },
+        "required": ["name", "photoUrl", "headline", "refereeName", "note"]
+      },
+      "EndorsementWritten": {
+        "type": "object",
+        "properties": {
+          "written": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["written"]
+      },
       "Billing": {
         "type": "object",
         "properties": {
@@ -2591,7 +3298,7 @@
     "/v1/me/profile": {
       "get": {
         "summary": "Your full profile",
-        "description": "Everything salons see when you apply: basics, skills and availability, experience, education, portfolio and verification.",
+        "description": "Everything salons see: basics, skills and availability, experience, education, portfolio, shown endorsements and verification. `settings` says who sees it and how salons may contact you; only you get those.",
         "tags": ["Me"],
         "responses": {
           "200": {
@@ -2599,7 +3306,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -2638,7 +3345,7 @@
       },
       "put": {
         "summary": "Save your basic details",
-        "description": "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. The mobile number may be in any Australian format; it's stored as +614….",
+        "description": "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here.",
         "tags": ["Me"],
         "requestBody": {
           "required": true,
@@ -2656,9 +3363,6 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 60
-                  },
-                  "phone": {
-                    "type": "string"
                   },
                   "headline": {
                     "type": "string",
@@ -2712,11 +3416,11 @@
                     "minimum": 0,
                     "maximum": 60
                   },
-                  "qualifications": {
-                    "type": "string",
-                    "maxLength": 500
-                  },
                   "instagram": {
+                    "type": "string",
+                    "maxLength": 60
+                  },
+                  "tiktok": {
                     "type": "string",
                     "maxLength": 60
                   },
@@ -2755,7 +3459,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -2796,7 +3500,7 @@
     "/v1/me/profile/details": {
       "put": {
         "summary": "Save your skills and availability",
-        "description": "Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and your pay expectation. Needs a profile first.",
+        "description": "Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and the least you'd take (`payMin` per `payPeriod`; leave it out to not say). Needs a profile first.",
         "tags": ["Me"],
         "requestBody": {
           "required": true,
@@ -2865,9 +3569,15 @@
                     "minimum": 0,
                     "maximum": 500
                   },
-                  "payExpectation": {
+                  "payMin": {
+                    "type": ["number", "null"],
+                    "minimum": 1,
+                    "maximum": 500000
+                  },
+                  "payPeriod": {
                     "type": "string",
-                    "maxLength": 60
+                    "enum": ["hour", "week", "year"],
+                    "default": "hour"
                   }
                 }
               }
@@ -2880,7 +3590,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -3071,6 +3781,56 @@
         }
       }
     },
+    "/v1/me/photo/image": {
+      "get": {
+        "summary": "Your profile photo's file",
+        "description": "The picture itself, from this address rather than the media CDN, so the website can draw it into a post image to share (D-13).",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "The picture",
+            "content": {
+              "image/*": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No photo",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/v1/me/portfolio": {
       "post": {
         "summary": "Add a portfolio photo",
@@ -3193,7 +3953,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -3289,7 +4049,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -3358,7 +4118,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -3415,7 +4175,6 @@
                   },
                   "institution": {
                     "type": "string",
-                    "minLength": 1,
                     "maxLength": 120
                   },
                   "year": {
@@ -3424,7 +4183,7 @@
                     "maximum": 2100
                   }
                 },
-                "required": ["qualification", "institution"]
+                "required": ["qualification"]
               }
             }
           }
@@ -3435,7 +4194,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -3504,7 +4263,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/FullProfile"
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -3589,6 +4348,678 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile/settings": {
+      "patch": {
+        "summary": "Choose who sees your profile and how salons contact you",
+        "description": "`visibility`: `public` (salons can find you and your share link works), `salons` (salons can find you) or `hidden` (only salons you apply to). `contactBy`: `email` (salons send a message we email to you; they never see your address), `phone` (they can see your mobile), or `both`. Salons you applied to always see your profile. Going public the first time makes your share link.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "visibility": {
+                    "type": "string",
+                    "enum": ["public", "salons", "hidden"]
+                  },
+                  "contactBy": {
+                    "type": "string",
+                    "enum": ["both", "email", "phone"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your settings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileSettings"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile/share-code": {
+      "post": {
+        "summary": "Get a new share link",
+        "description": "Replaces your share code: the old link stops working at once. Use it if your link went somewhere you didn't want it to.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Your settings, with the new code",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileSettings"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/hidden-salons": {
+      "get": {
+        "summary": "Salons you've hidden your profile from",
+        "description": "They can't see or contact you, wherever your profile is visible, unless you apply to one of their jobs.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "The salons",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenSalons"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/hidden-salons/{salonId}": {
+      "put": {
+        "summary": "Hide your profile from a salon",
+        "description": "Find the salon with GET /v1/salons?q=… Hiding from a salon twice is fine.",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenFromSalon"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Stop hiding your profile from a salon",
+        "description": "Your profile shows to them again, as your visibility allows.",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Shown again",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HiddenFromSalon"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile/contacts": {
+      "get": {
+        "summary": "Salons that contacted you",
+        "description": "Every message a salon sent you through us, and each day a salon looked at your number. Newest first, the last 200.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Who contacted you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileContacts"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile/contacts/read": {
+      "post": {
+        "summary": "Mark salons' messages as seen",
+        "description": "The ones in `ids`, or all of them when it's left out. Answers how many are still unseen.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ContactsRead"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Still unseen",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Unread"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/endorsements": {
+      "get": {
+        "summary": "Your endorsements and requests",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Newest first",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEndorsements"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Ask someone for an endorsement",
+        "description": "Emails them a link to write it (it works once, for 30 days). You choose whether to show it once it's written, but you can't change it. Not your own address; each person once; 5 requests a day.",
+        "tags": ["Me"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "refereeName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "refereeEmail": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "note": {
+                    "type": "string",
+                    "maxLength": 300
+                  }
+                },
+                "required": ["refereeName", "refereeEmail"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEndorsement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Already asked, or too many waiting",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many today",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/endorsements/{id}": {
+      "patch": {
+        "summary": "Show or hide an endorsement",
+        "description": "Only a written one. Up to 5 shown at once.",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "end_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EndorsementShown"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The endorsement",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyEndorsement"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not yours, or not written yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Five are shown already",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Delete an endorsement or request",
+        "description": "A request's link stops working. You can ask the same person again afterwards.",
+        "tags": ["Me"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "end_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -3735,6 +5166,160 @@
           },
           "409": {
             "description": "That's already your email, or another account's",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many tries",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/mobile": {
+      "post": {
+        "summary": "Change your mobile: send a code",
+        "description": "Sends a 6-digit code by SMS to the new number (an Australian mobile, in any usual format); it lasts 10 minutes. Confirm with POST /v1/me/mobile/confirm. Adds a first mobile to an account that has none. It's the number salons see and SMS codes go to. If another account has the number, nothing is sent (the answer is the same). Shares the sign-in codes' rate limit.",
+        "tags": ["Sign-in and security"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phoneNumber": {
+                    "type": "string"
+                  }
+                },
+                "required": ["phoneNumber"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MobileCodeSent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That's already your mobile",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many codes",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/mobile/confirm": {
+      "post": {
+        "summary": "Change your mobile: confirm with the code",
+        "description": "The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS. With `dry_run` only the form is checked.",
+        "tags": ["Sign-in and security"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "phoneNumber": {
+                    "type": "string"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": ["phoneNumber", "code"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your account, with its new mobile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not valid, or the code is wrong or has expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That's already your mobile, or another account's",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -4174,7 +5759,7 @@
     "/v1/me/checks/qualification": {
       "post": {
         "summary": "Send a qualification for checking",
-        "description": "A certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) and the qualification's `title`, e.g. Cert III in Hairdressing. The certificate is kept privately only until staff decide, then deleted.",
+        "description": "The certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) for one of your education entries (`educationId`, from GET /v1/me/profile). Staff check it against the entry's qualification, institution and year; once passed, the entry shows as verified on your profile. The certificate is kept privately only until staff decide, then deleted. One check at a time per entry.",
         "tags": ["Verification"],
         "requestBody": {
           "required": true,
@@ -4187,13 +5772,12 @@
                     "type": "string",
                     "format": "binary"
                   },
-                  "title": {
+                  "educationId": {
                     "type": "string",
-                    "minLength": 2,
-                    "maxLength": 120
+                    "example": "edu_01k6q2x8h4f7tbn3m9vz5cdr0e"
                   }
                 },
-                "required": ["file", "title"]
+                "required": ["file", "educationId"]
               }
             }
           }
@@ -4239,8 +5823,18 @@
               }
             }
           },
+          "404": {
+            "description": "No such education entry",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
           "409": {
-            "description": "A qualification is already waiting for review",
+            "description": "This qualification is already waiting for review, or verified",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -5571,7 +7165,7 @@
     "/v1/employer/salons/{salonId}/candidates/{userId}": {
       "get": {
         "summary": "A candidate's full profile",
-        "description": "Only for someone who applied to one of your jobs: their full profile, verification, contact details and their applications to your salon.",
+        "description": "Someone who applied to one of your jobs, or whose profile is open to salons and not hidden from yours (D-13): their full profile, verification, endorsements, how you can contact them (`contact`) and their applications to your salon. Referees' contact details come only with an application, and only where the referee agreed.",
         "tags": ["Salon"],
         "parameters": [
           {
@@ -5615,7 +7209,213 @@
             }
           },
           "404": {
-            "description": "Nobody with that ID applied to your salon",
+            "description": "No profile you can see has that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/candidates/{userId}/messages": {
+      "post": {
+        "summary": "Message a candidate",
+        "description": "We email your message to them with your name and salon, and replies come straight back to your email: they never see each other's address until they reply. Only if their `contact.message` is true. Your salon can message 25 people a day, each once a day. They see every message in their account.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message": {
+                    "type": "string",
+                    "minLength": 20,
+                    "maxLength": 2000
+                  }
+                },
+                "required": ["message"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessageSent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your salon can't contact job seekers now",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No profile you can see has that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "They don't take messages, or your account has no email for replies",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Today's limit reached",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/candidates/{userId}/phone": {
+      "post": {
+        "summary": "See a candidate's mobile",
+        "description": "Their verified mobile, only if their `contact.phone` is true. Each look is recorded, and they can see which salons looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
+        "tags": ["Salon"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Their mobile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidatePhone"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Your salon can't contact job seekers now",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No profile you can see has that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "They don't share their number",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Today's limit reached",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -6547,6 +8347,178 @@
           },
           "404": {
             "description": "No claim, or no such salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/profiles/{code}": {
+      "get": {
+        "summary": "A job seeker's shared profile",
+        "description": "Through the share link they posted: their first name and last initial, work, skills, portfolio, endorsements and which checks they passed. Never their contact details, work rights or pay. Works only while their profile is public. Signed in on a salon's team, `viewer` says how you can contact them.",
+        "tags": ["Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "k7x2m9qd4h"
+            },
+            "required": true,
+            "name": "code",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SharedProfile"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/endorsements/{token}": {
+      "get": {
+        "summary": "An endorsement you were asked for",
+        "description": "From the link in your email: who asked you. The link works once, for 30 days.",
+        "tags": ["Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "3q2-…"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Who asked",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndorsementAsk"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "summary": "Write the endorsement",
+        "description": "Once only. They choose whether to show it on their profile; they can't change what you wrote. Your email address and phone are never shown on their profile; salons they apply to see them only if `contactOk`.",
+        "tags": ["Profiles"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "3q2-…"
+            },
+            "required": true,
+            "name": "token",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "title": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 80
+                  },
+                  "salonName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "relationship": {
+                    "type": "string",
+                    "enum": ["managed", "worked_with", "trained", "client"]
+                  },
+                  "body": {
+                    "type": "string",
+                    "minLength": 40,
+                    "maxLength": 1000
+                  },
+                  "contactOk": {
+                    "type": "boolean",
+                    "default": false
+                  },
+                  "phone": {
+                    "type": "string"
+                  }
+                },
+                "required": ["name", "title", "salonName", "relationship", "body"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Thank you",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EndorsementWritten"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The link has expired or was used",
             "content": {
               "application/problem+json": {
                 "schema": {

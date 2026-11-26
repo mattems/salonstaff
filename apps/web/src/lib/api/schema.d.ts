@@ -186,7 +186,7 @@ export interface paths {
     };
     /**
      * Your full profile
-     * @description Everything salons see when you apply: basics, skills and availability, experience, education, portfolio and verification.
+     * @description Everything salons see: basics, skills and availability, experience, education, portfolio, shown endorsements and verification. `settings` says who sees it and how salons may contact you; only you get those.
      */
     get: {
       parameters: {
@@ -203,7 +203,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description Not signed in */
@@ -237,7 +237,7 @@ export interface paths {
     };
     /**
      * Save your basic details
-     * @description Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. The mobile number may be in any Australian format; it's stored as +614….
+     * @description Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here.
      */
     put: {
       parameters: {
@@ -251,7 +251,6 @@ export interface paths {
           "application/json": {
             firstName: string;
             lastName: string;
-            phone?: string;
             headline?: string;
             about?: string;
             suburb: string;
@@ -277,8 +276,8 @@ export interface paths {
               | "educator"
             )[];
             yearsExperience: number | null;
-            qualifications?: string;
             instagram?: string;
+            tiktok?: string;
             /** @enum {string} */
             rightToWork:
               | "citizen"
@@ -298,7 +297,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description The request is not valid */
@@ -347,7 +346,7 @@ export interface paths {
     get?: never;
     /**
      * Save your skills and availability
-     * @description Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and your pay expectation. Needs a profile first.
+     * @description Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and the least you'd take (`payMin` per `payPeriod`; leave it out to not say). Needs a profile first.
      */
     put: {
       parameters: {
@@ -376,7 +375,12 @@ export interface paths {
             )[];
             availableFrom?: string | "";
             travelKm?: number | null;
-            payExpectation?: string;
+            payMin?: number | null;
+            /**
+             * @default hour
+             * @enum {string}
+             */
+            payPeriod?: "hour" | "week" | "year";
           };
         };
       };
@@ -387,7 +391,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description The request is not valid */
@@ -585,6 +589,72 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/me/photo/image": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Your profile photo's file
+     * @description The picture itself, from this address rather than the media CDN, so the website can draw it into a post image to share (D-13).
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The picture */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "image/*": string;
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description No photo */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/me/portfolio": {
     parameters: {
       query?: never;
@@ -717,7 +787,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description Not signed in */
@@ -793,7 +863,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description The request is not valid */
@@ -868,7 +938,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description Not signed in */
@@ -929,7 +999,7 @@ export interface paths {
         content: {
           "application/json": {
             qualification: string;
-            institution: string;
+            institution?: string;
             year?: number | null;
           };
         };
@@ -941,7 +1011,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description The request is not valid */
@@ -1016,7 +1086,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["FullProfile"];
+            "application/json": components["schemas"]["MyProfile"];
           };
         };
         /** @description Not signed in */
@@ -1147,6 +1217,742 @@ export interface paths {
     options?: never;
     head?: never;
     patch?: never;
+    trace?: never;
+  };
+  "/v1/me/profile/settings": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Choose who sees your profile and how salons contact you
+     * @description `visibility`: `public` (salons can find you and your share link works), `salons` (salons can find you) or `hidden` (only salons you apply to). `contactBy`: `email` (salons send a message we email to you; they never see your address), `phone` (they can see your mobile), or `both`. Salons you applied to always see your profile. Going public the first time makes your share link.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @enum {string} */
+            visibility?: "public" | "salons" | "hidden";
+            /** @enum {string} */
+            contactBy?: "both" | "email" | "phone";
+          };
+        };
+      };
+      responses: {
+        /** @description Your settings */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["ProfileSettings"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description No profile yet */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  "/v1/me/profile/share-code": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Get a new share link
+     * @description Replaces your share code: the old link stops working at once. Use it if your link went somewhere you didn't want it to.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Your settings, with the new code */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["ProfileSettings"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description No profile yet */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/hidden-salons": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Salons you've hidden your profile from
+     * @description They can't see or contact you, wherever your profile is visible, unless you apply to one of their jobs.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The salons */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["HiddenSalons"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/hidden-salons/{salonId}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Hide your profile from a salon
+     * @description Find the salon with GET /v1/salons?q=… Hiding from a salon twice is fine.
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Hidden */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["HiddenFromSalon"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    post?: never;
+    /**
+     * Stop hiding your profile from a salon
+     * @description Your profile shows to them again, as your visibility allows.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Shown again */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["HiddenFromSalon"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/profile/contacts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Salons that contacted you
+     * @description Every message a salon sent you through us, and each day a salon looked at your number. Newest first, the last 200.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Who contacted you */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["ProfileContacts"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/profile/contacts/read": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Mark salons' messages as seen
+     * @description The ones in `ids`, or all of them when it's left out. Answers how many are still unseen.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["ContactsRead"];
+        };
+      };
+      responses: {
+        /** @description Still unseen */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Unread"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/endorsements": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Your endorsements and requests */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Newest first */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MyEndorsements"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    /**
+     * Ask someone for an endorsement
+     * @description Emails them a link to write it (it works once, for 30 days). You choose whether to show it once it's written, but you can't change it. Not your own address; each person once; 5 requests a day.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            refereeName: string;
+            /** Format: email */
+            refereeEmail: string;
+            note?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description The request */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MyEndorsement"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description No profile yet */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Already asked, or too many waiting */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Too many today */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/endorsements/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /**
+     * Delete an endorsement or request
+     * @description A request's link stops working. You can ask the same person again afterwards.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Deleted */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Deleted"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /**
+     * Show or hide an endorsement
+     * @description Only a written one. Up to 5 shown at once.
+     */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["EndorsementShown"];
+        };
+      };
+      responses: {
+        /** @description The endorsement */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MyEndorsement"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not yours, or not written yet */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Five are shown already */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
     trace?: never;
   };
   "/v1/me/email": {
@@ -1289,6 +2095,169 @@ export interface paths {
           };
         };
         /** @description That's already your email, or another account's */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Too many tries */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/mobile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Change your mobile: send a code
+     * @description Sends a 6-digit code by SMS to the new number (an Australian mobile, in any usual format); it lasts 10 minutes. Confirm with POST /v1/me/mobile/confirm. Adds a first mobile to an account that has none. It's the number salons see and SMS codes go to. If another account has the number, nothing is sent (the answer is the same). Shares the sign-in codes' rate limit.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            phoneNumber: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Code sent */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MobileCodeSent"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description That's already your mobile */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Too many codes */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/mobile/confirm": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Change your mobile: confirm with the code
+     * @description The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS. With `dry_run` only the form is checked.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            phoneNumber: string;
+            code: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Your account, with its new mobile */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Me"];
+          };
+        };
+        /** @description Not valid, or the code is wrong or has expired */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description That's already your mobile, or another account's */
         409: {
           headers: {
             [name: string]: unknown;
@@ -1821,7 +2790,7 @@ export interface paths {
     put?: never;
     /**
      * Send a qualification for checking
-     * @description A certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) and the qualification's `title`, e.g. Cert III in Hairdressing. The certificate is kept privately only until staff decide, then deleted.
+     * @description The certificate (`file`: PDF, JPG, PNG, WebP or HEIC, 8MB at most) for one of your education entries (`educationId`, from GET /v1/me/profile). Staff check it against the entry's qualification, institution and year; once passed, the entry shows as verified on your profile. The certificate is kept privately only until staff decide, then deleted. One check at a time per entry.
      */
     post: {
       parameters: {
@@ -1835,7 +2804,8 @@ export interface paths {
           "multipart/form-data": {
             /** Format: binary */
             file: string;
-            title: string;
+            /** @example edu_01k6q2x8h4f7tbn3m9vz5cdr0e */
+            educationId: string;
           };
         };
       };
@@ -1876,7 +2846,16 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description A qualification is already waiting for review */
+        /** @description No such education entry */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description This qualification is already waiting for review, or verified */
         409: {
           headers: {
             [name: string]: unknown;
@@ -3041,7 +4020,7 @@ export interface paths {
     };
     /**
      * A candidate's full profile
-     * @description Only for someone who applied to one of your jobs: their full profile, verification, contact details and their applications to your salon.
+     * @description Someone who applied to one of your jobs, or whose profile is open to salons and not hidden from yours (D-13): their full profile, verification, endorsements, how you can contact them (`contact`) and their applications to your salon. Referees' contact details come only with an application, and only where the referee agreed.
      */
     get: {
       parameters: {
@@ -3073,7 +4052,7 @@ export interface paths {
             "application/problem+json": components["schemas"]["Problem"];
           };
         };
-        /** @description Nobody with that ID applied to your salon */
+        /** @description No profile you can see has that ID */
         404: {
           headers: {
             [name: string]: unknown;
@@ -3086,6 +4065,195 @@ export interface paths {
     };
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/candidates/{userId}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Message a candidate
+     * @description We email your message to them with your name and salon, and replies come straight back to your email: they never see each other's address until they reply. Only if their `contact.message` is true. Your salon can message 25 people a day, each once a day. They see every message in their account.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            message: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Sent */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MessageSent"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Your salon can't contact job seekers now */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description No profile you can see has that ID */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description They don't take messages, or your account has no email for replies */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Today's limit reached */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/candidates/{userId}/phone": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * See a candidate's mobile
+     * @description Their verified mobile, only if their `contact.phone` is true. Each look is recorded, and they can see which salons looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          userId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Their mobile */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["CandidatePhone"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Your salon can't contact job seekers now */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description No profile you can see has that ID */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description They don't share their number */
+        409: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Today's limit reached */
+        429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
     delete?: never;
     options?: never;
     head?: never;
@@ -3981,6 +5149,163 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/profiles/{code}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * A job seeker's shared profile
+     * @description Through the share link they posted: their first name and last initial, work, skills, portfolio, endorsements and which checks they passed. Never their contact details, work rights or pay. Works only while their profile is public. Signed in on a salon's team, `viewer` says how you can contact them.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          code: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The profile */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["SharedProfile"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/endorsements/{token}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * An endorsement you were asked for
+     * @description From the link in your email: who asked you. The link works once, for 30 days.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          token: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Who asked */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["EndorsementAsk"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    /**
+     * Write the endorsement
+     * @description Once only. They choose whether to show it on their profile; they can't change what you wrote. Your email address and phone are never shown on their profile; salons they apply to see them only if `contactOk`.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          token: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            name: string;
+            title: string;
+            salonName: string;
+            /** @enum {string} */
+            relationship: "managed" | "worked_with" | "trained" | "client";
+            body: string;
+            /** @default false */
+            contactOk?: boolean;
+            phone?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Thank you */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["EndorsementWritten"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description The link has expired or was used */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/employer/salons/{salonId}/billing": {
     parameters: {
       query?: never;
@@ -4458,11 +5783,12 @@ export interface components {
       verification: components["schemas"]["Verification"];
       /** @description The salons you're on the team of, in the order you joined them. */
       salons: components["schemas"]["OwnSalonSummary"][];
+      /** @description Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts). */
+      unreadMessages: number;
     };
     SeekerProfile: {
       firstName: string;
       lastName: string;
-      phone: string | null;
       headline: string | null;
       about: string | null;
       suburb: string;
@@ -4491,8 +5817,8 @@ export interface components {
         | "educator"
       )[];
       yearsExperience: number;
-      qualifications: string | null;
       instagram: string | null;
+      tiktok: string | null;
       /** @enum {string} */
       rightToWork:
         | "citizen"
@@ -4515,7 +5841,10 @@ export interface components {
       )[];
       availableFrom: string | null;
       travelKm: number | null;
-      payExpectation: string | null;
+      /** @description The least they'd take, per `payPeriod`. Null: not saying. */
+      payMin: number | null;
+      /** @enum {string} */
+      payPeriod: "hour" | "week" | "year";
     };
     Verification: {
       /** @enum {string} */
@@ -4540,6 +5869,16 @@ export interface components {
        */
       identityVerifiedAt: string | null;
       qualificationTitle: string | null;
+      /**
+       * @description Once right to work is verified: the basis staff checked.
+       * @enum {string|null}
+       */
+      rightToWorkBasis: "citizen" | "permanent_resident" | "visa" | null;
+      /**
+       * @description Once right to work is verified: how (`VEVO` for a visa, else `ID document`).
+       * @example VEVO
+       */
+      rightToWorkCheckedVia: string | null;
     };
     OwnSalonSummary: {
       /** @example sln_01k6q2x8h4f7tbn3m9vz5cdr0e */
@@ -4574,12 +5913,8 @@ export interface components {
       /** @example Olive Owner */
       name: string;
     };
-    FullProfile: {
-      profile: components["schemas"]["SeekerProfile"];
-      experience: components["schemas"]["Experience"][];
-      education: components["schemas"]["Education"][];
-      portfolio: components["schemas"]["PortfolioItem"][];
-      verification: components["schemas"]["Verification"];
+    MyProfile: components["schemas"]["FullProfile"] & {
+      settings: components["schemas"]["ProfileSettings"];
     };
     Experience: {
       /** @example exp_01k6q2x8h4f7tbn3m9vz5cdr0e */
@@ -4596,14 +5931,72 @@ export interface components {
       /** @example edu_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       qualification: string;
-      institution: string;
+      institution: string | null;
       year: number | null;
+      /** @description The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent. */
+      verification: {
+        /** @enum {string} */
+        status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @description The verification ID (`SSV-…`) once passed. Not on share pages. */
+        reference: string | null;
+      } | null;
     };
     PortfolioItem: {
       /** @example pfi_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       imageUrl: string;
       caption: string | null;
+    };
+    Endorsement: {
+      /** @example end_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      refereeName: string;
+      /** @example Salon owner */
+      refereeTitle: string | null;
+      /** @description Where they worked together. */
+      salonName: string | null;
+      /** @enum {string|null} */
+      relationship: "managed" | "worked_with" | "trained" | "client" | null;
+      body: string;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      writtenAt: string;
+      /** @description The salon whose team the referee is on here, when they wrote it. Their email address proved it. */
+      onSalonStaff: {
+        name: string;
+        path: string;
+      } | null;
+      /** @description How to reach the referee: only for a salon the person applied to, and only if the referee agreed. */
+      contact: {
+        email: string;
+        phone: string | null;
+      } | null;
+    };
+    ProfileSettings: {
+      /**
+       * @description `public`: salons can find you and your share link works. `salons`: salons can find you. `hidden`: only salons you apply to.
+       * @enum {string}
+       */
+      visibility: "public" | "salons" | "hidden";
+      /** @enum {string} */
+      contactBy: "both" | "email" | "phone";
+      /** @example k7x2m9qd4h */
+      shareCode: string | null;
+      /**
+       * @description Your share page on the website. Null unless your profile is public.
+       * @example /p/k7x2m9qd4h
+       */
+      sharePath: string | null;
+    };
+    FullProfile: {
+      profile: components["schemas"]["SeekerProfile"];
+      experience: components["schemas"]["Experience"][];
+      education: components["schemas"]["Education"][];
+      portfolio: components["schemas"]["PortfolioItem"][];
+      endorsements: components["schemas"]["Endorsement"][];
+      verification: components["schemas"]["Verification"];
     };
     ProfilePhoto: {
       photoUrl: string | null;
@@ -4713,8 +6106,111 @@ export interface components {
       /** @enum {boolean} */
       deleted: true;
     };
+    HiddenSalons: {
+      items: components["schemas"]["HiddenSalon"][];
+    };
+    HiddenSalon: {
+      /** @example sln_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      name: string;
+      path: string;
+      suburb: string;
+      /**
+       * @example NSW
+       * @enum {string}
+       */
+      state: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+    };
+    HiddenFromSalon: {
+      hidden: boolean;
+    };
+    ProfileContacts: {
+      items: components["schemas"]["ProfileContact"][];
+    };
+    ProfileContact: {
+      /** @example pct_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /**
+       * @description `message`: they sent you a message (emailed to you). `phone`: they looked at your number.
+       * @enum {string}
+       */
+      kind: "message" | "phone";
+      message: string | null;
+      /** @description You've seen it in your inbox. */
+      read: boolean;
+      /** @description Who sent a message, and where your reply goes (it's the message's reply-to). */
+      sender: {
+        name: string;
+        email: string;
+      } | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+      salon: {
+        id: string;
+        name: string;
+        path: string;
+      };
+      /** @description You've hidden your profile from this salon. */
+      hidden: boolean;
+    };
+    Unread: {
+      unread: number;
+    };
+    ContactsRead: {
+      ids?: string[];
+    };
+    MyEndorsements: {
+      items: components["schemas"]["MyEndorsement"][];
+    };
+    MyEndorsement: {
+      /** @example end_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /**
+       * @description `requested`: waiting for them to write it. `received`: written, waiting for you to show it. `shown` on your profile, or `hidden`.
+       * @enum {string}
+       */
+      status: "requested" | "received" | "shown" | "hidden";
+      refereeName: string;
+      refereeEmail: string;
+      note: string | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      linkExpiresAt: string | null;
+      refereeTitle: string | null;
+      salonName: string | null;
+      /** @enum {string|null} */
+      relationship: "managed" | "worked_with" | "trained" | "client" | null;
+      body: string | null;
+      /** @description They agreed that salons you apply to may contact them. */
+      contactOk: boolean;
+      refereePhone: string | null;
+      /** @description Their address is on a salon's team here: shown as such on your profile. */
+      onSalonStaff: boolean;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      writtenAt: string | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    EndorsementShown: {
+      shown: boolean;
+    };
     EmailCodeSent: {
       /** @example olive@example.com */
+      sentTo: string;
+    };
+    MobileCodeSent: {
+      /** @example +61412345678 */
       sentTo: string;
     };
     SignInMethods: {
@@ -4772,6 +6268,11 @@ export interface components {
       reference: string | null;
       /** @description A qualification's name. */
       title: string | null;
+      /**
+       * @description The education entry a qualification check is for, while it's on your profile.
+       * @example edu_01k6q2x8h4f7tbn3m9vz5cdr0e
+       */
+      educationId: string | null;
       createdAt: string;
       decidedAt: string | null;
     };
@@ -5194,7 +6695,7 @@ export interface components {
     Candidate: components["schemas"]["FullProfile"] & {
       /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
-      contact: components["schemas"]["Contact"];
+      contact: components["schemas"]["ContactOptions"];
       applications: {
         id: string;
         jobId: string;
@@ -5208,9 +6709,19 @@ export interface components {
         createdAt: string;
       }[];
     };
-    Contact: {
-      email: string | null;
-      phone: string | null;
+    ContactOptions: {
+      /** @description You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you. */
+      message: boolean;
+      /** @description You can see their mobile (POST …/candidates/{userId}/phone). */
+      phone: boolean;
+    };
+    MessageSent: {
+      /** @enum {boolean} */
+      sent: true;
+    };
+    CandidatePhone: {
+      /** @example +61412345678 */
+      phone: string;
     };
     Team: {
       /** @description Owners first. */
@@ -5366,6 +6877,108 @@ export interface components {
     ClaimConfirmed: {
       claim: components["schemas"]["Claim"];
       salon: components["schemas"]["MySalon"];
+    };
+    SharedProfile: {
+      /** @example Jess D. */
+      name: string;
+      profile: {
+        firstName: string;
+        headline: string | null;
+        about: string | null;
+        suburb: string;
+        /**
+         * @example NSW
+         * @enum {string}
+         */
+        state: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+        roles: (
+          | "senior_stylist"
+          | "stylist"
+          | "junior_stylist"
+          | "apprentice_hair"
+          | "colourist"
+          | "barber"
+          | "beauty_therapist"
+          | "nail_technician"
+          | "lash_brow"
+          | "makeup_artist"
+          | "skin_therapist"
+          | "massage_spa"
+          | "apprentice_beauty"
+          | "salon_manager"
+          | "receptionist"
+          | "educator"
+        )[];
+        yearsExperience: number;
+        instagram: string | null;
+        tiktok: string | null;
+        openToWork: boolean;
+        photoUrl: string | null;
+        specialties: string[];
+        brands: string[];
+        availableDays: string[];
+        employmentTypes: (
+          | "full_time"
+          | "part_time"
+          | "casual"
+          | "contract"
+          | "apprenticeship"
+          | "chair_rental"
+        )[];
+        availableFrom: string | null;
+        travelKm: number | null;
+      };
+      experience: components["schemas"]["Experience"][];
+      education: components["schemas"]["Education"][];
+      portfolio: components["schemas"]["PortfolioItem"][];
+      endorsements: components["schemas"]["Endorsement"][];
+      verification: {
+        /** @enum {string} */
+        identity: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @enum {string} */
+        rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @enum {string} */
+        qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @description 0 not verified, 1 ID verified, 2 work-ready (ID and right to work). */
+        level: number;
+        /**
+         * @description Once right to work is verified: the basis staff checked.
+         * @enum {string|null}
+         */
+        rightToWorkBasis: "citizen" | "permanent_resident" | "visa" | null;
+        /**
+         * @description Once right to work is verified: how (`VEVO` for a visa, else `ID document`).
+         * @example VEVO
+         */
+        rightToWorkCheckedVia: string | null;
+      };
+      /** @description For someone signed in on a salon's team: each salon they can contact this person as. Null for anyone else. */
+      viewer: {
+        salons: {
+          id: string;
+          name: string;
+          /** @description Their ID in your salon's routes. */
+          candidateId: string;
+          contact: components["schemas"]["ContactOptions"];
+        }[];
+      } | null;
+    };
+    EndorsementAsk: {
+      /**
+       * @description Who asked.
+       * @example Jess D.
+       */
+      name: string;
+      photoUrl: string | null;
+      headline: string | null;
+      /** @description Your name, as they typed it. */
+      refereeName: string;
+      /** @description What they said when asking. */
+      note: string | null;
+    };
+    EndorsementWritten: {
+      /** @enum {boolean} */
+      written: true;
     };
     Billing: {
       /** @description Real payments are switched on here. */

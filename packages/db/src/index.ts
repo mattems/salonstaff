@@ -63,6 +63,7 @@ export * from "./checks";
 export * from "./claims";
 export * from "./housekeeping";
 export { contains } from "./like";
+export * from "./profiles";
 export * from "./public-site";
 export * from "./salon";
 export * from "./seeker";

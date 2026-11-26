@@ -1,7 +1,8 @@
 import { Badge } from "@salonstaff/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@salonstaff/ui/components/card";
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
-import { ProfileView } from "@/components/profile-view";
+import { ContactActions } from "@/components/contact-actions";
+import { ProfileView, viewable } from "@/components/profile-view";
 import { api, unwrap } from "@/lib/api";
 import { applicationStatusLabel, formatDate } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
@@ -23,38 +24,49 @@ export const Route = createFileRoute("/employer/$salonId/candidates/$id")({
 
 function Candidate() {
   const candidate = Route.useLoaderData();
+  const { salon } = Route.useRouteContext();
   const { salonId } = Route.useParams();
   return (
     <ProfileView
-      full={candidate}
-      contact={candidate.contact}
+      full={viewable(candidate)}
+      actions={
+        <ContactActions
+          salonId={salonId}
+          salonName={salon.name}
+          candidateId={candidate.id}
+          firstName={candidate.profile.firstName}
+          contact={candidate.contact}
+        />
+      }
       aside={
-        <Card>
-          <CardHeader>
-            <CardTitle>Applied to your salon</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-2 text-sm">
-              {candidate.applications.map((application) => (
-                <li key={application.id} className="flex justify-between gap-3">
-                  <span>
-                    <Link
-                      to="/employer/$salonId/jobs/$id"
-                      params={{ salonId, id: application.jobId }}
-                      className="font-medium hover:underline"
-                    >
-                      {application.jobTitle}
-                    </Link>
-                    <span className="block text-muted-foreground text-xs">
-                      {formatDate(application.createdAt)}
+        candidate.applications.length > 0 && (
+          <Card>
+            <CardHeader>
+              <CardTitle>Applied to your salon</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-2 text-sm">
+                {candidate.applications.map((application) => (
+                  <li key={application.id} className="flex justify-between gap-3">
+                    <span>
+                      <Link
+                        to="/employer/$salonId/jobs/$id"
+                        params={{ salonId, id: application.jobId }}
+                        className="font-medium hover:underline"
+                      >
+                        {application.jobTitle}
+                      </Link>
+                      <span className="block text-muted-foreground text-xs">
+                        {formatDate(application.createdAt)}
+                      </span>
                     </span>
-                  </span>
-                  <Badge variant="secondary">{applicationStatusLabel(application.status)}</Badge>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
+                    <Badge variant="secondary">{applicationStatusLabel(application.status)}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        )
       }
     />
   );

@@ -10,6 +10,8 @@ export interface EmailMessage {
   headers?: Record<string, string>;
   /** In place of the configured sender, for mail sent from another domain of ours. */
   from?: string;
+  /** Where replies go: an account's own address, e.g. a salon messaging a job seeker (D-13). */
+  replyTo?: string;
   /**
    * Names and values the provider sends back with a bounce or complaint, so the email can be
    * traced without its address. Letters, digits, `_` and `-` only. Resend alone has them.
@@ -112,6 +114,7 @@ export function createEmailSender(config: EmailConfig, fetcher: Fetch = fetch): 
               Subject: m.subject,
               HTML: m.html,
               Text: m.text,
+              ...(m.replyTo ? { ReplyTo: [{ Email: m.replyTo }] } : {}),
               ...(m.headers ? { Headers: m.headers } : {}),
             },
           );
@@ -132,6 +135,7 @@ export function createEmailSender(config: EmailConfig, fetcher: Fetch = fetch): 
               subject: m.subject,
               html: m.html,
               text: m.text,
+              ...(m.replyTo ? { reply_to: m.replyTo } : {}),
               ...(m.headers ? { headers: m.headers } : {}),
               ...(m.tags
                 ? { tags: Object.entries(m.tags).map(([name, value]) => ({ name, value })) }
@@ -153,6 +157,7 @@ export function createEmailSender(config: EmailConfig, fetcher: Fetch = fetch): 
               Subject: m.subject,
               HtmlBody: m.html,
               TextBody: m.text,
+              ...(m.replyTo ? { ReplyTo: m.replyTo } : {}),
               ...(m.headers
                 ? { Headers: Object.entries(m.headers).map(([Name, Value]) => ({ Name, Value })) }
                 : {}),

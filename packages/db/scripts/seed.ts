@@ -4,7 +4,8 @@
  *
  * - Six salons with live jobs, owned by owner1@salonstaff.test … owner6@salonstaff.test
  * - Unclaimed directory listings (some with a business email, to try claiming by link)
- * - A job seeker, seeker@salonstaff.test, with a profile (not yet ID-verified, to try the check)
+ * - A job seeker, seeker@salonstaff.test, with a public profile, a verified mobile and an
+ *   endorsement from owner1 (not yet ID-verified, to try the check)
  * - A staff owner for the admin portal, from STAFF_EMAIL
  *
  * Sign in as any of them with the dev login (the springboard lists them). The ABNs and businesses
@@ -14,16 +15,27 @@ import {
   type AuState,
   type EmploymentType,
   educationSchema,
+  endorsementSchema,
   experienceSchema,
   isValidAbn,
   type JobRole,
   jobInputSchema,
   type PayPeriod,
+  randomToken,
   salonSchema,
+  sha256Hex,
   uuidv7,
 } from "@salonstaff/shared";
-import { and, eq } from "drizzle-orm";
-import { connect, type Db, salonScope, salonsFor, seeker, staffOffice } from "../src/index";
+import { and, eq, isNull } from "drizzle-orm";
+import {
+  connect,
+  type Db,
+  publicProfiles,
+  salonScope,
+  salonsFor,
+  seeker,
+  staffOffice,
+} from "../src/index";
 import { jobs, salons, users } from "../src/schema";
 
 const url = process.env.DATABASE_URL;
@@ -362,7 +374,6 @@ async function seedSeeker(db: Db): Promise<boolean> {
     {
       firstName: "Jess",
       lastName: "Demo",
-      phone: "+61400000001",
       headline: "Colourist with 6 years behind the chair",
       about:
         "Lived-in blondes, vivids and colour corrections. Looking for a team that loves education.",
@@ -371,8 +382,8 @@ async function seedSeeker(db: Db): Promise<boolean> {
       postcode: "2204",
       roles: ["colourist", "stylist"],
       yearsExperience: 6,
-      qualifications: "Cert III in Hairdressing",
       instagram: "jess.does.colour",
+      tiktok: undefined,
       rightToWork: "citizen",
       openToWork: true,
     },
@@ -385,7 +396,8 @@ async function seedSeeker(db: Db): Promise<boolean> {
       availableDays: ["tue", "wed", "thu", "fri", "sat"],
       employmentTypes: ["full_time", "part_time"],
       travelKm: 15,
-      payExpectation: "$35–$40 per hour",
+      payMin: 35,
+      payPeriod: "hour",
     },
     actor,
   );
@@ -427,11 +439,51 @@ async function seedStaff(db: Db): Promise<string | null> {
   return email;
 }
 
+/**
+ * What D-13 added to the demo job seeker, for a database seeded before it: a verified mobile, a
+ * public profile and an endorsement from owner1. Each part only if it's missing.
+ */
+async function seedSeekerSharing(db: Db): Promise<void> {
+  const [user] = await db.select().from(users).where(eq(users.email, "seeker@salonstaff.test"));
+  if (!user) return;
+  await db
+    .update(users)
+    .set({ phoneNumber: "+61400000001", phoneNumberVerified: true })
+    .where(and(eq(users.id, user.id), isNull(users.phoneNumber)));
+  const me = seeker(db, user.id);
+  const profile = await me.profile();
+  if (!profile) return;
+  if (!profile.shareCode) await me.saveSettings({ visibility: "public" }, actor);
+  if ((await me.endorsements()).length > 0) return;
+  const token = randomToken();
+  const tokenHash = await sha256Hex(token);
+  await me.requestEndorsement(
+    { refereeName: "Demo Owner", refereeEmail: "owner1@salonstaff.test", note: undefined },
+    tokenHash,
+    actor,
+  );
+  const { endorsement } = await publicProfiles(db).write(
+    tokenHash,
+    endorsementSchema.parse({
+      name: "Demo Owner",
+      title: "Salon owner",
+      salonName: "Inner West Hair",
+      relationship: "managed",
+      body: "Jess was our go-to colourist for three years. Clients followed her, apprentices learned from her, and she never left a foil unfinished.",
+      contactOk: true,
+      phone: "0290000000",
+    }),
+    actor,
+  );
+  await me.showEndorsement(endorsement.id, true, actor);
+}
+
 const { db, close } = await connect(url);
 try {
   const listings = await seedDirectory(db);
   const jobsMade = await seedSalons(db);
   const seekerMade = await seedSeeker(db);
+  await seedSeekerSharing(db);
   const staffMade = await seedStaff(db);
   console.log(
     `• Seeded ${jobsMade} jobs, ${listings} directory listings${seekerMade ? ", the demo job seeker" : ""}${staffMade ? `, staff owner ${staffMade}` : ""}`,
