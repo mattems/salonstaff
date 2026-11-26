@@ -17,7 +17,8 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 - After changing a route: `bun run api:types`.
 
 ## Data (`packages/db`)
-- No table imports outside `packages/db`. Scopes: `publicSite`, `seeker(db, userId)`, `salonScope(db, salonId)`,
+- No table imports outside `packages/db`. Scopes: `publicSite`, `seeker(db, userId)`, `signIns(db, userId)`,
+  `salonScope(db, salonId)`,
   `salonTeam(db, salonId)`, `invites`, `claims`, `checks`, `backOffice` (behind `requireStaff` only),
   `housekeeping` (the cron only).
 - Who manages a salon is `salon_members` (D-11); `salons.owner_id` is deprecated, never read or written.
@@ -29,6 +30,9 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 ## Auth (`packages/auth`)
 - Only this package imports Better Auth. No passwords. Rate limits come from the API's Cloudflare bindings.
 - Dev login (`POST /v1/auth/dev-login`) exists only locally.
+- Changes to how someone signs in go through audited `/v1/me` routes (D-12). The API answers 404 for Better
+  Auth's own versions (`update-user`, `change-email`, session listing and revoking, `unlink-account`);
+  add any new one to `HIDDEN` in `apps/api/src/routes/auth.ts`.
 
 ## Admin portal (`apps/admin`, `/admin/v1/*`)
 - Every route starts with `requireStaff(c, permission)`; permissions are in `packages/shared/src/staff.ts`.

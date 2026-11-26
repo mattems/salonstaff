@@ -30,6 +30,7 @@ import { jobsRoutes } from "./routes/jobs";
 import { meRoutes } from "./routes/me";
 import { mediaRoutes } from "./routes/media";
 import { root } from "./routes/root";
+import { securityRoutes } from "./routes/security";
 import { siteRoutes } from "./routes/site";
 import { teamRoutes } from "./routes/team";
 
@@ -126,6 +127,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/", root);
   app.route("/", auth);
   app.route("/", meRoutes);
+  app.route("/", securityRoutes);
   app.route("/", checksRoutes);
   app.route("/", jobsRoutes);
   app.route("/", employerRoutes);

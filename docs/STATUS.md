@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-25_
+_Last updated: 2026-11-26_
 
 ## Where things stand
 
@@ -16,7 +16,7 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - `packages/email`: Resend/Mailpit sender, sign-in code and notice templates.
 - `apps/api`: `/v1` (account and profile, checks, jobs + apply/save, salon onboarding, jobs, applicants, candidates,
   directory + claims, salon teams and invites, billing + Stripe webhook, sitemap data, local mock identity/checkout) and `/admin/v1` (overview,
-  checks and claims queues, people, salons, jobs, payments, directory import, staff, passkeys, audit log). 119 tests.
+  checks and claims queues, people, salons, jobs, payments, directory import, staff, passkeys, audit log). 125 tests.
 - `apps/admin`: the admin portal from kaybee, trimmed, with all Salon Staff pages (basic shadcn).
 - `apps/web`: the website (TanStack Start on a Worker, basic shadcn, no design yet): SEO job/salon/landing pages with
   canonical tags, JSON-LD, 301s and `/sitemap.xml`; sign-in (Google, Apple, email code, mobile code, local dev login);
@@ -41,12 +41,20 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   their name (`PATCH /v1/me`; a job seeker's name follows their profile), see how they sign in, their salons,
   and delete the account.
 
+- Account security (D-12), on both account pages (`/employer/account`, `/account`): change or add the
+  account's email with a code to the new address (the old address is told; `POST /v1/me/email` and
+  `/v1/me/email/confirm`), connect and disconnect Google and Apple (`/v1/me/sign-in-methods`), and see
+  where you're signed in and sign devices out (`/v1/me/sessions`). All audited. Better Auth's own
+  `update-user` (which let anyone set their own role), session and unlink endpoints now 404.
+
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
 ### Known issues
 - Not yet tried in a browser: the multi-salon employer pages, switcher, Team page, invite page and
   employer account page (API tests cover the flows).
+- Not yet tried for real: connecting Google/Apple from the account page (needs keys; the API side is
+  Better Auth's `link-social`).
 - Not yet tried for real: Google/Apple sign-in, Twilio SMS, Stripe, Stripe Identity, ABR lookup (all need keys),
   and a deploy.
 - Not yet tried on PlanetScale: migration 0003 creates a PL/pgSQL trigger function (plain Postgres; should work).

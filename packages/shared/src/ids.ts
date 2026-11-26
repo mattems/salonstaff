@@ -23,6 +23,7 @@ export const ID_PREFIXES = {
   passkey: "pk",
   confirmation: "cfm",
   request: "req",
+  session: "ses",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

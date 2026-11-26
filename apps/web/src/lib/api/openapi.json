@@ -706,6 +706,110 @@
         },
         "required": ["deleted"]
       },
+      "EmailCodeSent": {
+        "type": "object",
+        "properties": {
+          "sentTo": {
+            "type": "string",
+            "example": "olive@example.com"
+          }
+        },
+        "required": ["sentTo"]
+      },
+      "SignInMethods": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": ["string", "null"],
+            "description": "Codes by email go here. Null for an account made with a mobile number."
+          },
+          "phoneNumber": {
+            "type": ["string", "null"],
+            "description": "Codes by SMS go here."
+          },
+          "providers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "provider": {
+                  "type": "string",
+                  "enum": ["google", "apple"]
+                },
+                "label": {
+                  "type": "string",
+                  "example": "Google"
+                },
+                "available": {
+                  "type": "boolean",
+                  "description": "False when this site isn't set up for it yet."
+                },
+                "connected": {
+                  "type": "boolean"
+                },
+                "connectedAt": {
+                  "type": ["string", "null"],
+                  "format": "date-time"
+                }
+              },
+              "required": ["provider", "label", "available", "connected", "connectedAt"]
+            }
+          }
+        },
+        "required": ["email", "phoneNumber", "providers"]
+      },
+      "SignInSessions": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SignInSession"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "SignInSession": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "ses_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "device": {
+            "type": "string",
+            "example": "Chrome on macOS"
+          },
+          "ipAddress": {
+            "type": ["string", "null"]
+          },
+          "signedInAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lastActiveAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Updated at most once a day as the session is used."
+          },
+          "current": {
+            "type": "boolean",
+            "description": "The device making this request."
+          }
+        },
+        "required": ["id", "device", "ipAddress", "signedInAt", "lastActiveAt", "current"]
+      },
+      "SignedOut": {
+        "type": "object",
+        "properties": {
+          "signedOut": {
+            "type": "integer",
+            "description": "How many devices."
+          }
+        },
+        "required": ["signedOut"]
+      },
       "Checks": {
         "type": "object",
         "properties": {
@@ -3485,6 +3589,368 @@
           },
           "401": {
             "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/email": {
+      "post": {
+        "summary": "Change your email: send a code",
+        "description": "Sends a 6-digit code to the new address; it lasts 10 minutes. Confirm the change with POST /v1/me/email/confirm. For an account made with a mobile number, this adds its first email. If the address already belongs to another account, nothing is sent (the answer is the same, so nobody can find out who has an account). Shares the sign-in codes' rate limit.",
+        "tags": ["Sign-in and security"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  }
+                },
+                "required": ["email"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Code sent",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EmailCodeSent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That's already your email",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many codes",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/email/confirm": {
+      "post": {
+        "summary": "Change your email: confirm with the code",
+        "description": "The code from the new address. Your account's email becomes that address: email codes go there from now on, and your old address is told about the change. Google and Apple stay connected. With `dry_run` only the form is checked (the code isn't used up).",
+        "tags": ["Sign-in and security"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email"
+                  },
+                  "code": {
+                    "type": "string",
+                    "pattern": "^\\d{6}$"
+                  }
+                },
+                "required": ["email", "code"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Your account, with its new email",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not valid, or the code is wrong or has expired",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That's already your email, or another account's",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many tries",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/sign-in-methods": {
+      "get": {
+        "summary": "How you sign in",
+        "description": "Your email and mobile (codes go to them) and whether Google and Apple are connected. Connect one with Better Auth's POST /v1/auth/link-social (`provider`, `callbackURL`); you're sent to Google or Apple and back. Its address needn't match your account's.",
+        "tags": ["Sign-in and security"],
+        "responses": {
+          "200": {
+            "description": "How you sign in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInMethods"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/sign-in-methods/{provider}": {
+      "delete": {
+        "summary": "Disconnect Google or Apple",
+        "description": "You can still sign in with a code to your email or mobile. Refused when there's neither.",
+        "tags": ["Sign-in and security"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "enum": ["google", "apple"],
+              "example": "google"
+            },
+            "required": true,
+            "name": "provider",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "How you sign in now",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInMethods"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not connected",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "It's your only way in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/sessions": {
+      "get": {
+        "summary": "Where you're signed in",
+        "description": "Each browser or app signed in to your account, most recently used first.",
+        "tags": ["Sign-in and security"],
+        "responses": {
+          "200": {
+            "description": "Your sessions",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignInSessions"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Sign out everywhere else",
+        "description": "Signs out every browser and app but the one making this request.",
+        "tags": ["Sign-in and security"],
+        "responses": {
+          "200": {
+            "description": "Signed out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/sessions/{id}": {
+      "delete": {
+        "summary": "Sign out a device",
+        "description": "To sign out of the device you're using, use POST /v1/auth/sign-out instead.",
+        "tags": ["Sign-in and security"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "ses_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Signed out",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SignedOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "That's this device",
             "content": {
               "application/problem+json": {
                 "schema": {

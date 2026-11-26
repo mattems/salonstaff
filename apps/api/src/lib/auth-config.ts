@@ -33,6 +33,14 @@ export const appOrigins = (env: Env) =>
     .map((origin) => origin.trim())
     .filter(Boolean);
 
+/** Which of Google and Apple this Worker has the keys for. */
+export const providersAvailable = (env: Env) => ({
+  google: Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET),
+  apple: Boolean(
+    env.APPLE_CLIENT_ID && env.APPLE_TEAM_ID && env.APPLE_KEY_ID && env.APPLE_PRIVATE_KEY,
+  ),
+});
+
 /** Apple's client secret lasts 30 days; one per isolate is plenty. */
 let appleSecret: { value: string; madeAt: number } | undefined;
 async function apple(env: Env) {
@@ -60,7 +68,7 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
   const env = c.env;
   if (!env.AUTH_SECRET)
     throw new ConfigurationError("The AUTH_SECRET secret is not set on this Worker.");
-  const audit = (userId: string, action: string) =>
+  const audit = (userId: string, action: string, after?: unknown) =>
     recordAudit(
       db,
       {
@@ -69,7 +77,7 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
         ip: c.req.header("CF-Connecting-IP"),
         requestId: c.get("requestId"),
       },
-      { action, targetType: "user", targetId: userId },
+      { action, targetType: "user", targetId: userId, after },
     );
   return {
     db,
@@ -82,10 +90,17 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
         ? { clientId: env.GOOGLE_CLIENT_ID, clientSecret: env.GOOGLE_CLIENT_SECRET }
         : undefined,
     apple: await apple(env),
-    sendEmailCode: async ({ email, code }) => {
+    sendEmailCode: async ({ email, code, purpose }) => {
       await c
         .get("email")()
-        .send(await signInCodeEmail({ to: email, code, expiresInMinutes: LIMITS.otpTtlMinutes }));
+        .send(
+          await signInCodeEmail({
+            to: email,
+            code,
+            expiresInMinutes: LIMITS.otpTtlMinutes,
+            purpose,
+          }),
+        );
     },
     sendSmsCode: async ({ phoneNumber, code }) => {
       await c
@@ -97,6 +112,7 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
     },
     onSignUp: ({ userId }) => audit(userId, "auth.signed_up"),
     onSignIn: ({ userId }) => audit(userId, "auth.signed_in"),
+    onLink: ({ userId, provider }) => audit(userId, "auth.provider_connected", { provider }),
   };
 }
 

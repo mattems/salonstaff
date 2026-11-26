@@ -95,6 +95,15 @@ export const verifyCodeSchema = z
   });
 export type VerifyCodeInput = z.infer<typeof verifyCodeSchema>;
 
+/** Changing the account's email: step one sends a code to `email`, step two sends it back. */
+export const emailChangeSchema = z.object({ email: emailField.pipe(z.string().max(254)) });
+export const emailChangeConfirmSchema = emailChangeSchema.extend({
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+
 /** Native Google / Apple sign-in from the mobile app: the app sends the provider's ID token. */
 export const oauthTokenSchema = z.object({
   provider: z.enum(["google", "apple"]),
