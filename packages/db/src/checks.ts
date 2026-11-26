@@ -9,6 +9,8 @@
 import {
   ApiError,
   nameMatches,
+  RIGHT_TO_WORK_BASIS_VALUES,
+  type RightToWorkBasis,
   type RightToWorkInput,
   type VerificationStatus,
   verificationLevel,
@@ -33,7 +35,15 @@ export interface CheckSummary {
   nameMatched: boolean | null;
   identityVerifiedAt: Date | null;
   qualificationTitle: string | null;
+  /** For a passed right-to-work check: the basis staff checked, and how (`VEVO`, `ID document`). */
+  rightToWorkBasis: RightToWorkBasis | null;
+  rightToWorkCheckedVia: string | null;
 }
+
+const basisOf = (value: unknown): RightToWorkBasis | null =>
+  (RIGHT_TO_WORK_BASIS_VALUES as readonly unknown[]).includes(value)
+    ? (value as RightToWorkBasis)
+    : null;
 
 /** Kinds staff decide. Identity is decided by the provider. */
 const REVIEWED: CheckKind[] = ["right_to_work", "qualification"];
@@ -75,6 +85,9 @@ export function summarise(rows: Check[]): CheckSummary {
     nameMatched: typeof id?.result.nameMatched === "boolean" ? id.result.nameMatched : null,
     identityVerifiedAt: id?.decidedAt ?? null,
     qualificationTitle: typeof qual?.result.title === "string" ? qual.result.title : null,
+    rightToWorkBasis: basisOf(rtw?.result.basis),
+    rightToWorkCheckedVia:
+      typeof rtw?.result.checkedVia === "string" ? rtw.result.checkedVia : null,
   };
 }
 

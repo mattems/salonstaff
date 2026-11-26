@@ -1,21 +1,14 @@
 import { CONTACT_BY } from "@salonstaff/shared";
-import { Badge } from "@salonstaff/ui/components/badge";
-import { Button } from "@salonstaff/ui/components/button";
 import { Label } from "@salonstaff/ui/components/label";
 import { RadioGroup, RadioGroupItem } from "@salonstaff/ui/components/radio-group";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
-import { toast } from "sonner";
 import { NeedsProfile, SectionCard, useMyProfile, useRefresh } from "@/components/account-profile";
 import { localMobile } from "@/components/account-security";
-import { AppLink } from "@/components/app-link";
 import { FormMessage, SubmitButton, useAction } from "@/components/form";
-import { api, errorMessage, type Schemas, unwrap } from "@/lib/api";
-import { ago } from "@/lib/format";
+import { api, type Schemas, unwrap } from "@/lib/api";
 import { privatePage } from "@/lib/seo";
 
 export const Route = createFileRoute("/account/contact")({
-  loader: async () => unwrap(await api.GET("/v1/me/profile/contacts")),
   head: () => privatePage("How salons contact you"),
   component: Contact,
 });
@@ -30,7 +23,6 @@ const DESCRIPTIONS: Record<Schemas["ProfileSettings"]["contactBy"], string> = {
 function Contact() {
   const full = useMyProfile();
   const { me } = Route.useRouteContext();
-  const { items } = Route.useLoaderData();
   const refresh = useRefresh();
   const action = useAction();
   if (!full) return <NeedsProfile />;
@@ -95,72 +87,13 @@ function Contact() {
           <SubmitButton pending={action.pending}>Save</SubmitButton>
         </form>
       </SectionCard>
-      <Contacts items={items} />
+      <p className="text-muted-foreground text-sm">
+        Salons that messaged you or looked at your number are in your{" "}
+        <Link to="/inbox" className="underline">
+          inbox
+        </Link>
+        .
+      </p>
     </div>
-  );
-}
-
-function Contacts({ items }: { items: Schemas["ProfileContact"][] }) {
-  const refresh = useRefresh();
-  const [pending, setPending] = useState<string | null>(null);
-
-  async function hide(salon: Schemas["ProfileContact"]["salon"]) {
-    setPending(salon.id);
-    try {
-      unwrap(
-        await api.PUT("/v1/me/hidden-salons/{salonId}", {
-          params: { path: { salonId: salon.id } },
-        }),
-      );
-      await refresh(`Hidden from ${salon.name}`);
-    } catch (error) {
-      toast.error(errorMessage(error));
-    } finally {
-      setPending(null);
-    }
-  }
-
-  return (
-    <SectionCard
-      title="Salons that contacted you"
-      description="Every message, and each day a salon looked at your number."
-    >
-      {items.length === 0 ? (
-        <p className="text-muted-foreground text-sm">No salons have contacted you yet.</p>
-      ) : (
-        <ul className="divide-y">
-          {items.map((item) => (
-            <li key={item.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <span className="flex flex-wrap items-center gap-2 text-sm">
-                  <AppLink href={item.salon.path} className="font-medium hover:underline">
-                    {item.salon.name}
-                  </AppLink>
-                  <Badge variant="outline">
-                    {item.kind === "message" ? "Sent a message" : "Looked at your number"}
-                  </Badge>
-                  <span className="text-muted-foreground">{ago(item.createdAt)}</span>
-                </span>
-                {item.hidden ? (
-                  <span className="text-muted-foreground text-xs">Hidden from them</span>
-                ) : (
-                  <Button
-                    size="xs"
-                    variant="outline"
-                    disabled={pending !== null}
-                    onClick={() => hide(item.salon)}
-                  >
-                    Hide from them
-                  </Button>
-                )}
-              </div>
-              {item.message && (
-                <p className="whitespace-pre-line text-muted-foreground text-sm">{item.message}</p>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
-    </SectionCard>
   );
 }

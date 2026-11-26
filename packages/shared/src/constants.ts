@@ -56,6 +56,18 @@ export const PAY_PERIODS = [
 export type PayPeriod = (typeof PAY_PERIODS)[number]["value"];
 export const PAY_PERIOD_VALUES = PAY_PERIODS.map((p) => p.value) as [PayPeriod, ...PayPeriod[]];
 
+/** How a passed right-to-work check found they may work (D-03): the basis staff checked. */
+export const RIGHT_TO_WORK_BASES = [
+  { value: "citizen", label: "Citizen" },
+  { value: "permanent_resident", label: "Permanent resident" },
+  { value: "visa", label: "Visa" },
+] as const;
+export type RightToWorkBasis = (typeof RIGHT_TO_WORK_BASES)[number]["value"];
+export const RIGHT_TO_WORK_BASIS_VALUES = RIGHT_TO_WORK_BASES.map((b) => b.value) as [
+  RightToWorkBasis,
+  ...RightToWorkBasis[],
+];
+
 export const RIGHT_TO_WORK = [
   { value: "citizen", label: "Australian or NZ citizen" },
   { value: "permanent_resident", label: "Permanent resident" },

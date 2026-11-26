@@ -206,6 +206,27 @@ describe("salons contacting a job seeker", () => {
     expect(contacts.body.items.map((c) => c.kind)).toEqual(["phone", "message"]);
     expect(contacts.body.items[1]).toMatchObject({ message, salon: { name: salon.name } });
 
+    // An inbox: both unread until seen, and replies go to whoever sent the message.
+    const unread = async () =>
+      (await seeker.api<{ unreadMessages: number }>("GET", "/v1/me")).body.unreadMessages;
+    expect(await unread()).toBe(2);
+    const inbox = await seeker.api<{
+      items: { id: string; read: boolean; sender: { email: string } | null }[];
+    }>("GET", "/v1/me/profile/contacts");
+    expect(inbox.body.items.map((c) => c.read)).toEqual([false, false]);
+    expect(inbox.body.items[1]?.sender?.email).toBe(owner.email);
+    expect(inbox.body.items[0]?.sender).toBeNull();
+    const one = await seeker.api<{ unread: number }>("POST", "/v1/me/profile/contacts/read", {
+      ids: [inbox.body.items[1]?.id, "not-an-id"],
+    });
+    expect(one.body.unread).toBe(1);
+    // Someone else can't mark them.
+    const other = await app.person("Nosy");
+    await other.api("POST", "/v1/me/profile/contacts/read", { ids: [inbox.body.items[0]?.id] });
+    expect(await unread()).toBe(1);
+    await seeker.api("POST", "/v1/me/profile/contacts/read", {});
+    expect(await unread()).toBe(0);
+
     // Email only: no number.
     await seeker.api("PATCH", "/v1/me/profile/settings", { contactBy: "email" });
     expect((await owner.api("POST", owner.at(`/candidates/${seekerId}/phone`))).status).toBe(409);

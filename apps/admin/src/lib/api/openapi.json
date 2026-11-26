@@ -76,6 +76,10 @@
               "$ref": "#/components/schemas/OwnSalonSummary"
             },
             "description": "The salons you're on the team of, in the order you joined them."
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts)."
           }
         },
         "required": [
@@ -87,7 +91,8 @@
           "createdAt",
           "profile",
           "verification",
-          "salons"
+          "salons",
+          "unreadMessages"
         ]
       },
       "SeekerProfile": {
@@ -285,6 +290,16 @@
           },
           "qualificationTitle": {
             "type": ["string", "null"]
+          },
+          "rightToWorkBasis": {
+            "type": ["string", "null"],
+            "enum": ["citizen", "permanent_resident", "visa", null],
+            "description": "Once right to work is verified: the basis staff checked."
+          },
+          "rightToWorkCheckedVia": {
+            "type": ["string", "null"],
+            "example": "VEVO",
+            "description": "Once right to work is verified: how (`VEVO` for a visa, else `ID document`)."
           }
         },
         "required": [
@@ -295,7 +310,9 @@
           "references",
           "nameMatched",
           "identityVerifiedAt",
-          "qualificationTitle"
+          "qualificationTitle",
+          "rightToWorkBasis",
+          "rightToWorkCheckedVia"
         ]
       },
       "OwnSalonSummary": {
@@ -917,6 +934,23 @@
           "message": {
             "type": ["string", "null"]
           },
+          "read": {
+            "type": "boolean",
+            "description": "You've seen it in your inbox."
+          },
+          "sender": {
+            "type": ["object", "null"],
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": ["name", "email"],
+            "description": "Who sent a message, and where your reply goes (it's the message's reply-to)."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
@@ -942,7 +976,29 @@
             "description": "You've hidden your profile from this salon."
           }
         },
-        "required": ["id", "kind", "message", "createdAt", "salon", "hidden"]
+        "required": ["id", "kind", "message", "read", "sender", "createdAt", "salon", "hidden"]
+      },
+      "Unread": {
+        "type": "object",
+        "properties": {
+          "unread": {
+            "type": "integer"
+          }
+        },
+        "required": ["unread"]
+      },
+      "ContactsRead": {
+        "type": "object",
+        "properties": {
+          "ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "maxItems": 200
+          }
+        }
       },
       "MyEndorsements": {
         "type": "object",
@@ -2858,9 +2914,32 @@
               "qualification": {
                 "type": "string",
                 "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 2,
+                "description": "0 not verified, 1 ID verified, 2 work-ready (ID and right to work)."
+              },
+              "rightToWorkBasis": {
+                "type": ["string", "null"],
+                "enum": ["citizen", "permanent_resident", "visa", null],
+                "description": "Once right to work is verified: the basis staff checked."
+              },
+              "rightToWorkCheckedVia": {
+                "type": ["string", "null"],
+                "example": "VEVO",
+                "description": "Once right to work is verified: how (`VEVO` for a visa, else `ID document`)."
               }
             },
-            "required": ["identity", "rightToWork", "qualification"]
+            "required": [
+              "identity",
+              "rightToWork",
+              "qualification",
+              "level",
+              "rightToWorkBasis",
+              "rightToWorkCheckedVia"
+            ]
           },
           "viewer": {
             "type": ["object", "null"],

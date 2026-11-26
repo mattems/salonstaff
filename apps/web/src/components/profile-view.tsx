@@ -1,14 +1,22 @@
 /**
  * A job seeker's profile: the seeker's own preview, a salon looking at a candidate (with ways to
- * contact them), and the share page (D-13: no surname, work rights, pay or contact details).
+ * contact them), and the share page (D-13: no surname, pay, contact details or verification IDs).
  */
-import { ENDORSEMENT_RELATIONSHIPS, formatPay, labelFor, WEEKDAYS } from "@salonstaff/shared";
+import {
+  ENDORSEMENT_RELATIONSHIPS,
+  formatPay,
+  labelFor,
+  RIGHT_TO_WORK_BASES,
+  WEEKDAYS,
+} from "@salonstaff/shared";
 import { Avatar, AvatarFallback, AvatarImage } from "@salonstaff/ui/components/avatar";
 import { Badge } from "@salonstaff/ui/components/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@salonstaff/ui/components/card";
 import { cn } from "@salonstaff/ui/lib/utils";
+import { BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
 import { AppLink } from "@/components/app-link";
+import { PortfolioGallery } from "@/components/portfolio-gallery";
 import { VerifiedTick } from "@/components/qualification-check";
 import type { Schemas } from "@/lib/api";
 import {
@@ -64,8 +72,110 @@ export interface ViewableProfile {
     identity: Status;
     rightToWork: Status;
     qualification: Status;
+    /** 2: ID and right to work verified (the tick by their name). */
+    level: number;
+    rightToWorkBasis: Schemas["Verification"]["rightToWorkBasis"];
+    rightToWorkCheckedVia: Schemas["Verification"]["rightToWorkCheckedVia"];
+    /** Verification IDs: for salons and the person themselves, never on the share page. */
     references?: Schemas["Verification"]["references"];
   };
+}
+
+const NOT_VERIFIED: Record<Status, string> = {
+  not_started: "Not yet",
+  pending: "In review",
+  requires_input: "Not yet",
+  failed: "Not verified",
+  verified: "Verified",
+};
+
+/** The blue tick by the name: ID and right to work both verified by Salon Staff. */
+function FullyVerified() {
+  return (
+    <span title="ID and right to work verified by Salon Staff" className="inline-flex">
+      <BadgeCheck className="size-6 fill-primary text-primary-foreground" aria-hidden />
+      <span className="sr-only">Verified: ID and right to work checked by Salon Staff</span>
+    </span>
+  );
+}
+
+/**
+ * What Salon Staff has checked, for the profile's side column: identity, right to work (and on
+ * what basis, how), and every qualification on the profile.
+ */
+function VerificationPanel({
+  verification: v,
+  education,
+}: {
+  verification: ViewableProfile["verification"];
+  education: Schemas["Education"][];
+}) {
+  const basis = v.rightToWorkBasis ? labelFor(RIGHT_TO_WORK_BASES, v.rightToWorkBasis) : null;
+  const row = (label: string, status: Status, detail?: ReactNode, reference?: string) => (
+    <li className="flex items-start justify-between gap-3">
+      <span className={status === "verified" ? "" : "text-muted-foreground"}>{label}</span>
+      <span className="text-right">
+        {status === "verified" ? (
+          <>
+            <VerifiedTick />
+            {detail && <span className="block text-muted-foreground text-xs">{detail}</span>}
+            {reference && (
+              <span className="block font-mono text-muted-foreground text-xs">{reference}</span>
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground">{NOT_VERIFIED[status]}</span>
+        )}
+      </span>
+    </li>
+  );
+  return (
+    <div className="space-y-4 text-sm">
+      <ul className="space-y-3">
+        {row("Identity", v.identity, null, v.references?.identity)}
+        {row(
+          "Right to work",
+          v.rightToWork,
+          basis &&
+            `${basis}${v.rightToWorkCheckedVia ? `, checked with ${v.rightToWorkCheckedVia}` : ""}`,
+          v.references?.rightToWork,
+        )}
+      </ul>
+      <div className="space-y-2 border-t pt-3">
+        <p className="text-muted-foreground">Qualifications</p>
+        {education.length === 0 ? (
+          <p className="text-muted-foreground text-xs">None listed</p>
+        ) : (
+          <ul className="space-y-2">
+            {education.map((item) => {
+              const status = item.verification?.status ?? "not_started";
+              return (
+                <li key={item.id} className="flex items-start justify-between gap-3">
+                  <span className={status === "verified" ? "" : "text-muted-foreground"}>
+                    {item.qualification}
+                  </span>
+                  <span className="shrink-0 text-right">
+                    {status === "verified" ? (
+                      <>
+                        <VerifiedTick />
+                        {item.verification?.reference && (
+                          <span className="block font-mono text-muted-foreground text-xs">
+                            {item.verification.reference}
+                          </span>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">{NOT_VERIFIED[status]}</span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /** A full profile (their own, or a salon's candidate) as `ProfileView` takes it. */
@@ -148,7 +258,10 @@ export function ProfileView({
             </Avatar>
             <div className="min-w-0 flex-1 space-y-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="font-semibold text-2xl tracking-tight">{name}</h1>
+                <h1 className="flex items-center gap-1.5 font-semibold text-2xl tracking-tight">
+                  {name}
+                  {v.level >= 2 && <FullyVerified />}
+                </h1>
                 {p.openToWork && <Badge variant="secondary">Open to work</Badge>}
               </div>
               {p.headline && <p className="text-lg">{p.headline}</p>}
@@ -184,9 +297,6 @@ export function ProfileView({
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {v.identity === "verified" && <Badge>ID verified</Badge>}
-            {v.rightToWork === "verified" && <Badge>Work rights checked</Badge>}
-            {v.qualification === "verified" && <Badge>Qualification verified</Badge>}
             {p.roles.map((role) => (
               <Badge key={role} variant="outline">
                 {roleLabel(role)}
@@ -206,24 +316,7 @@ export function ProfileView({
           )}
           {portfolio.length > 0 && (
             <Panel title="Portfolio">
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                {portfolio.map((item) => (
-                  <figure key={item.id} className="space-y-1">
-                    <a href={item.imageUrl} target="_blank" rel="noreferrer">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.caption ?? "Portfolio photo"}
-                        className="aspect-square w-full rounded-lg border object-cover"
-                      />
-                    </a>
-                    {item.caption && (
-                      <figcaption className="text-muted-foreground text-xs">
-                        {item.caption}
-                      </figcaption>
-                    )}
-                  </figure>
-                ))}
-              </div>
+              <PortfolioGallery items={portfolio} name={p.firstName} />
             </Panel>
           )}
           {(p.specialties.length > 0 || p.brands.length > 0) && (
@@ -414,7 +507,7 @@ export function ProfileView({
             </Panel>
           )}
           <Panel title="Verification">
-            <VerificationList verification={v} />
+            <VerificationPanel verification={v} education={education} />
             <p className="mt-4 border-t pt-4 text-muted-foreground text-xs">
               Checked by Salon Staff. We keep only the verification ID, never copies of ID
               documents.

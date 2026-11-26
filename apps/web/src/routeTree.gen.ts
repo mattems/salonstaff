@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as SeekerRouteImport } from './routes/_seeker'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as EmployerRouteImport } from './routes/employer'
 import { Route as ForSalonsRouteImport } from './routes/for-salons'
@@ -18,8 +19,9 @@ import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RobotsDottxtRouteImport } from './routes/robots[.]txt'
 import { Route as SignInRouteImport } from './routes/sign-in'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
+import { Route as SeekerApplicationsRouteImport } from './routes/_seeker.applications'
+import { Route as SeekerInboxRouteImport } from './routes/_seeker.inbox'
 import { Route as AccountIndexRouteImport } from './routes/account.index'
-import { Route as AccountApplicationsRouteImport } from './routes/account.applications'
 import { Route as AccountAvailabilityRouteImport } from './routes/account.availability'
 import { Route as AccountContactRouteImport } from './routes/account.contact'
 import { Route as AccountEndorsementsRouteImport } from './routes/account.endorsements'
@@ -27,7 +29,6 @@ import { Route as AccountExperienceRouteImport } from './routes/account.experien
 import { Route as AccountPhotoRouteImport } from './routes/account.photo'
 import { Route as AccountPortfolioRouteImport } from './routes/account.portfolio'
 import { Route as AccountPreviewRouteImport } from './routes/account.preview'
-import { Route as AccountSavedRouteImport } from './routes/account.saved'
 import { Route as AccountSecurityRouteImport } from './routes/account.security'
 import { Route as AccountSharingRouteImport } from './routes/account.sharing'
 import { Route as AccountSkillsRouteImport } from './routes/account.skills'
@@ -47,6 +48,8 @@ import { Route as PCodeRouteImport } from './routes/p.$code'
 import { Route as SalonsIndexRouteImport } from './routes/salons.index'
 import { Route as SalonsSplatRouteImport } from './routes/salons.$'
 import { Route as SitemapsNameRouteImport } from './routes/sitemaps.$name'
+import { Route as SeekerApplicationsIndexRouteImport } from './routes/_seeker.applications.index'
+import { Route as SeekerApplicationsSavedRouteImport } from './routes/_seeker.applications.saved'
 import { Route as EmployerSalonIdIndexRouteImport } from './routes/employer.$salonId.index'
 import { Route as EmployerSalonIdBillingRouteImport } from './routes/employer.$salonId.billing'
 import { Route as EmployerSalonIdSettingsRouteImport } from './routes/employer.$salonId.settings'
@@ -59,6 +62,10 @@ import { Route as EmployerSalonIdJobsIdEditRouteImport } from './routes/employer
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SeekerRoute = SeekerRouteImport.update({
+  id: '/_seeker',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AccountRoute = AccountRouteImport.update({
@@ -101,14 +108,19 @@ const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   path: '/sitemap.xml',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeekerApplicationsRoute = SeekerApplicationsRouteImport.update({
+  id: '/applications',
+  path: '/applications',
+  getParentRoute: () => SeekerRoute,
+} as any)
+const SeekerInboxRoute = SeekerInboxRouteImport.update({
+  id: '/inbox',
+  path: '/inbox',
+  getParentRoute: () => SeekerRoute,
+} as any)
 const AccountIndexRoute = AccountIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AccountRoute,
-} as any)
-const AccountApplicationsRoute = AccountApplicationsRouteImport.update({
-  id: '/applications',
-  path: '/applications',
   getParentRoute: () => AccountRoute,
 } as any)
 const AccountAvailabilityRoute = AccountAvailabilityRouteImport.update({
@@ -144,11 +156,6 @@ const AccountPortfolioRoute = AccountPortfolioRouteImport.update({
 const AccountPreviewRoute = AccountPreviewRouteImport.update({
   id: '/preview',
   path: '/preview',
-  getParentRoute: () => AccountRoute,
-} as any)
-const AccountSavedRoute = AccountSavedRouteImport.update({
-  id: '/saved',
-  path: '/saved',
   getParentRoute: () => AccountRoute,
 } as any)
 const AccountSecurityRoute = AccountSecurityRouteImport.update({
@@ -246,6 +253,16 @@ const SitemapsNameRoute = SitemapsNameRouteImport.update({
   path: '/sitemaps/$name',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SeekerApplicationsIndexRoute = SeekerApplicationsIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SeekerApplicationsRoute,
+} as any)
+const SeekerApplicationsSavedRoute = SeekerApplicationsSavedRouteImport.update({
+  id: '/saved',
+  path: '/saved',
+  getParentRoute: () => SeekerApplicationsRoute,
+} as any)
 const EmployerSalonIdIndexRoute = EmployerSalonIdIndexRouteImport.update({
   id: '/',
   path: '/',
@@ -300,7 +317,8 @@ export interface FileRoutesByFullPath {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/account/applications': typeof AccountApplicationsRoute
+  '/applications': typeof SeekerApplicationsRouteWithChildren
+  '/inbox': typeof SeekerInboxRoute
   '/account/availability': typeof AccountAvailabilityRoute
   '/account/contact': typeof AccountContactRoute
   '/account/endorsements': typeof AccountEndorsementsRoute
@@ -308,7 +326,6 @@ export interface FileRoutesByFullPath {
   '/account/photo': typeof AccountPhotoRoute
   '/account/portfolio': typeof AccountPortfolioRoute
   '/account/preview': typeof AccountPreviewRoute
-  '/account/saved': typeof AccountSavedRoute
   '/account/security': typeof AccountSecurityRoute
   '/account/sharing': typeof AccountSharingRoute
   '/account/skills': typeof AccountSkillsRoute
@@ -329,9 +346,11 @@ export interface FileRoutesByFullPath {
   '/employer/': typeof EmployerIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/salons/': typeof SalonsIndexRoute
+  '/applications/saved': typeof SeekerApplicationsSavedRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/applications/': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
@@ -346,7 +365,7 @@ export interface FileRoutesByTo {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/account/applications': typeof AccountApplicationsRoute
+  '/inbox': typeof SeekerInboxRoute
   '/account/availability': typeof AccountAvailabilityRoute
   '/account/contact': typeof AccountContactRoute
   '/account/endorsements': typeof AccountEndorsementsRoute
@@ -354,7 +373,6 @@ export interface FileRoutesByTo {
   '/account/photo': typeof AccountPhotoRoute
   '/account/portfolio': typeof AccountPortfolioRoute
   '/account/preview': typeof AccountPreviewRoute
-  '/account/saved': typeof AccountSavedRoute
   '/account/security': typeof AccountSecurityRoute
   '/account/sharing': typeof AccountSharingRoute
   '/account/skills': typeof AccountSkillsRoute
@@ -374,9 +392,11 @@ export interface FileRoutesByTo {
   '/employer': typeof EmployerIndexRoute
   '/jobs': typeof JobsIndexRoute
   '/salons': typeof SalonsIndexRoute
+  '/applications/saved': typeof SeekerApplicationsSavedRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/applications': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId': typeof EmployerSalonIdIndexRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
@@ -386,6 +406,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_seeker': typeof SeekerRouteWithChildren
   '/account': typeof AccountRouteWithChildren
   '/employer': typeof EmployerRouteWithChildren
   '/for-salons': typeof ForSalonsRoute
@@ -394,7 +415,8 @@ export interface FileRoutesById {
   '/robots.txt': typeof RobotsDottxtRoute
   '/sign-in': typeof SignInRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
-  '/account/applications': typeof AccountApplicationsRoute
+  '/_seeker/applications': typeof SeekerApplicationsRouteWithChildren
+  '/_seeker/inbox': typeof SeekerInboxRoute
   '/account/availability': typeof AccountAvailabilityRoute
   '/account/contact': typeof AccountContactRoute
   '/account/endorsements': typeof AccountEndorsementsRoute
@@ -402,7 +424,6 @@ export interface FileRoutesById {
   '/account/photo': typeof AccountPhotoRoute
   '/account/portfolio': typeof AccountPortfolioRoute
   '/account/preview': typeof AccountPreviewRoute
-  '/account/saved': typeof AccountSavedRoute
   '/account/security': typeof AccountSecurityRoute
   '/account/sharing': typeof AccountSharingRoute
   '/account/skills': typeof AccountSkillsRoute
@@ -423,9 +444,11 @@ export interface FileRoutesById {
   '/employer/': typeof EmployerIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/salons/': typeof SalonsIndexRoute
+  '/_seeker/applications/saved': typeof SeekerApplicationsSavedRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/_seeker/applications/': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
@@ -444,7 +467,8 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sign-in'
     | '/sitemap.xml'
-    | '/account/applications'
+    | '/applications'
+    | '/inbox'
     | '/account/availability'
     | '/account/contact'
     | '/account/endorsements'
@@ -452,7 +476,6 @@ export interface FileRouteTypes {
     | '/account/photo'
     | '/account/portfolio'
     | '/account/preview'
-    | '/account/saved'
     | '/account/security'
     | '/account/sharing'
     | '/account/skills'
@@ -473,9 +496,11 @@ export interface FileRouteTypes {
     | '/employer/'
     | '/jobs/'
     | '/salons/'
+    | '/applications/saved'
     | '/employer/$salonId/billing'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
+    | '/applications/'
     | '/employer/$salonId/'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
@@ -490,7 +515,7 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sign-in'
     | '/sitemap.xml'
-    | '/account/applications'
+    | '/inbox'
     | '/account/availability'
     | '/account/contact'
     | '/account/endorsements'
@@ -498,7 +523,6 @@ export interface FileRouteTypes {
     | '/account/photo'
     | '/account/portfolio'
     | '/account/preview'
-    | '/account/saved'
     | '/account/security'
     | '/account/sharing'
     | '/account/skills'
@@ -518,9 +542,11 @@ export interface FileRouteTypes {
     | '/employer'
     | '/jobs'
     | '/salons'
+    | '/applications/saved'
     | '/employer/$salonId/billing'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
+    | '/applications'
     | '/employer/$salonId'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
@@ -529,6 +555,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/'
+    | '/_seeker'
     | '/account'
     | '/employer'
     | '/for-salons'
@@ -537,7 +564,8 @@ export interface FileRouteTypes {
     | '/robots.txt'
     | '/sign-in'
     | '/sitemap.xml'
-    | '/account/applications'
+    | '/_seeker/applications'
+    | '/_seeker/inbox'
     | '/account/availability'
     | '/account/contact'
     | '/account/endorsements'
@@ -545,7 +573,6 @@ export interface FileRouteTypes {
     | '/account/photo'
     | '/account/portfolio'
     | '/account/preview'
-    | '/account/saved'
     | '/account/security'
     | '/account/sharing'
     | '/account/skills'
@@ -566,9 +593,11 @@ export interface FileRouteTypes {
     | '/employer/'
     | '/jobs/'
     | '/salons/'
+    | '/_seeker/applications/saved'
     | '/employer/$salonId/billing'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
+    | '/_seeker/applications/'
     | '/employer/$salonId/'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
@@ -578,6 +607,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SeekerRoute: typeof SeekerRouteWithChildren
   AccountRoute: typeof AccountRouteWithChildren
   EmployerRoute: typeof EmployerRouteWithChildren
   ForSalonsRoute: typeof ForSalonsRoute
@@ -606,6 +636,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_seeker': {
+      id: '/_seeker'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof SeekerRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/account': {
@@ -664,18 +701,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapDotxmlRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_seeker/applications': {
+      id: '/_seeker/applications'
+      path: '/applications'
+      fullPath: '/applications'
+      preLoaderRoute: typeof SeekerApplicationsRouteImport
+      parentRoute: typeof SeekerRoute
+    }
+    '/_seeker/inbox': {
+      id: '/_seeker/inbox'
+      path: '/inbox'
+      fullPath: '/inbox'
+      preLoaderRoute: typeof SeekerInboxRouteImport
+      parentRoute: typeof SeekerRoute
+    }
     '/account/': {
       id: '/account/'
       path: '/'
       fullPath: '/account/'
       preLoaderRoute: typeof AccountIndexRouteImport
-      parentRoute: typeof AccountRoute
-    }
-    '/account/applications': {
-      id: '/account/applications'
-      path: '/applications'
-      fullPath: '/account/applications'
-      preLoaderRoute: typeof AccountApplicationsRouteImport
       parentRoute: typeof AccountRoute
     }
     '/account/availability': {
@@ -725,13 +769,6 @@ declare module '@tanstack/react-router' {
       path: '/preview'
       fullPath: '/account/preview'
       preLoaderRoute: typeof AccountPreviewRouteImport
-      parentRoute: typeof AccountRoute
-    }
-    '/account/saved': {
-      id: '/account/saved'
-      path: '/saved'
-      fullPath: '/account/saved'
-      preLoaderRoute: typeof AccountSavedRouteImport
       parentRoute: typeof AccountRoute
     }
     '/account/security': {
@@ -867,6 +904,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SitemapsNameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_seeker/applications/': {
+      id: '/_seeker/applications/'
+      path: '/'
+      fullPath: '/applications/'
+      preLoaderRoute: typeof SeekerApplicationsIndexRouteImport
+      parentRoute: typeof SeekerApplicationsRoute
+    }
+    '/_seeker/applications/saved': {
+      id: '/_seeker/applications/saved'
+      path: '/saved'
+      fullPath: '/applications/saved'
+      preLoaderRoute: typeof SeekerApplicationsSavedRouteImport
+      parentRoute: typeof SeekerApplicationsRoute
+    }
     '/employer/$salonId/': {
       id: '/employer/$salonId/'
       path: '/'
@@ -926,8 +977,33 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SeekerApplicationsRouteChildren {
+  SeekerApplicationsSavedRoute: typeof SeekerApplicationsSavedRoute
+  SeekerApplicationsIndexRoute: typeof SeekerApplicationsIndexRoute
+}
+
+const SeekerApplicationsRouteChildren: SeekerApplicationsRouteChildren = {
+  SeekerApplicationsSavedRoute: SeekerApplicationsSavedRoute,
+  SeekerApplicationsIndexRoute: SeekerApplicationsIndexRoute,
+}
+
+const SeekerApplicationsRouteWithChildren =
+  SeekerApplicationsRoute._addFileChildren(SeekerApplicationsRouteChildren)
+
+interface SeekerRouteChildren {
+  SeekerApplicationsRoute: typeof SeekerApplicationsRouteWithChildren
+  SeekerInboxRoute: typeof SeekerInboxRoute
+}
+
+const SeekerRouteChildren: SeekerRouteChildren = {
+  SeekerApplicationsRoute: SeekerApplicationsRouteWithChildren,
+  SeekerInboxRoute: SeekerInboxRoute,
+}
+
+const SeekerRouteWithChildren =
+  SeekerRoute._addFileChildren(SeekerRouteChildren)
+
 interface AccountRouteChildren {
-  AccountApplicationsRoute: typeof AccountApplicationsRoute
   AccountAvailabilityRoute: typeof AccountAvailabilityRoute
   AccountContactRoute: typeof AccountContactRoute
   AccountEndorsementsRoute: typeof AccountEndorsementsRoute
@@ -935,7 +1011,6 @@ interface AccountRouteChildren {
   AccountPhotoRoute: typeof AccountPhotoRoute
   AccountPortfolioRoute: typeof AccountPortfolioRoute
   AccountPreviewRoute: typeof AccountPreviewRoute
-  AccountSavedRoute: typeof AccountSavedRoute
   AccountSecurityRoute: typeof AccountSecurityRoute
   AccountSharingRoute: typeof AccountSharingRoute
   AccountSkillsRoute: typeof AccountSkillsRoute
@@ -944,7 +1019,6 @@ interface AccountRouteChildren {
 }
 
 const AccountRouteChildren: AccountRouteChildren = {
-  AccountApplicationsRoute: AccountApplicationsRoute,
   AccountAvailabilityRoute: AccountAvailabilityRoute,
   AccountContactRoute: AccountContactRoute,
   AccountEndorsementsRoute: AccountEndorsementsRoute,
@@ -952,7 +1026,6 @@ const AccountRouteChildren: AccountRouteChildren = {
   AccountPhotoRoute: AccountPhotoRoute,
   AccountPortfolioRoute: AccountPortfolioRoute,
   AccountPreviewRoute: AccountPreviewRoute,
-  AccountSavedRoute: AccountSavedRoute,
   AccountSecurityRoute: AccountSecurityRoute,
   AccountSharingRoute: AccountSharingRoute,
   AccountSkillsRoute: AccountSkillsRoute,
@@ -1009,6 +1082,7 @@ const EmployerRouteWithChildren = EmployerRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SeekerRoute: SeekerRouteWithChildren,
   AccountRoute: AccountRouteWithChildren,
   EmployerRoute: EmployerRouteWithChildren,
   ForSalonsRoute: ForSalonsRoute,

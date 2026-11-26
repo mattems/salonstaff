@@ -585,7 +585,7 @@ employerRoutes.openapi(
         title: `${salon.name} updated your application`,
         body: `Your application for "${result.job.title}" is now: ${labelFor(APPLICATION_STATUSES, status)}.`,
         action: "See your applications",
-        url: appUrl(c, "/account/applications"),
+        url: appUrl(c, "/applications"),
       });
     }
     return c.json({ id: param, status: result.application.status }, 200);
@@ -672,8 +672,8 @@ employerRoutes.openapi(
         subject: `${salon.name} sent you a message`,
         title: `${sender} from ${salon.name} sent you a message`,
         body: `${message}\n\nReply to this email to answer ${sender} directly. ${salon.name}: ${appUrl(c, salonPath(salon))}`,
-        action: "See who's contacted you",
-        url: appUrl(c, "/account/contact"),
+        action: "Open your inbox",
+        url: appUrl(c, "/inbox"),
         replyTo,
         footer: `${salon.name} found you on ${BRAND.name}. To stop them contacting you, hide your profile from them in your account.`,
       });

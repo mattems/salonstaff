@@ -38,11 +38,7 @@ export function ContactActions({
   const path = { salonId, userId: candidateId };
 
   if (!contact.message && !contact.phone) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        {firstName} isn't taking contact from salons right now.
-      </p>
-    );
+    return <p className="text-muted-foreground text-sm">You can't contact this person.</p>;
   }
 
   async function reveal() {

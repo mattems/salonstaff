@@ -11,6 +11,7 @@ import {
   uuidv7,
   type VerificationStatus,
 } from "@salonstaff/shared";
+import { sql } from "drizzle-orm";
 import {
   bigint,
   boolean,
@@ -264,10 +265,13 @@ export const profileContacts = pgTable(
     senderId: uuid("sender_id").references(() => users.id, { onDelete: "set null" }),
     kind: text("kind").$type<ProfileContactKind>().notNull(),
     message: text("message"),
+    /** When the job seeker saw it in their inbox; null while unread. */
+    readAt: ts("read_at"),
     createdAt: createdAt(),
   },
   (table) => [
     index("profile_contacts_seeker_idx").on(table.seekerId, table.createdAt),
+    index("profile_contacts_unread_idx").on(table.seekerId).where(sql`${table.readAt} is null`),
     index("profile_contacts_salon_idx").on(table.salonId, table.kind, table.createdAt),
   ],
 );

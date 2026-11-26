@@ -3,12 +3,12 @@ import { Button } from "@salonstaff/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@salonstaff/ui/components/card";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppLink } from "@/components/app-link";
-import { EmptyState, PageHeader } from "@/components/page";
+import { EmptyState } from "@/components/page";
 import { api, unwrap } from "@/lib/api";
 import { applicationStatusLabel, formatDate } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
-export const Route = createFileRoute("/account/applications")({
+export const Route = createFileRoute("/_seeker/applications/")({
   loader: async () => unwrap(await api.GET("/v1/me/applications")),
   head: () => privatePage("Your applications"),
   component: Applications,
@@ -18,7 +18,6 @@ function Applications() {
   const { items } = Route.useLoaderData();
   return (
     <div className="space-y-6">
-      <PageHeader title="Your applications" description="Where each one is up to." />
       {items.length === 0 ? (
         <EmptyState
           title="No applications yet"

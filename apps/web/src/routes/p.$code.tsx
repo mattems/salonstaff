@@ -1,6 +1,6 @@
 import { BRAND } from "@salonstaff/shared";
 import { Button } from "@salonstaff/ui/components/button";
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
 import { ContactActions } from "@/components/contact-actions";
 import { selectClass } from "@/components/form";
@@ -51,7 +51,8 @@ function Reach({ shared, me }: { shared: Schemas["SharedProfile"]; me: Me | null
   const { firstName } = shared.profile;
   const salons = shared.viewer?.salons ?? [];
   const [salonId, setSalonId] = useState(salons[0]?.id);
-  const here = typeof window === "undefined" ? "/" : window.location.pathname;
+  // From the router, not `window`: the server renders this link too.
+  const here = useLocation({ select: (location) => location.pathname });
 
   if (!shared.viewer) {
     if (me?.role === "seeker") return null;
@@ -63,17 +64,14 @@ function Reach({ shared, me }: { shared: Schemas["SharedProfile"]; me: Me | null
         <div className="flex flex-wrap gap-2">
           {me ? (
             <Button asChild>
-              <Link to="/employer/onboarding">Add your salon</Link>
+              <Link to="/employer/onboarding" search={{ next: here }}>
+                Add your salon to contact {firstName}
+              </Link>
             </Button>
           ) : (
-            <>
-              <Button asChild>
-                <a href={signInPath(here, "employer")}>Sign in to contact {firstName}</a>
-              </Button>
-              <Button asChild variant="outline">
-                <Link to="/for-salons">List your salon free</Link>
-              </Button>
-            </>
+            <Button asChild>
+              <a href={signInPath(here, "employer")}>Sign in or list your salon free</a>
+            </Button>
           )}
         </div>
       </div>
@@ -81,11 +79,7 @@ function Reach({ shared, me }: { shared: Schemas["SharedProfile"]; me: Me | null
   }
   const chosen = salons.find((s) => s.id === salonId);
   if (!chosen) {
-    return (
-      <p className="text-muted-foreground text-sm">
-        {firstName} isn't taking contact from your salon.
-      </p>
-    );
+    return <p className="text-muted-foreground text-sm">You can't contact this person.</p>;
   }
   return (
     <div className="space-y-3">

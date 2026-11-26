@@ -7,8 +7,9 @@ import { api, orNull } from "@/lib/api";
 import { requireSignedIn } from "@/lib/session";
 
 /**
- * A job seeker's own pages: the sections on the left, the one chosen on the right. Employer
- * accounts have their dashboard instead. The profile is loaded once here for every section.
+ * A job seeker's profile and account: the sections on the left, the one chosen on the right. Their
+ * inbox and jobs are pages of their own (`/inbox`, `/applications`). Employer accounts have their
+ * dashboard instead. The profile is loaded once here for every section.
  */
 export const Route = createFileRoute("/account")({
   beforeLoad: ({ context, location }) => {
@@ -30,8 +31,6 @@ type To =
   | "/account/endorsements"
   | "/account/sharing"
   | "/account/contact"
-  | "/account/applications"
-  | "/account/saved"
   | "/account/verify"
   | "/account/security";
 
@@ -53,13 +52,6 @@ const GROUPS: { label: string; items: { to: To; label: string; needsProfile?: tr
     items: [
       { to: "/account/sharing", label: "Visibility and sharing", needsProfile: true },
       { to: "/account/contact", label: "How salons contact you", needsProfile: true },
-    ],
-  },
-  {
-    label: "Jobs",
-    items: [
-      { to: "/account/applications", label: "Applications" },
-      { to: "/account/saved", label: "Saved jobs" },
     ],
   },
   {

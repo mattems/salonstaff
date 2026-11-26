@@ -11,6 +11,8 @@ const DISALLOW = [
   "/api",
   "/dev",
   "/endorse",
+  "/inbox",
+  "/applications",
 ];
 
 export const Route = createFileRoute("/robots.txt")({

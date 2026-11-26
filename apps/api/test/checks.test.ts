@@ -13,6 +13,8 @@ interface Checks {
     level: number;
     references: Record<string, string>;
     qualificationTitle: string | null;
+    rightToWorkBasis: string | null;
+    rightToWorkCheckedVia: string | null;
   };
   checks: {
     id: string;
@@ -91,6 +93,8 @@ describe("verification checks", () => {
     });
     expect(sent.status).toBe(201);
     expect(sent.body.verification.rightToWork).toBe("pending");
+    // How work rights were checked shows only once they're verified.
+    expect(sent.body.verification.rightToWorkBasis).toBeNull();
     expect(
       (await seeker.api("POST", "/v1/me/checks/right-to-work", { basis: "citizen" })).status,
     ).toBe(409);
@@ -113,6 +117,28 @@ describe("verification checks", () => {
 
     const after = await seeker.api<Checks>("GET", "/v1/me/checks");
     expect(after.body.verification.references.rightToWork).toBe(check.reference as string);
+    expect(after.body.verification).toMatchObject({
+      rightToWorkBasis: "visa",
+      rightToWorkCheckedVia: "VEVO",
+    });
+
+    // The share page says how, but not the verification ID.
+    const { shareCode } = (
+      await seeker.api<{ shareCode: string }>("PATCH", "/v1/me/profile/settings", {
+        visibility: "public",
+      })
+    ).body;
+    const shared = (await (await app.call(`/v1/profiles/${shareCode}`)).json()) as {
+      verification: Record<string, unknown>;
+    };
+    expect(shared.verification).toEqual({
+      identity: "not_started",
+      rightToWork: "verified",
+      qualification: "not_started",
+      level: 0,
+      rightToWorkBasis: "visa",
+      rightToWorkCheckedVia: "VEVO",
+    });
     // Not ID-verified, so still level 0.
     expect(after.body.verification.level).toBe(0);
   });

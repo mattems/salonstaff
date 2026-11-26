@@ -50,7 +50,8 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - Job seeker profiles (D-13):
   - `/account` is a list of sections on the left with the chosen one on the right: basics, photo,
     skills, availability and pay, portfolio, experience and education, endorsements, visibility and
-    sharing, how salons contact you, applications, saved jobs, verification, sign-in and security.
+    sharing, how salons contact you, verification, sign-in and security. The inbox (`/inbox`) and
+    their jobs (`/applications`, applied and saved) are full-width pages of their own.
   - Visibility is public, salons only (the default) or hidden. Seekers can hide from chosen salons.
   - Public profiles get an unguessable share link (`/p/{code}`, noindex, first name and last
     initial, no contact details, work rights or pay). The seeker can get a new code, and there's a
@@ -69,7 +70,11 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   - Qualifications are one list (education entries); the Basics box is gone. Each entry is
     verified with its certificate from the Qualifications section or the Verification page, and
     shows a "Verified" tick on the profile once staff pass it.
-  - Migrations 0005 and 0006.
+  - Profiles show a tick by the name once ID and right to work are verified, and a side panel of
+    what was checked (right to work's basis and how, each qualification). Portfolio photos open
+    in a lightbox.
+  - An inbox of salons' messages and number views, with an unread count on a bell in the header.
+  - Migrations 0005, 0006 and 0007.
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 

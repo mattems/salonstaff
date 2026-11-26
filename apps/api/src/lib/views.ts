@@ -65,6 +65,8 @@ export function verificationJson(checks: CheckSummary) {
     nameMatched: checks.nameMatched,
     identityVerifiedAt: iso(checks.identityVerifiedAt),
     qualificationTitle: checks.qualificationTitle,
+    rightToWorkBasis: checks.rightToWorkBasis,
+    rightToWorkCheckedVia: checks.rightToWorkCheckedVia,
   };
 }
 
@@ -142,10 +144,12 @@ export const myEndorsementJson = (e: Endorsement) => ({
 });
 
 /** A salon's message or number reveal, for the job seeker's list (D-13). */
-export const contactRecordJson = ({ contact, salon, hidden }: ContactRecord) => ({
+export const contactRecordJson = ({ contact, salon, sender, hidden }: ContactRecord) => ({
   id: encodeId("profileContact", contact.id),
   kind: contact.kind,
   message: contact.message,
+  read: contact.readAt !== null,
+  sender: sender && contact.kind === "message" ? { name: sender.name, email: sender.email } : null,
   createdAt: contact.createdAt.toISOString(),
   salon: { id: encodeId("salon", salon.id), name: salon.name, path: salonPath(salon) },
   hidden,
@@ -221,10 +225,14 @@ export function sharedProfileJson(env: Env, { full }: SharedProfile) {
       ...e,
       verification: e.verification && { ...e.verification, reference: null },
     })),
+    // Which checks passed and how work rights were checked, never the verification IDs.
     verification: {
       identity: verification.identity,
       rightToWork: verification.rightToWork,
       qualification: verification.qualification,
+      level: verification.level,
+      rightToWorkBasis: verification.rightToWorkBasis,
+      rightToWorkCheckedVia: verification.rightToWorkCheckedVia,
     },
   };
 }

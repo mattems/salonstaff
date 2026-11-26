@@ -15,7 +15,8 @@ import {
   type SeekerProfileInput,
   shareCode,
 } from "@salonstaff/shared";
-import { and, asc, count, desc, eq, gt, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, type EducationCheck, educationChecks, summarise } from "./checks";
 import type { Db } from "./index";
@@ -68,6 +69,8 @@ export interface ShownEndorsement {
 export interface ContactRecord {
   contact: ProfileContact;
   salon: Salon;
+  /** Who on the salon's team, if their account still exists. */
+  sender: { name: string; email: string } | null;
   /** They've hidden their profile from this salon. */
   hidden: boolean;
 }
@@ -168,7 +171,11 @@ export interface Account {
   checks: CheckSummary;
   /** The salons they're on the team of (D-11), in the order they joined. */
   salons: MySalon[];
+  /** Salons' messages and number views they haven't seen in their inbox (D-13). */
+  unreadContacts: number;
 }
+
+const sender = alias(users, "sender");
 
 export interface MyApplication extends JobWithSalon {
   application: Application;
@@ -178,6 +185,13 @@ export function seeker(db: Db, userId: string) {
   const profileRow = async (tx: Executor = db) => {
     const [row] = await tx.select().from(seekerProfiles).where(eq(seekerProfiles.userId, userId));
     return row ?? null;
+  };
+  const unread = async () => {
+    const [row] = await db
+      .select({ n: count() })
+      .from(profileContacts)
+      .where(and(eq(profileContacts.seekerId, userId), isNull(profileContacts.readAt)));
+    return row?.n ?? 0;
   };
   const requireProfile = async (tx: Executor) => {
     const row = await profileRow(tx);
@@ -189,12 +203,13 @@ export function seeker(db: Db, userId: string) {
     async account(): Promise<Account | null> {
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return null;
-      const [profile, checkRows, mySalons] = await Promise.all([
+      const [profile, checkRows, mySalons, unreadContacts] = await Promise.all([
         profileRow(),
         db.select().from(seekerChecks).where(eq(seekerChecks.userId, userId)),
         salonsFor(db).ofUser(userId),
+        unread(),
       ]);
-      return { user, profile, checks: summarise(checkRows), salons: mySalons };
+      return { user, profile, checks: summarise(checkRows), salons: mySalons, unreadContacts };
     },
 
     profile: () => profileRow(),
@@ -375,9 +390,12 @@ export function seeker(db: Db, userId: string) {
           contact: profileContacts,
           salon: salons,
           hiddenSalon: seekerHiddenSalons.salonId,
+          senderName: sender.name,
+          senderEmail: sender.email,
         })
         .from(profileContacts)
         .innerJoin(salons, eq(salons.id, profileContacts.salonId))
+        .leftJoin(sender, eq(sender.id, profileContacts.senderId))
         .leftJoin(
           seekerHiddenSalons,
           and(
@@ -391,8 +409,40 @@ export function seeker(db: Db, userId: string) {
       return rows.map((r) => ({
         contact: r.contact,
         salon: r.salon,
+        sender:
+          r.senderName !== null && r.senderEmail !== null
+            ? { name: r.senderName, email: r.senderEmail }
+            : null,
         hidden: r.hiddenSalon !== null,
       }));
+    },
+
+    unreadContacts: unread,
+
+    /** Marks messages and number views as seen: those given, or all. Returns how many changed. */
+    async markContactsRead(ids: string[] | null, actor: Actor): Promise<number> {
+      return db.transaction(async (tx) => {
+        const rows = await tx
+          .update(profileContacts)
+          .set({ readAt: new Date() })
+          .where(
+            and(
+              eq(profileContacts.seekerId, userId),
+              isNull(profileContacts.readAt),
+              ids ? inArray(profileContacts.id, ids) : undefined,
+            ),
+          )
+          .returning({ id: profileContacts.id });
+        if (rows.length > 0) {
+          await recordAudit(tx, actor, {
+            action: "profile.contacts_read",
+            targetType: "user",
+            targetId: userId,
+            after: { count: rows.length },
+          });
+        }
+        return rows.length;
+      });
     },
 
     // ---------- Endorsements (D-13) ----------

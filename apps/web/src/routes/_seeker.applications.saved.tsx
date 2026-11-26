@@ -2,11 +2,11 @@ import { Button } from "@salonstaff/ui/components/button";
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { JobCard } from "@/components/listing";
-import { EmptyState, PageHeader } from "@/components/page";
+import { EmptyState } from "@/components/page";
 import { api, errorMessage, unwrap } from "@/lib/api";
 import { privatePage } from "@/lib/seo";
 
-export const Route = createFileRoute("/account/saved")({
+export const Route = createFileRoute("/_seeker/applications/saved")({
   loader: async () => unwrap(await api.GET("/v1/me/saved")),
   head: () => privatePage("Saved jobs"),
   component: Saved,
@@ -26,7 +26,6 @@ function Saved() {
   }
   return (
     <div className="space-y-6">
-      <PageHeader title="Saved jobs" description="Jobs you've kept for later." />
       {items.length === 0 ? (
         <EmptyState
           title="No saved jobs"

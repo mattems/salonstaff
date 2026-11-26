@@ -1,6 +1,6 @@
 import { backOffice, LastOwnerError, schema } from "@salonstaff/db";
 import { decodeId, encodeId, uuidv7 } from "@salonstaff/shared";
-import { and, eq, ne } from "drizzle-orm";
+import { and, eq, ne, sql } from "drizzle-orm";
 import { generateKeyPair } from "jose";
 import { describe, expect, it } from "vitest";
 import { APP_ORIGIN, createTestApp, withDb } from "./helpers";
@@ -392,6 +392,9 @@ describe("staff", () => {
     await withDb(async (db) => {
       await db
         .transaction(async (tx) => {
+          // Other tests add owners at the same time. Until this transaction is undone, they wait,
+          // so none can appear between hiding the other owners and the check. Nothing is kept.
+          await tx.execute(sql`lock table staff in share row exclusive mode`);
           await tx
             .update(schema.staff)
             .set({ removedAt: new Date() })

@@ -24,6 +24,8 @@ const PRIVATE_PATHS = [
   "/dev",
   "/endorse",
   "/p",
+  "/inbox",
+  "/applications",
 ];
 
 function newNonce(): string {

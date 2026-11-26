@@ -12,6 +12,7 @@ import {
   JOB_ROLE_VALUES,
   PAY_PERIOD_VALUES,
   PROFILE_VISIBILITY_VALUES,
+  RIGHT_TO_WORK_BASIS_VALUES,
   RIGHT_TO_WORK_VALUES,
   VERIFICATION_STATUSES,
 } from "@salonstaff/shared";
@@ -92,6 +93,7 @@ export const EmploymentTypeSchema = z.enum(EMPLOYMENT_TYPE_VALUES);
 export const PayPeriodSchema = z.enum(PAY_PERIOD_VALUES);
 export const ApplicationStatusSchema = z.enum(APPLICATION_STATUS_VALUES);
 export const CheckStatusSchema = z.enum(VERIFICATION_STATUSES);
+export const RightToWorkBasisSchema = z.enum(RIGHT_TO_WORK_BASIS_VALUES);
 export const Timestamp = z
   .string()
   .openapi({ format: "date-time", example: "2026-11-25T03:00:00.000Z" });
@@ -124,6 +126,13 @@ export const VerificationSchema = z
       .openapi({ description: "Whether the name on the ID matched the profile when checked." }),
     identityVerifiedAt: Timestamp.nullable(),
     qualificationTitle: z.string().nullable(),
+    rightToWorkBasis: RightToWorkBasisSchema.nullable().openapi({
+      description: "Once right to work is verified: the basis staff checked.",
+    }),
+    rightToWorkCheckedVia: z.string().nullable().openapi({
+      example: "VEVO",
+      description: "Once right to work is verified: how (`VEVO` for a visa, else `ID document`).",
+    }),
   })
   .openapi("Verification");
 
@@ -278,6 +287,10 @@ export const MeSchema = z
     verification: VerificationSchema,
     salons: z.array(OwnSalonSummarySchema).openapi({
       description: "The salons you're on the team of, in the order you joined them.",
+    }),
+    unreadMessages: z.number().int().openapi({
+      description:
+        "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts).",
     }),
   })
   .openapi("Me");
@@ -551,10 +564,13 @@ export const SharedProfileSchema = z
     education: z.array(EducationSchema),
     portfolio: z.array(PortfolioItemSchema),
     endorsements: z.array(EndorsementSchema),
-    verification: z.object({
-      identity: CheckStatusSchema,
-      rightToWork: CheckStatusSchema,
-      qualification: CheckStatusSchema,
+    verification: VerificationSchema.pick({
+      identity: true,
+      rightToWork: true,
+      qualification: true,
+      level: true,
+      rightToWorkBasis: true,
+      rightToWorkCheckedVia: true,
     }),
     viewer: z
       .object({

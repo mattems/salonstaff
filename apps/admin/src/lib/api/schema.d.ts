@@ -3012,6 +3012,8 @@ export interface components {
       verification: components["schemas"]["Verification"];
       /** @description The salons you're on the team of, in the order you joined them. */
       salons: components["schemas"]["OwnSalonSummary"][];
+      /** @description Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts). */
+      unreadMessages: number;
     };
     SeekerProfile: {
       firstName: string;
@@ -3096,6 +3098,16 @@ export interface components {
        */
       identityVerifiedAt: string | null;
       qualificationTitle: string | null;
+      /**
+       * @description Once right to work is verified: the basis staff checked.
+       * @enum {string|null}
+       */
+      rightToWorkBasis: "citizen" | "permanent_resident" | "visa" | null;
+      /**
+       * @description Once right to work is verified: how (`VEVO` for a visa, else `ID document`).
+       * @example VEVO
+       */
+      rightToWorkCheckedVia: string | null;
     };
     OwnSalonSummary: {
       /** @example sln_01k6q2x8h4f7tbn3m9vz5cdr0e */
@@ -3353,6 +3365,13 @@ export interface components {
        */
       kind: "message" | "phone";
       message: string | null;
+      /** @description You've seen it in your inbox. */
+      read: boolean;
+      /** @description Who sent a message, and where your reply goes (it's the message's reply-to). */
+      sender: {
+        name: string;
+        email: string;
+      } | null;
       /**
        * Format: date-time
        * @example 2026-11-25T03:00:00.000Z
@@ -3365,6 +3384,12 @@ export interface components {
       };
       /** @description You've hidden your profile from this salon. */
       hidden: boolean;
+    };
+    Unread: {
+      unread: number;
+    };
+    ContactsRead: {
+      ids?: string[];
     };
     MyEndorsements: {
       items: components["schemas"]["MyEndorsement"][];
@@ -4143,6 +4168,18 @@ export interface components {
         rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
         /** @enum {string} */
         qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @description 0 not verified, 1 ID verified, 2 work-ready (ID and right to work). */
+        level: number;
+        /**
+         * @description Once right to work is verified: the basis staff checked.
+         * @enum {string|null}
+         */
+        rightToWorkBasis: "citizen" | "permanent_resident" | "visa" | null;
+        /**
+         * @description Once right to work is verified: how (`VEVO` for a visa, else `ID document`).
+         * @example VEVO
+         */
+        rightToWorkCheckedVia: string | null;
       };
       /** @description For someone signed in on a salon's team: each salon they can contact this person as. Null for anyone else. */
       viewer: {

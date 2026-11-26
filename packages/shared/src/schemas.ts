@@ -9,6 +9,7 @@ import {
   PAY_PERIOD_VALUES,
   PROFILE_LIMITS,
   PROFILE_VISIBILITY_VALUES,
+  RIGHT_TO_WORK_BASIS_VALUES,
   RIGHT_TO_WORK_VALUES,
   WEEKDAY_VALUES,
 } from "./constants";
@@ -145,7 +146,7 @@ export const seekerProfileSchema = z.object({
 export type SeekerProfileInput = z.infer<typeof seekerProfileSchema>;
 
 export const rightToWorkSchema = z.object({
-  basis: z.enum(["citizen", "permanent_resident", "visa"]),
+  basis: z.enum(RIGHT_TO_WORK_BASIS_VALUES),
   visaGrantNumber: z.string().trim().max(20).optional(),
   passportCountry: z.string().trim().max(60).optional(),
 });

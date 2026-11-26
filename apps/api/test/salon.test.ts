@@ -355,7 +355,7 @@ describe("applicants", () => {
     });
     const texts = app.sent.filter((m) => m.to === mobile.smsTo);
     expect(texts).toHaveLength(before + 1);
-    expect(texts.at(-1)?.text).toContain("/account/applications");
+    expect(texts.at(-1)?.text).toContain("/applications");
     const me = await mobile.api<{ email: string | null; phoneNumber: string }>("GET", "/v1/me");
     expect(me.body).toMatchObject({ email: null, phoneNumber: mobile.phoneNumber });
   });

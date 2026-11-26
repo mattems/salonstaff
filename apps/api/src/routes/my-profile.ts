@@ -4,6 +4,7 @@ import {
   ApiError,
   BRAND,
   CONTACT_LIMITS,
+  decodeId,
   encodeId,
   endorsementRequestSchema,
   endorsePath,
@@ -224,6 +225,10 @@ const ProfileContactSchema = z
         "`message`: they sent you a message (emailed to you). `phone`: they looked at your number.",
     }),
     message: z.string().nullable(),
+    read: z.boolean().openapi({ description: "You've seen it in your inbox." }),
+    sender: z.object({ name: z.string(), email: z.string() }).nullable().openapi({
+      description: "Who sent a message, and where your reply goes (it's the message's reply-to).",
+    }),
     createdAt: Timestamp,
     salon: z.object({ id: z.string(), name: z.string(), path: z.string() }),
     hidden: z.boolean().openapi({ description: "You've hidden your profile from this salon." }),
@@ -251,6 +256,42 @@ myProfileRoutes.openapi(
     const session = await requireSeeker(c);
     const rows = await seeker(await c.get("db")(), session.user.id).contacts();
     return c.json({ items: rows.map(contactRecordJson) }, 200);
+  },
+);
+
+myProfileRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/me/profile/contacts/read",
+    summary: "Mark salons' messages as seen",
+    description:
+      "The ones in `ids`, or all of them when it's left out. Answers how many are still unseen.",
+    tags: TAGS,
+    request: jsonBody(
+      z
+        .object({
+          ids: z
+            .array(z.string().openapi({ example: "pct_01k6q2x8h4f7tbn3m9vz5cdr0e" }))
+            .max(200)
+            .optional(),
+        })
+        .openapi("ContactsRead"),
+    ),
+    responses: {
+      200: json(z.object({ unread: z.number().int() }).openapi("Unread"), "Still unseen"),
+      400: errors[400],
+      401: errors[401],
+      403: errors[403],
+    },
+  }),
+  async (c) => {
+    const session = await requireSeeker(c);
+    const { ids } = c.req.valid("json");
+    const me = seeker(await c.get("db")(), session.user.id);
+    // IDs that aren't valid can't be theirs: they're simply not marked.
+    const decoded = ids?.map((id) => decodeId("profileContact", id)).filter((id) => id !== null);
+    if (!c.get("dryRun")) await me.markContactsRead(decoded ?? null, userActor(c, session.user.id));
+    return c.json({ unread: await me.unreadContacts() }, 200);
   },
 );
 

@@ -1,0 +1,2 @@
+ALTER TABLE "profile_contacts" ADD COLUMN "read_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "profile_contacts_unread_idx" ON "profile_contacts" USING btree ("seeker_id") WHERE "profile_contacts"."read_at" is null;

@@ -15,8 +15,11 @@
   be guessed, so profiles can't be scraped by walking IDs or names.
   - It works only while the profile is public. A new code kills the old link.
   - Google doesn't index it (`noindex`).
-  - It shows the first name and last initial, and never contact details, pay or the kind of work
-    rights (citizen, visa…). Passed checks show as badges.
+  - It shows the first name and last initial, and never contact details, pay or verification IDs.
+- **Verified tick:** a tick by the name once ID and right to work are both verified. The profile's
+  side column lists what was checked: identity, right to work with its basis and how (e.g.
+  "Visa, checked with VEVO"), and every qualification with its own tick. Salons also see the
+  verification IDs.
   - The preview image is the person's photo.
   - The account page draws a post image (photo, name, headline, link) in the browser to
     download for Instagram and TikTok, which don't take links.
@@ -25,8 +28,10 @@
     the sender's address. The job seeker's address is never shown.
   - **"Show number":** reveals their verified mobile.
   - The job seeker chooses which of the two salons get (email, phone, or both).
-  - Every message and number reveal is recorded (`profile_contacts`), and the job seeker sees
-    who contacted them and can hide that salon.
+  - Every message and number reveal is recorded (`profile_contacts`). The job seeker sees them
+    in an inbox (`/inbox`, a page of its own), where opening one marks it read. They can reply by email or
+    hide that salon from there. A bell in the header shows how many are unread
+    (`unreadMessages` on `/v1/me`).
   - Each salon has daily caps (`CONTACT_LIMITS`): 25 messages and 50 number reveals a day, and
     one message to the same person a day.
   - Anyone else (a visitor from a share link) is asked to sign in or list their salon.
