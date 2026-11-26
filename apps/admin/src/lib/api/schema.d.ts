@@ -3016,7 +3016,6 @@ export interface components {
     SeekerProfile: {
       firstName: string;
       lastName: string;
-      phone: string | null;
       headline: string | null;
       about: string | null;
       suburb: string;
@@ -3045,8 +3044,8 @@ export interface components {
         | "educator"
       )[];
       yearsExperience: number;
-      qualifications: string | null;
       instagram: string | null;
+      tiktok: string | null;
       /** @enum {string} */
       rightToWork:
         | "citizen"
@@ -3069,7 +3068,10 @@ export interface components {
       )[];
       availableFrom: string | null;
       travelKm: number | null;
-      payExpectation: string | null;
+      /** @description The least they'd take, per `payPeriod`. Null: not saying. */
+      payMin: number | null;
+      /** @enum {string} */
+      payPeriod: "hour" | "week" | "year";
     };
     Verification: {
       /** @enum {string} */
@@ -3128,12 +3130,8 @@ export interface components {
       /** @example Olive Owner */
       name: string;
     };
-    FullProfile: {
-      profile: components["schemas"]["SeekerProfile"];
-      experience: components["schemas"]["Experience"][];
-      education: components["schemas"]["Education"][];
-      portfolio: components["schemas"]["PortfolioItem"][];
-      verification: components["schemas"]["Verification"];
+    MyProfile: components["schemas"]["FullProfile"] & {
+      settings: components["schemas"]["ProfileSettings"];
     };
     Experience: {
       /** @example exp_01k6q2x8h4f7tbn3m9vz5cdr0e */
@@ -3150,14 +3148,72 @@ export interface components {
       /** @example edu_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       qualification: string;
-      institution: string;
+      institution: string | null;
       year: number | null;
+      /** @description The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent. */
+      verification: {
+        /** @enum {string} */
+        status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @description The verification ID (`SSV-…`) once passed. Not on share pages. */
+        reference: string | null;
+      } | null;
     };
     PortfolioItem: {
       /** @example pfi_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       imageUrl: string;
       caption: string | null;
+    };
+    Endorsement: {
+      /** @example end_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      refereeName: string;
+      /** @example Salon owner */
+      refereeTitle: string | null;
+      /** @description Where they worked together. */
+      salonName: string | null;
+      /** @enum {string|null} */
+      relationship: "managed" | "worked_with" | "trained" | "client" | null;
+      body: string;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      writtenAt: string;
+      /** @description The salon whose team the referee is on here, when they wrote it. Their email address proved it. */
+      onSalonStaff: {
+        name: string;
+        path: string;
+      } | null;
+      /** @description How to reach the referee: only for a salon the person applied to, and only if the referee agreed. */
+      contact: {
+        email: string;
+        phone: string | null;
+      } | null;
+    };
+    ProfileSettings: {
+      /**
+       * @description `public`: salons can find you and your share link works. `salons`: salons can find you. `hidden`: only salons you apply to.
+       * @enum {string}
+       */
+      visibility: "public" | "salons" | "hidden";
+      /** @enum {string} */
+      contactBy: "both" | "email" | "phone";
+      /** @example k7x2m9qd4h */
+      shareCode: string | null;
+      /**
+       * @description Your share page on the website. Null unless your profile is public.
+       * @example /p/k7x2m9qd4h
+       */
+      sharePath: string | null;
+    };
+    FullProfile: {
+      profile: components["schemas"]["SeekerProfile"];
+      experience: components["schemas"]["Experience"][];
+      education: components["schemas"]["Education"][];
+      portfolio: components["schemas"]["PortfolioItem"][];
+      endorsements: components["schemas"]["Endorsement"][];
+      verification: components["schemas"]["Verification"];
     };
     ProfilePhoto: {
       photoUrl: string | null;
@@ -3267,8 +3323,98 @@ export interface components {
       /** @enum {boolean} */
       deleted: true;
     };
+    HiddenSalons: {
+      items: components["schemas"]["HiddenSalon"][];
+    };
+    HiddenSalon: {
+      /** @example sln_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      name: string;
+      path: string;
+      suburb: string;
+      /**
+       * @example NSW
+       * @enum {string}
+       */
+      state: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+    };
+    HiddenFromSalon: {
+      hidden: boolean;
+    };
+    ProfileContacts: {
+      items: components["schemas"]["ProfileContact"][];
+    };
+    ProfileContact: {
+      /** @example pct_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /**
+       * @description `message`: they sent you a message (emailed to you). `phone`: they looked at your number.
+       * @enum {string}
+       */
+      kind: "message" | "phone";
+      message: string | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+      salon: {
+        id: string;
+        name: string;
+        path: string;
+      };
+      /** @description You've hidden your profile from this salon. */
+      hidden: boolean;
+    };
+    MyEndorsements: {
+      items: components["schemas"]["MyEndorsement"][];
+    };
+    MyEndorsement: {
+      /** @example end_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /**
+       * @description `requested`: waiting for them to write it. `received`: written, waiting for you to show it. `shown` on your profile, or `hidden`.
+       * @enum {string}
+       */
+      status: "requested" | "received" | "shown" | "hidden";
+      refereeName: string;
+      refereeEmail: string;
+      note: string | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      linkExpiresAt: string | null;
+      refereeTitle: string | null;
+      salonName: string | null;
+      /** @enum {string|null} */
+      relationship: "managed" | "worked_with" | "trained" | "client" | null;
+      body: string | null;
+      /** @description They agreed that salons you apply to may contact them. */
+      contactOk: boolean;
+      refereePhone: string | null;
+      /** @description Their address is on a salon's team here: shown as such on your profile. */
+      onSalonStaff: boolean;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      writtenAt: string | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    EndorsementShown: {
+      shown: boolean;
+    };
     EmailCodeSent: {
       /** @example olive@example.com */
+      sentTo: string;
+    };
+    MobileCodeSent: {
+      /** @example +61412345678 */
       sentTo: string;
     };
     SignInMethods: {
@@ -3326,6 +3472,11 @@ export interface components {
       reference: string | null;
       /** @description A qualification's name. */
       title: string | null;
+      /**
+       * @description The education entry a qualification check is for, while it's on your profile.
+       * @example edu_01k6q2x8h4f7tbn3m9vz5cdr0e
+       */
+      educationId: string | null;
       createdAt: string;
       decidedAt: string | null;
     };
@@ -3748,7 +3899,7 @@ export interface components {
     Candidate: components["schemas"]["FullProfile"] & {
       /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
-      contact: components["schemas"]["Contact"];
+      contact: components["schemas"]["ContactOptions"];
       applications: {
         id: string;
         jobId: string;
@@ -3762,9 +3913,19 @@ export interface components {
         createdAt: string;
       }[];
     };
-    Contact: {
-      email: string | null;
-      phone: string | null;
+    ContactOptions: {
+      /** @description You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you. */
+      message: boolean;
+      /** @description You can see their mobile (POST …/candidates/{userId}/phone). */
+      phone: boolean;
+    };
+    MessageSent: {
+      /** @enum {boolean} */
+      sent: true;
+    };
+    CandidatePhone: {
+      /** @example +61412345678 */
+      phone: string;
     };
     Team: {
       /** @description Owners first. */
@@ -3921,6 +4082,96 @@ export interface components {
       claim: components["schemas"]["Claim"];
       salon: components["schemas"]["MySalon"];
     };
+    SharedProfile: {
+      /** @example Jess D. */
+      name: string;
+      profile: {
+        firstName: string;
+        headline: string | null;
+        about: string | null;
+        suburb: string;
+        /**
+         * @example NSW
+         * @enum {string}
+         */
+        state: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+        roles: (
+          | "senior_stylist"
+          | "stylist"
+          | "junior_stylist"
+          | "apprentice_hair"
+          | "colourist"
+          | "barber"
+          | "beauty_therapist"
+          | "nail_technician"
+          | "lash_brow"
+          | "makeup_artist"
+          | "skin_therapist"
+          | "massage_spa"
+          | "apprentice_beauty"
+          | "salon_manager"
+          | "receptionist"
+          | "educator"
+        )[];
+        yearsExperience: number;
+        instagram: string | null;
+        tiktok: string | null;
+        openToWork: boolean;
+        photoUrl: string | null;
+        specialties: string[];
+        brands: string[];
+        availableDays: string[];
+        employmentTypes: (
+          | "full_time"
+          | "part_time"
+          | "casual"
+          | "contract"
+          | "apprenticeship"
+          | "chair_rental"
+        )[];
+        availableFrom: string | null;
+        travelKm: number | null;
+      };
+      experience: components["schemas"]["Experience"][];
+      education: components["schemas"]["Education"][];
+      portfolio: components["schemas"]["PortfolioItem"][];
+      endorsements: components["schemas"]["Endorsement"][];
+      verification: {
+        /** @enum {string} */
+        identity: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @enum {string} */
+        rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        /** @enum {string} */
+        qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      };
+      /** @description For someone signed in on a salon's team: each salon they can contact this person as. Null for anyone else. */
+      viewer: {
+        salons: {
+          id: string;
+          name: string;
+          /** @description Their ID in your salon's routes. */
+          candidateId: string;
+          contact: components["schemas"]["ContactOptions"];
+        }[];
+      } | null;
+    };
+    EndorsementAsk: {
+      /**
+       * @description Who asked.
+       * @example Jess D.
+       */
+      name: string;
+      photoUrl: string | null;
+      headline: string | null;
+      /** @description Your name, as they typed it. */
+      refereeName: string;
+      /** @description What they said when asking. */
+      note: string | null;
+    };
+    EndorsementWritten: {
+      /** @enum {boolean} */
+      written: true;
+    };
     Billing: {
       /** @description Real payments are switched on here. */
       billingOn: boolean;
@@ -4074,7 +4325,10 @@ export interface components {
       profile: {
         first_name: string;
         last_name: string;
-        phone: string | null;
+        /** @enum {string} */
+        visibility: "public" | "salons" | "hidden";
+        /** @enum {string} */
+        contact_by: "both" | "email" | "phone";
         headline: string | null;
         suburb: string;
         state: string;
@@ -4084,6 +4338,7 @@ export interface components {
         right_to_work: string;
         open_to_work: boolean;
         instagram: string | null;
+        tiktok: string | null;
         photo_url: string | null;
       } | null;
       checks: components["schemas"]["AdminUserCheck"][];

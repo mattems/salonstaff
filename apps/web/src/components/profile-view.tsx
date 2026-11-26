@@ -1,15 +1,16 @@
 /**
- * A job seeker's profile as salons see it: the seeker's own preview, and a salon reviewing an
- * applicant (with contact details, which only salons they applied to get).
+ * A job seeker's profile: the seeker's own preview, a salon looking at a candidate (with ways to
+ * contact them), and the share page (D-13: no surname, work rights, pay or contact details).
  */
-import { WEEKDAYS } from "@salonstaff/shared";
+import { ENDORSEMENT_RELATIONSHIPS, formatPay, labelFor, WEEKDAYS } from "@salonstaff/shared";
 import { Avatar, AvatarFallback, AvatarImage } from "@salonstaff/ui/components/avatar";
 import { Badge } from "@salonstaff/ui/components/badge";
-import { Button } from "@salonstaff/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@salonstaff/ui/components/card";
 import { cn } from "@salonstaff/ui/lib/utils";
 import type { ReactNode } from "react";
-import type { FullProfile, Schemas } from "@/lib/api";
+import { AppLink } from "@/components/app-link";
+import { VerifiedTick } from "@/components/qualification-check";
+import type { Schemas } from "@/lib/api";
 import {
   employmentLabel,
   formatDate,
@@ -44,11 +45,44 @@ function Panel({ title, children }: { title: string; children: ReactNode }) {
   );
 }
 
-export function VerificationList({ verification: v }: { verification: Schemas["Verification"] }) {
+type Status = Schemas["Verification"]["identity"];
+
+/** What every view of a profile has. The share page leaves out the private parts. */
+export interface ViewableProfile {
+  /** "Jess Demo", or "Jess D." on the share page. */
+  name: string;
+  profile: Omit<
+    Schemas["SeekerProfile"],
+    "lastName" | "postcode" | "rightToWork" | "payMin" | "payPeriod"
+  > &
+    Partial<Pick<Schemas["SeekerProfile"], "rightToWork" | "payMin" | "payPeriod">>;
+  experience: Schemas["Experience"][];
+  education: Schemas["Education"][];
+  portfolio: Schemas["PortfolioItem"][];
+  endorsements: Schemas["Endorsement"][];
+  verification: {
+    identity: Status;
+    rightToWork: Status;
+    qualification: Status;
+    references?: Schemas["Verification"]["references"];
+  };
+}
+
+/** A full profile (their own, or a salon's candidate) as `ProfileView` takes it. */
+export const viewable = (full: Schemas["FullProfile"]): ViewableProfile => ({
+  ...full,
+  name: `${full.profile.firstName} ${full.profile.lastName}`,
+});
+
+export function VerificationList({
+  verification: v,
+}: {
+  verification: ViewableProfile["verification"];
+}) {
   const rows = [
-    ["Identity", v.identity, v.references.identity],
-    ["Right to work", v.rightToWork, v.references.rightToWork],
-    ["Qualification", v.qualification, v.references.qualification],
+    ["Identity", v.identity, v.references?.identity],
+    ["Right to work", v.rightToWork, v.references?.rightToWork],
+    ["Qualification", v.qualification, v.references?.qualification],
   ] as const;
   return (
     <ul className="space-y-3 text-sm">
@@ -79,26 +113,29 @@ export function VerificationList({ verification: v }: { verification: Schemas["V
   );
 }
 
+const handleOf = (value: string) => value.replace(/^@/, "");
+
 export function ProfileView({
   full,
-  contact,
+  actions,
   aside,
 }: {
-  full: FullProfile;
-  contact?: Schemas["Contact"];
+  full: ViewableProfile;
+  /** Ways to get in touch (a salon's contact buttons, or a sign-in prompt), under the name. */
+  actions?: ReactNode;
   /** Extra content for the side column (application status, say). */
   aside?: ReactNode;
 }) {
-  const { profile: p, experience, education, portfolio, verification: v } = full;
-  const name = `${p.firstName} ${p.lastName}`;
-  const phone = p.phone ?? contact?.phone ?? null;
+  const { profile: p, experience, education, portfolio, endorsements, verification: v } = full;
+  const { name } = full;
   const today = new Date().toISOString().slice(0, 10);
+  const pay = p.payMin ? formatPay(p.payMin, null, p.payPeriod) : null;
   const hasAvailability =
     p.availableDays.length > 0 ||
     p.employmentTypes.length > 0 ||
     p.availableFrom ||
     p.travelKm != null ||
-    p.payExpectation;
+    pay;
 
   return (
     <div className="space-y-6">
@@ -122,15 +159,25 @@ export function ProfileView({
                 <span>
                   {p.yearsExperience} year{p.yearsExperience === 1 ? "" : "s"} experience
                 </span>
-                <span>{rightToWorkLabel(p.rightToWork)}</span>
+                {p.rightToWork && <span>{rightToWorkLabel(p.rightToWork)}</span>}
                 {p.instagram && (
                   <a
-                    href={`https://www.instagram.com/${p.instagram.replace(/^@/, "")}`}
+                    href={`https://www.instagram.com/${handleOf(p.instagram)}`}
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noreferrer nofollow"
                     className="underline"
                   >
-                    @{p.instagram.replace(/^@/, "")}
+                    Instagram @{handleOf(p.instagram)}
+                  </a>
+                )}
+                {p.tiktok && (
+                  <a
+                    href={`https://www.tiktok.com/@${handleOf(p.tiktok)}`}
+                    target="_blank"
+                    rel="noreferrer nofollow"
+                    className="underline"
+                  >
+                    TikTok @{handleOf(p.tiktok)}
                   </a>
                 )}
               </p>
@@ -146,20 +193,7 @@ export function ProfileView({
               </Badge>
             ))}
           </div>
-          {contact && (contact.email || phone) && (
-            <div className="flex flex-wrap gap-2 border-t pt-4">
-              {contact.email && (
-                <Button asChild>
-                  <a href={`mailto:${contact.email}`}>Email {p.firstName}</a>
-                </Button>
-              )}
-              {phone && (
-                <Button asChild variant="outline">
-                  <a href={`tel:${phone}`}>Call {phone}</a>
-                </Button>
-              )}
-            </div>
-          )}
+          {actions && <div className="border-t pt-4">{actions}</div>}
         </CardContent>
       </Card>
 
@@ -221,6 +255,58 @@ export function ProfileView({
               </div>
             </Panel>
           )}
+          {endorsements.length > 0 && (
+            <Panel title="Endorsements">
+              <ul className="space-y-6">
+                {endorsements.map((item) => (
+                  <li key={item.id} className="space-y-2">
+                    <blockquote className="whitespace-pre-line border-l-2 pl-4 leading-relaxed">
+                      {item.body}
+                    </blockquote>
+                    <p className="text-sm">
+                      <span className="font-medium">{item.refereeName}</span>
+                      {item.refereeTitle && `, ${item.refereeTitle}`}
+                      {item.salonName && ` · ${item.salonName}`}
+                      {item.relationship && (
+                        <span className="text-muted-foreground">
+                          {" "}
+                          · {labelFor(ENDORSEMENT_RELATIONSHIPS, item.relationship)}
+                        </span>
+                      )}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-xs">
+                      {item.onSalonStaff ? (
+                        <Badge variant="secondary" asChild>
+                          <AppLink href={item.onSalonStaff.path}>
+                            On Salon Staff: {item.onSalonStaff.name}
+                          </AppLink>
+                        </Badge>
+                      ) : (
+                        <span className="text-muted-foreground">Email address confirmed</span>
+                      )}
+                      <span className="text-muted-foreground">{formatDate(item.writtenAt)}</span>
+                    </div>
+                    {item.contact && (
+                      <p className="text-muted-foreground text-sm">
+                        Happy to be contacted:{" "}
+                        <a href={`mailto:${item.contact.email}`} className="underline">
+                          {item.contact.email}
+                        </a>
+                        {item.contact.phone && (
+                          <>
+                            {" · "}
+                            <a href={`tel:${item.contact.phone}`} className="underline">
+                              {item.contact.phone}
+                            </a>
+                          </>
+                        )}
+                      </p>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </Panel>
+          )}
           {experience.length > 0 && (
             <Panel title="Experience">
               <ol className="space-y-5">
@@ -247,22 +333,25 @@ export function ProfileView({
               </ol>
             </Panel>
           )}
-          {(education.length > 0 || p.qualifications) && (
-            <Panel title="Education and qualifications">
+          {education.length > 0 && (
+            <Panel title="Qualifications">
               <ul className="space-y-3">
                 {education.map((item) => (
                   <li key={item.id}>
-                    <p className="font-medium">{item.qualification}</p>
-                    <p className="text-muted-foreground text-sm">
-                      {item.institution}
-                      {item.year && ` · ${item.year}`}
+                    <p className="flex flex-wrap items-center gap-2 font-medium">
+                      {item.qualification}
+                      {item.verification?.status === "verified" && (
+                        <VerifiedTick reference={item.verification.reference} />
+                      )}
                     </p>
+                    {(item.institution || item.year) && (
+                      <p className="text-muted-foreground text-sm">
+                        {[item.institution, item.year].filter(Boolean).join(" · ")}
+                      </p>
+                    )}
                   </li>
                 ))}
               </ul>
-              {p.qualifications && (
-                <p className={cn("text-sm", education.length > 0 && "mt-4")}>{p.qualifications}</p>
-              )}
             </Panel>
           )}
         </div>
@@ -315,10 +404,10 @@ export function ProfileView({
                     <dd>Up to {p.travelKm} km</dd>
                   </div>
                 )}
-                {p.payExpectation && (
+                {pay && (
                   <div className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">Pay expectation</dt>
-                    <dd className="text-right">{p.payExpectation}</dd>
+                    <dt className="text-muted-foreground">Pay</dt>
+                    <dd className="text-right">From {pay}</dd>
                   </div>
                 )}
               </dl>

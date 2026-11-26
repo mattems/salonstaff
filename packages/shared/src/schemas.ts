@@ -2,10 +2,13 @@ import { z } from "zod";
 import {
   APPLICATION_STATUS_VALUES,
   AU_STATE_VALUES,
+  CONTACT_BY_VALUES,
   EMPLOYMENT_TYPE_VALUES,
+  ENDORSEMENT_RELATIONSHIP_VALUES,
   JOB_ROLE_VALUES,
   PAY_PERIOD_VALUES,
   PROFILE_LIMITS,
+  PROFILE_VISIBILITY_VALUES,
   RIGHT_TO_WORK_VALUES,
   WEEKDAY_VALUES,
 } from "./constants";
@@ -104,6 +107,15 @@ export const emailChangeConfirmSchema = emailChangeSchema.extend({
     .regex(/^\d{6}$/, "Enter the 6-digit code"),
 });
 
+/** Changing (or adding) the account's mobile: a code by SMS to the new number, then sent back. */
+export const mobileChangeSchema = z.object({ phoneNumber: phoneField });
+export const mobileChangeConfirmSchema = mobileChangeSchema.extend({
+  code: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, "Enter the 6-digit code"),
+});
+
 /** Native Google / Apple sign-in from the mobile app: the app sends the provider's ID token. */
 export const oauthTokenSchema = z.object({
   provider: z.enum(["google", "apple"]),
@@ -118,17 +130,6 @@ export type OAuthTokenInput = z.infer<typeof oauthTokenSchema>;
 export const seekerProfileSchema = z.object({
   firstName: trimmed(60).min(1, "Required"),
   lastName: trimmed(60).min(1, "Required"),
-  /** Any common AU mobile format; stored as +614xxxxxxxx. */
-  phone: z
-    .string()
-    .trim()
-    .optional()
-    .transform((v, ctx) => {
-      if (!v) return undefined;
-      const n = normaliseAuMobile(v);
-      if (!n) ctx.addIssue({ code: "custom", message: "Enter an Australian mobile number" });
-      return n ?? v;
-    }),
   headline: optionalText(120),
   about: optionalText(2000),
   suburb: trimmed(80).min(1, "Required"),
@@ -136,8 +137,8 @@ export const seekerProfileSchema = z.object({
   postcode: postcodeSchema,
   roles: z.array(z.enum(JOB_ROLE_VALUES)).min(1, "Pick at least one role").max(6),
   yearsExperience: z.coerce.number().int().min(0).max(60),
-  qualifications: optionalText(500),
   instagram: optionalText(60),
+  tiktok: optionalText(60),
   rightToWork: z.enum(RIGHT_TO_WORK_VALUES),
   openToWork: z.boolean().default(true),
 });
@@ -165,12 +166,9 @@ export const profileDetailsSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   travelKm: optionalNumber(z.coerce.number().int().min(0).max(500)),
-  payExpectation: z
-    .string()
-    .trim()
-    .max(60)
-    .optional()
-    .transform((v) => v || undefined),
+  /** The least they'd take, per `payPeriod`. Left out: not saying. */
+  payMin: optionalNumber(z.coerce.number().min(1, "Enter an amount").max(500000)),
+  payPeriod: z.enum(PAY_PERIOD_VALUES).default("hour"),
 });
 export type ProfileDetailsInput = z.infer<typeof profileDetailsSchema>;
 
@@ -201,10 +199,59 @@ export type ExperienceInput = z.infer<typeof experienceSchema>;
 
 export const educationSchema = z.object({
   qualification: z.string().trim().min(1, "Required").max(120),
-  institution: z.string().trim().min(1, "Required").max(120),
+  /** Where they studied; optional (a short course, or not remembered). */
+  institution: optionalText(120),
   year: optionalNumber(z.coerce.number().int().min(1960).max(2100)),
 });
 export type EducationInput = z.infer<typeof educationSchema>;
+
+/** Who sees the profile and how salons may contact them (D-13). Send only what changes. */
+export const profileSettingsSchema = z.object({
+  visibility: z.enum(PROFILE_VISIBILITY_VALUES).optional(),
+  contactBy: z.enum(CONTACT_BY_VALUES).optional(),
+});
+export type ProfileSettingsInput = z.infer<typeof profileSettingsSchema>;
+
+/** Asking someone for an endorsement: they get an email with a one-time link. */
+export const endorsementRequestSchema = z.object({
+  refereeName: trimmed(80).min(1, "Required"),
+  refereeEmail: emailField.pipe(z.string().max(254)),
+  /** A line from the job seeker, included in the email. */
+  note: optionalText(300),
+});
+export type EndorsementRequestInput = z.infer<typeof endorsementRequestSchema>;
+
+/** What a referee writes through their link. */
+export const endorsementSchema = z.object({
+  name: trimmed(80).min(1, "Required"),
+  /** Their own role, e.g. "Salon owner". */
+  title: trimmed(80).min(1, "Required"),
+  /** Where they worked together (or where the referee works). */
+  salonName: trimmed(120).min(1, "Required"),
+  relationship: z.enum(ENDORSEMENT_RELATIONSHIP_VALUES),
+  body: trimmed(1000).min(40, "Write at least a couple of sentences (40 characters)"),
+  /** Salons the job seeker applies to may contact them. */
+  contactOk: z.boolean().default(false),
+  phone: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v, ctx) => {
+      if (!v) return undefined;
+      const digits = v.replace(/[^\d+]/g, "");
+      if (!/^(\+?61|0)\d{9}$/.test(digits)) {
+        ctx.addIssue({ code: "custom", message: "Enter an Australian phone number" });
+      }
+      return digits;
+    }),
+});
+export type EndorsementInput = z.infer<typeof endorsementSchema>;
+
+/** A salon's message to a job seeker, emailed with reply-to the sender (D-13). */
+export const contactMessageSchema = z.object({
+  message: trimmed(2000).min(20, "Write a little more (at least 20 characters)"),
+});
+export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
 
 export const applySchema = z.object({
   coverNote: optionalText(1500),

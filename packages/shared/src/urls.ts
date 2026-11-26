@@ -138,6 +138,12 @@ export function parseSalonsPath(segments: string[]): SalonsRoute | null {
   return { kind: "salon", state, suburbSlug: second, slug: third };
 }
 
+/** A job seeker's share page (D-13). Not indexed; the code is unguessable. */
+export const profilePath = (code: string) => `/p/${code}`;
+
+/** Where a referee writes an endorsement, from the link in their email. */
+export const endorsePath = (token: string) => `/endorse/${token}`;
+
 /** Picks the first free slug: `base`, `base-2`, `base-3`… */
 export function nextFreeSlug(base: string, taken: ReadonlySet<string>): string {
   if (!taken.has(base)) return base;

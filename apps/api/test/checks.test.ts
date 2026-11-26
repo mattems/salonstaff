@@ -3,7 +3,7 @@ import { checks, housekeeping } from "@salonstaff/db";
 import { decodeId, uuidv7 } from "@salonstaff/shared";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { form, PDF, PNG, seekerWithProfile } from "./fixtures";
+import { form, PDF, type Person, PNG, seekerWithProfile } from "./fixtures";
 import { createTestApp, query, withDb } from "./helpers";
 
 interface Checks {
@@ -14,7 +14,13 @@ interface Checks {
     references: Record<string, string>;
     qualificationTitle: string | null;
   };
-  checks: { id: string; kind: string; status: string; reference: string | null }[];
+  checks: {
+    id: string;
+    kind: string;
+    status: string;
+    reference: string | null;
+    educationId: string | null;
+  }[];
 }
 
 const checkRow = (id: string) =>
@@ -27,6 +33,26 @@ const checkRow = (id: string) =>
   }>(
     sql`select status, result, document_key, reference, reviewed_by from seeker_checks where id = ${id}`,
   ).then((rows) => rows[0]);
+
+/** Adds an education entry and returns its ID. */
+async function education(seeker: Person, qualification: string) {
+  const added = await seeker.api<{ education: { id: string; qualification: string }[] }>(
+    "POST",
+    "/v1/me/education",
+    { qualification, institution: "TAFE NSW", year: 2019 },
+  );
+  expect(added.status).toBe(201);
+  return added.body.education.find((e) => e.qualification === qualification)?.id as string;
+}
+
+const certificate = (educationId: string, type: "png" | "pdf" = "pdf") =>
+  form({
+    file:
+      type === "png"
+        ? { bytes: PNG, name: "c.png", type: "image/png" }
+        : { bytes: PDF, name: "c.pdf", type: "application/pdf" },
+    educationId,
+  });
 
 describe("verification checks", () => {
   it("won't start an identity check before there's a profile, or send people elsewhere", async () => {
@@ -94,10 +120,11 @@ describe("verification checks", () => {
   it("deletes a certificate from the private bucket once decided", async () => {
     const app = createTestApp();
     const seeker = await seekerWithProfile(app, "Certified");
+    const diploma = await education(seeker, "Diploma of Beauty");
     const image = await seeker.api(
       "POST",
       "/v1/me/checks/qualification",
-      form({ file: { bytes: PNG, name: "c.png", type: "image/png" }, title: "Diploma of Beauty" }),
+      certificate(diploma, "png"),
     );
     expect(image.status).toBe(201);
     const sent = await seeker.api<Checks>("GET", "/v1/me/checks");
@@ -105,14 +132,9 @@ describe("verification checks", () => {
     const before = await checkRow(checkId);
     const key = before?.document_key as string;
     expect(await env.PRIVATE.head(key)).not.toBeNull();
+    // One at a time for the same entry.
     expect(
-      (
-        await seeker.api(
-          "POST",
-          "/v1/me/checks/qualification",
-          form({ file: { bytes: PDF, name: "c.pdf", type: "application/pdf" }, title: "Another" }),
-        )
-      ).status,
+      (await seeker.api("POST", "/v1/me/checks/qualification", certificate(diploma))).status,
     ).toBe(409);
 
     const { evidenceKeys } = await withDb((db) =>
@@ -127,18 +149,13 @@ describe("verification checks", () => {
       status: "failed",
       document_key: null,
       reference: null,
-      result: { title: "Diploma of Beauty" },
+      result: { title: "Diploma of Beauty", institution: "TAFE NSW", year: 2019 },
     });
 
     // A PDF certificate is accepted too, and a pass shows its title.
+    const cert = await education(seeker, "Cert III");
     expect(
-      (
-        await seeker.api(
-          "POST",
-          "/v1/me/checks/qualification",
-          form({ file: { bytes: PDF, name: "c.pdf", type: "application/pdf" }, title: "Cert III" }),
-        )
-      ).status,
+      (await seeker.api("POST", "/v1/me/checks/qualification", certificate(cert))).status,
     ).toBe(201);
     const second = (await seeker.api<Checks>("GET", "/v1/me/checks")).body.checks[0]?.id as string;
     await withDb((db) =>
@@ -157,7 +174,7 @@ describe("verification checks", () => {
     await seeker.api(
       "POST",
       "/v1/me/checks/qualification",
-      form({ file: { bytes: PDF, name: "c.pdf", type: "application/pdf" }, title: "Old cert" }),
+      certificate(await education(seeker, "Old cert")),
     );
     const id = decodeId(
       "check",
@@ -171,5 +188,65 @@ describe("verification checks", () => {
     const { evidenceKeys } = await withDb((db) => housekeeping(db).purgeStaleEvidence());
     expect(evidenceKeys).toContain(key);
     expect(await checkRow(id)).toMatchObject({ status: "failed", document_key: null, result: {} });
+  });
+
+  it("verifies each education entry on its own, and shows it on the entry", async () => {
+    const app = createTestApp();
+    const seeker = await seekerWithProfile(app, "Educated");
+    const cert = await education(seeker, "Cert III in Hairdressing");
+    const diploma = await education(seeker, "Diploma of Salon Management");
+    const other = await seekerWithProfile(app, "Stranger");
+    expect((await other.api("POST", "/v1/me/checks/qualification", certificate(cert))).status).toBe(
+      404,
+    );
+
+    // Two entries can wait for review at once.
+    for (const id of [cert, diploma]) {
+      expect(
+        (await seeker.api("POST", "/v1/me/checks/qualification", certificate(id))).status,
+      ).toBe(201);
+    }
+    type Profile = {
+      education: {
+        id: string;
+        verification: { status: string; reference: string | null } | null;
+      }[];
+    };
+    const statusOf = async (id: string) =>
+      (await seeker.api<Profile>("GET", "/v1/me/profile")).body.education.find((e) => e.id === id)
+        ?.verification;
+    expect(await statusOf(cert)).toEqual({ status: "pending", reference: null });
+
+    const sent = (await seeker.api<Checks>("GET", "/v1/me/checks")).body.checks;
+    const certCheck = sent.find((c) => c.educationId === cert)?.id as string;
+    await withDb((db) =>
+      checks(db).review(decodeId("check", certCheck) as string, "verified", uuidv7()),
+    );
+    const passed = await statusOf(cert);
+    expect(passed?.status).toBe("verified");
+    expect(passed?.reference).toMatch(/^SSV-/);
+    expect(await statusOf(diploma)).toEqual({ status: "pending", reference: null });
+    // A verified entry needs nothing more.
+    expect(
+      (await seeker.api("POST", "/v1/me/checks/qualification", certificate(cert))).status,
+    ).toBe(409);
+
+    // The share page says it passed, without the verification ID.
+    const { shareCode } = (
+      await seeker.api<{ shareCode: string }>("PATCH", "/v1/me/profile/settings", {
+        visibility: "public",
+      })
+    ).body;
+    const shared = (await (await app.call(`/v1/profiles/${shareCode}`)).json()) as Profile;
+    expect(shared.education.find((e) => e.id === cert)?.verification).toEqual({
+      status: "verified",
+      reference: null,
+    });
+
+    // Removing the entry keeps the check (its verification ID stays valid), unlinked.
+    await seeker.api("DELETE", `/v1/me/education/${cert}`);
+    const after = (await seeker.api<Checks>("GET", "/v1/me/checks")).body;
+    expect(after.checks.find((c) => c.id === certCheck)?.educationId).toBeNull();
+    expect(after.verification.qualification).toBe("verified");
   });
 });

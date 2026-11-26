@@ -25,4 +25,4 @@ accounts get taken over this way: require a fresh sign-in (Better Auth's `freshA
 current email or mobile first.
 
 **Not included:** passwords, passkeys and two-factor (D-02: no passwords; codes already prove the
-address or number), changing the mobile number (it's tied to the D-08 verified mobile).
+address or number). Changing the mobile was left out here and added by D-13 (`/v1/me/mobile`).

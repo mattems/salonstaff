@@ -5,6 +5,8 @@ import {
   ApiError,
   type ApplicationStatus,
   applicationStatusSchema,
+  BRAND,
+  contactMessageSchema,
   decodeId,
   entitlementOf,
   isValidAbn,
@@ -21,7 +23,7 @@ import {
 } from "@salonstaff/shared";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
-import { appUrl, notify } from "../lib/notify";
+import { appUrl, notify, sendEmail } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import {
@@ -37,7 +39,7 @@ import {
   SalonParams,
 } from "../lib/schemas";
 import { idFrom, requireSalon, requireUser } from "../lib/session";
-import { applicantJson, candidateJson, mySalonJson, salonJobJson } from "../lib/views";
+import { applicantJson, candidateJson, mySalonJson, realEmail, salonJobJson } from "../lib/views";
 
 /**
  * A salon team's pages (D-11): your salons, a salon's settings, jobs and publishing, applicants and
@@ -590,36 +592,128 @@ employerRoutes.openapi(
   },
 );
 
+const CandidateParams = SalonParams.extend({
+  userId: pathParam("userId", "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"),
+});
+const candidateHint =
+  "Open a job's applicants, or a profile shared with you, and use its `candidateId`.";
+const noCandidate = () =>
+  new ApiError("not_found", { detail: "No profile you can see has that ID", hint: candidateHint });
+
 employerRoutes.openapi(
   createRoute({
     method: "get",
     path: "/v1/employer/salons/{salonId}/candidates/{userId}",
     summary: "A candidate's full profile",
     description:
-      "Only for someone who applied to one of your jobs: their full profile, verification, contact details and their applications to your salon.",
+      "Someone who applied to one of your jobs, or whose profile is open to salons and not hidden from yours (D-13): their full profile, verification, endorsements, how you can contact them (`contact`) and their applications to your salon. Referees' contact details come only with an application, and only where the referee agreed.",
     tags: TAGS,
-    request: {
-      params: SalonParams.extend({
-        userId: pathParam("userId", "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"),
-      }),
-    },
+    request: { params: CandidateParams },
     responses: {
       200: json(CandidateSchema, "The candidate"),
       401: errors[401],
-      404: problemResponse("Nobody with that ID applied to your salon"),
+      404: problemResponse("No profile you can see has that ID"),
     },
   }),
   async (c) => {
     const { scope } = await requireSalon(c, c.req.valid("param").salonId);
-    const hint = "Open a job's applicants and use a `candidateId` from there.";
-    const userId = idFrom("user", c.req.valid("param").userId, "candidate", hint);
+    const userId = idFrom("user", c.req.valid("param").userId, "candidate", candidateHint);
     const candidate = await scope.candidate(userId);
-    if (!candidate) {
-      throw new ApiError("not_found", {
-        detail: "Nobody with that ID applied to your salon",
-        hint,
+    if (!candidate) throw noCandidate();
+    return c.json(candidateJson(c.env, userId, candidate), 200);
+  },
+);
+
+employerRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/employer/salons/{salonId}/candidates/{userId}/messages",
+    summary: "Message a candidate",
+    description:
+      "We email your message to them with your name and salon, and replies come straight back to your email: they never see each other's address until they reply. Only if their `contact.message` is true. Your salon can message 25 people a day, each once a day. They see every message in their account.",
+    tags: TAGS,
+    request: { params: CandidateParams, ...jsonBody(contactMessageSchema) },
+    responses: {
+      201: json(z.object({ sent: z.literal(true) }).openapi("MessageSent"), "Sent"),
+      400: errors[400],
+      401: errors[401],
+      403: problemResponse("Your salon can't contact job seekers now"),
+      404: problemResponse("No profile you can see has that ID"),
+      409: problemResponse("They don't take messages, or your account has no email for replies"),
+      429: problemResponse("Today's limit reached"),
+    },
+  }),
+  async (c) => {
+    const { scope, salon, session, actor } = await requireSalon(c, c.req.valid("param").salonId);
+    const userId = idFrom("user", c.req.valid("param").userId, "candidate", candidateHint);
+    const { message } = c.req.valid("json");
+    const replyTo = session.user.email;
+    if (!replyTo) {
+      throw new ApiError("conflict", {
+        detail: "Add an email to your account first",
+        hint: "Replies go to your email. Add one with POST /v1/me/email.",
       });
     }
-    return c.json(candidateJson(c.env, userId, candidate), 200);
+    if (c.get("dryRun")) {
+      const found = await scope.access(userId);
+      if (!found?.access.view) throw noCandidate();
+      return c.json({ sent: true as const }, 201);
+    }
+    const { contact } = await scope.contact(
+      userId,
+      "message",
+      { message, senderId: session.user.id },
+      actor,
+    );
+    const to = realEmail(contact.email);
+    if (to) {
+      const sender = session.user.name || "Someone";
+      sendEmail(c, to, {
+        subject: `${salon.name} sent you a message`,
+        title: `${sender} from ${salon.name} sent you a message`,
+        body: `${message}\n\nReply to this email to answer ${sender} directly. ${salon.name}: ${appUrl(c, salonPath(salon))}`,
+        action: "See who's contacted you",
+        url: appUrl(c, "/account/contact"),
+        replyTo,
+        footer: `${salon.name} found you on ${BRAND.name}. To stop them contacting you, hide your profile from them in your account.`,
+      });
+    }
+    return c.json({ sent: true as const }, 201);
+  },
+);
+
+employerRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/employer/salons/{salonId}/candidates/{userId}/phone",
+    summary: "See a candidate's mobile",
+    description:
+      "Their verified mobile, only if their `contact.phone` is true. Each look is recorded, and they can see which salons looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
+    tags: TAGS,
+    request: { params: CandidateParams },
+    responses: {
+      200: json(
+        z
+          .object({ phone: z.string().openapi({ example: "+61412345678" }) })
+          .openapi("CandidatePhone"),
+        "Their mobile",
+      ),
+      401: errors[401],
+      403: problemResponse("Your salon can't contact job seekers now"),
+      404: problemResponse("No profile you can see has that ID"),
+      409: problemResponse("They don't share their number"),
+      429: problemResponse("Today's limit reached"),
+    },
+  }),
+  async (c) => {
+    const { scope, session, actor } = await requireSalon(c, c.req.valid("param").salonId);
+    const userId = idFrom("user", c.req.valid("param").userId, "candidate", candidateHint);
+    if (c.get("dryRun")) {
+      const found = await scope.access(userId);
+      if (!found?.access.phone) throw noCandidate();
+      return c.json({ phone: found.contact.phoneNumber ?? "" }, 200);
+    }
+    const { contact } = await scope.contact(userId, "phone", { senderId: session.user.id }, actor);
+    return c.json({ phone: contact.phoneNumber ?? "" }, 200);
   },
 );

@@ -25,13 +25,13 @@ import {
   Deleted,
   errors,
   FileField,
-  FullProfileSchema,
   formBody,
   JobSummarySchema,
   json,
   jsonBody,
   MeSchema,
   MyApplicationSchema,
+  MyProfileSchema,
   PortfolioItemSchema,
   pathParam,
 } from "../lib/schemas";
@@ -44,8 +44,8 @@ import {
   storeUpload,
 } from "../lib/storage";
 import {
-  fullProfileJson,
   jobSummaryJson,
+  myProfileJson,
   portfolioJson,
   profileJson,
   realEmail,
@@ -87,7 +87,7 @@ async function fullProfile(c: Context<AppEnv>, db: Db, userId: string) {
       hint: "Send your basic details with PUT /v1/me/profile first.",
     });
   }
-  return fullProfileJson(c.env, full);
+  return myProfileJson(c.env, full);
 }
 
 const emptyChecks = () => summarise([]);
@@ -154,10 +154,10 @@ meRoutes.openapi(
     path: "/v1/me/profile",
     summary: "Your full profile",
     description:
-      "Everything salons see when you apply: basics, skills and availability, experience, education, portfolio and verification.",
+      "Everything salons see: basics, skills and availability, experience, education, portfolio, shown endorsements and verification. `settings` says who sees it and how salons may contact you; only you get those.",
     tags: TAGS,
     responses: {
-      200: json(FullProfileSchema, "Your profile"),
+      200: json(MyProfileSchema, "Your profile"),
       401: errors[401],
       403: errors[403],
       404: problemResponse("No profile yet"),
@@ -175,11 +175,11 @@ meRoutes.openapi(
     path: "/v1/me/profile",
     summary: "Save your basic details",
     description:
-      "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. The mobile number may be in any Australian format; it's stored as +614….",
+      "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here.",
     tags: TAGS,
     request: jsonBody(seekerProfileSchema),
     responses: {
-      200: json(FullProfileSchema, "Your profile"),
+      200: json(MyProfileSchema, "Your profile"),
       400: errors[400],
       401: errors[401],
       403: errors[403],
@@ -202,17 +202,25 @@ meRoutes.openapi(
         employmentTypes: [],
         availableFrom: null,
         travelKm: null,
+        phone: null,
+        qualifications: null,
         payExpectation: null,
+        payMin: null,
+        payPeriod: "hour",
+        visibility: "salons",
+        contactBy: "both",
+        shareCode: null,
         createdAt: now,
         ...current?.profile,
         ...profileValues(input),
         updatedAt: now,
       };
       return c.json(
-        fullProfileJson(c.env, {
+        myProfileJson(c.env, {
           experience: [],
           education: [],
           portfolio: [],
+          endorsements: [],
           ...current,
           profile,
           checks: account?.checks ?? current?.checks ?? emptyChecks(),
@@ -231,11 +239,11 @@ meRoutes.openapi(
     path: "/v1/me/profile/details",
     summary: "Save your skills and availability",
     description:
-      "Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and your pay expectation. Needs a profile first.",
+      "Specialties and brands (tags; duplicates are dropped, ignoring case), the days and kinds of work you're after, when you can start, how far you'll travel and the least you'd take (`payMin` per `payPeriod`; leave it out to not say). Needs a profile first.",
     tags: TAGS,
     request: jsonBody(profileDetailsSchema),
     responses: {
-      200: json(FullProfileSchema, "Your profile"),
+      200: json(MyProfileSchema, "Your profile"),
       400: errors[400],
       401: errors[401],
       403: errors[403],
@@ -298,6 +306,44 @@ meRoutes.openapi(
       throw error;
     }
     return c.json({ photoUrl: mediaUrl(c.env, key) }, 200);
+  },
+);
+
+meRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/me/photo/image",
+    summary: "Your profile photo's file",
+    description:
+      "The picture itself, from this address rather than the media CDN, so the website can draw it into a post image to share (D-13).",
+    tags: TAGS,
+    responses: {
+      200: {
+        description: "The picture",
+        content: { "image/*": { schema: z.string().openapi({ format: "binary" }) } },
+      },
+      401: errors[401],
+      403: errors[403],
+      404: problemResponse("No photo"),
+    },
+  }),
+  async (c) => {
+    const session = await requireSeeker(c);
+    const profile = await seeker(await c.get("db")(), session.user.id).profile();
+    const object = profile?.photoKey ? await c.env.MEDIA.get(profile.photoKey) : null;
+    if (!object) {
+      throw new ApiError("not_found", {
+        detail: "You have no profile photo",
+        hint: "Add one with POST /v1/me/photo.",
+      });
+    }
+    return new Response(object.body, {
+      headers: {
+        "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
+        "Cache-Control": "private, max-age=300",
+        "X-Content-Type-Options": "nosniff",
+      },
+    }) as never;
   },
 );
 
@@ -392,7 +438,7 @@ meRoutes.openapi(
     tags: TAGS,
     request: { params: ItemParams },
     responses: {
-      200: json(FullProfileSchema, "Your profile"),
+      200: json(MyProfileSchema, "Your profile"),
       401: errors[401],
       403: errors[403],
       404: errors[404],
@@ -411,7 +457,7 @@ meRoutes.openapi(
     if (c.get("dryRun")) {
       const full = await scope.fullProfile();
       if (!full?.portfolio.some((p) => p.id === id)) throw notYours("portfolio photo");
-      return c.json(fullProfileJson(c.env, full), 200);
+      return c.json(myProfileJson(c.env, full), 200);
     }
     const key = await scope.removePortfolioItem(id, userActor(c, session.user.id));
     if (!key) throw notYours("portfolio photo");
@@ -431,7 +477,7 @@ meRoutes.openapi(
     tags: TAGS,
     request: jsonBody(experienceSchema),
     responses: {
-      201: json(FullProfileSchema, "Your profile"),
+      201: json(MyProfileSchema, "Your profile"),
       400: errors[400],
       401: errors[401],
       403: errors[403],
@@ -460,7 +506,7 @@ meRoutes.openapi(
     tags: TAGS,
     request: { params: z.object({ id: pathParam("id", "exp_01k6q2x8h4f7tbn3m9vz5cdr0e") }) },
     responses: {
-      200: json(FullProfileSchema, "Your profile"),
+      200: json(MyProfileSchema, "Your profile"),
       401: errors[401],
       403: errors[403],
       404: errors[404],
@@ -479,7 +525,7 @@ meRoutes.openapi(
     if (c.get("dryRun")) {
       const full = await scope.fullProfile();
       if (!full?.experience.some((e) => e.id === id)) throw notYours("role");
-      return c.json(fullProfileJson(c.env, full), 200);
+      return c.json(myProfileJson(c.env, full), 200);
     }
     if (!(await scope.removeExperience(id, userActor(c, session.user.id)))) throw notYours("role");
     return c.json(await fullProfile(c, db, session.user.id), 200);
@@ -496,7 +542,7 @@ meRoutes.openapi(
     tags: TAGS,
     request: jsonBody(educationSchema),
     responses: {
-      201: json(FullProfileSchema, "Your profile"),
+      201: json(MyProfileSchema, "Your profile"),
       400: errors[400],
       401: errors[401],
       403: errors[403],
@@ -525,7 +571,7 @@ meRoutes.openapi(
     tags: TAGS,
     request: { params: z.object({ id: pathParam("id", "edu_01k6q2x8h4f7tbn3m9vz5cdr0e") }) },
     responses: {
-      200: json(FullProfileSchema, "Your profile"),
+      200: json(MyProfileSchema, "Your profile"),
       401: errors[401],
       403: errors[403],
       404: errors[404],
@@ -544,7 +590,7 @@ meRoutes.openapi(
     if (c.get("dryRun")) {
       const full = await scope.fullProfile();
       if (!full?.education.some((e) => e.id === id)) throw notYours("qualification");
-      return c.json(fullProfileJson(c.env, full), 200);
+      return c.json(myProfileJson(c.env, full), 200);
     }
     if (!(await scope.removeEducation(id, userActor(c, session.user.id))))
       throw notYours("qualification");

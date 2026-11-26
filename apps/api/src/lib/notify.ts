@@ -12,6 +12,8 @@ export interface Notice {
   action: string;
   url: string;
   footer?: string;
+  /** Where replies go: an account's own address, never one typed into a form. */
+  replyTo?: string;
 }
 
 /**
@@ -43,6 +45,16 @@ export function sendEmail(c: Context<AppEnv>, to: string, notice: Notice): void 
     await c
       .get("email")()
       .send(await noticeEmail({ to, ...notice }));
+  })().catch((error: unknown) => logFailure(c, error));
+  c.executionCtx.waitUntil(task);
+}
+
+/** A text to a number that may no longer be an account's (the old mobile, after a change). */
+export function sendSms(c: Context<AppEnv>, to: string, body: string): void {
+  const task = (async () => {
+    await c
+      .get("sms")()
+      .send({ to, body: body.slice(0, 320) });
   })().catch((error: unknown) => logFailure(c, error));
   c.executionCtx.waitUntil(task);
 }

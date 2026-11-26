@@ -13,13 +13,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@salonstaff/ui/components/card";
-import { Input } from "@salonstaff/ui/components/input";
-import { createFileRoute, useRouter } from "@tanstack/react-router";
+import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
+import { useMyProfile } from "@/components/account-profile";
 import { AppLink } from "@/components/app-link";
 import {
-  FormError,
   FormMessage,
   formText,
   parse,
@@ -30,7 +29,8 @@ import {
 } from "@/components/form";
 import { Notice, PageHeader } from "@/components/page";
 import { VerificationList } from "@/components/profile-view";
-import { api, multipart, type Schemas, unwrap } from "@/lib/api";
+import { QualificationItem } from "@/components/qualification-check";
+import { api, type Schemas, unwrap } from "@/lib/api";
 import { formatDate } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
@@ -69,7 +69,7 @@ function Verify() {
         <div className="space-y-6">
           <Identity status={v.identity} hasProfile={me.profile !== null} />
           <RightToWork status={v.rightToWork} />
-          <Qualification status={v.qualification} title={v.qualificationTitle} />
+          <Qualifications status={v.qualification} />
         </div>
         <aside className="space-y-6">
           <Card>
@@ -220,60 +220,32 @@ function RightToWork({ status }: { status: Status }) {
   );
 }
 
-function Qualification({ status, title }: { status: Status; title: string | null }) {
-  const router = useRouter();
-  const action = useAction();
+/** The same qualifications as the profile's education section, each verified on its own. */
+function Qualifications({ status }: { status: Status }) {
+  const full = useMyProfile();
+  const education = full?.education ?? [];
   return (
     <CheckCard
-      title="Qualification"
-      description="Upload your certificate (PDF or a photo, up to 8MB). It's kept privately until we've reviewed it, then deleted."
+      title="Qualifications"
+      description="Verify each qualification on your profile with its certificate. Verified ones get a tick on your profile, and salons see the verification ID."
       status={status}
     >
-      {status === "pending" ? (
-        <p className="text-sm">We're reviewing {title ?? "your certificate"}.</p>
-      ) : (
-        <div className="space-y-3">
-          {status === "verified" && (
-            <p className="text-sm">
-              {title ?? "Your qualification"} is verified. You can add another.
-            </p>
-          )}
-          <form
-            className="grid gap-3"
-            onSubmit={action.submit(
-              async (form) => {
-                const file = form.get("file");
-                if (!(file instanceof File) || file.size === 0)
-                  throw new FormError("Choose your certificate first");
-                if (!String(form.get("title") ?? "").trim())
-                  throw new FormError("Enter the qualification's name");
-                unwrap(await api.POST("/v1/me/checks/qualification", multipart(form)));
-                toast.success("Certificate sent for review");
-                await router.invalidate();
-              },
-              { reset: true },
-            )}
-          >
-            <TextField
-              label="Qualification"
-              name="title"
-              placeholder="Cert III in Hairdressing"
-              maxLength={120}
-              error={action.errors.title}
-            />
-            <Input
-              type="file"
-              name="file"
-              accept="application/pdf,image/jpeg,image/png,image/webp,image/heic"
-              aria-label="Certificate"
-            />
-            <FormMessage message={action.message} />
-            <div>
-              <SubmitButton pending={action.pending}>Send for review</SubmitButton>
-            </div>
-          </form>
-        </div>
-      )}
+      <div className="space-y-3">
+        {education.length > 0 ? (
+          <ul className="divide-y">
+            {education.map((item) => (
+              <QualificationItem key={item.id} item={item} />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-muted-foreground text-sm">No qualifications on your profile yet.</p>
+        )}
+        {full && (
+          <Link to="/account/experience" className="text-sm underline">
+            Add a qualification
+          </Link>
+        )}
+      </div>
     </CheckCard>
   );
 }

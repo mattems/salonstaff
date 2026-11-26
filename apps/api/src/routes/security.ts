@@ -1,8 +1,10 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   confirmEmailChange,
+  confirmMobileChange,
   type EmailChangeProblem,
   requestEmailChange,
+  requestMobileChange,
   SOCIAL_PROVIDERS,
   type SocialProvider,
 } from "@salonstaff/auth";
@@ -14,12 +16,14 @@ import {
   emailChangeConfirmSchema,
   emailChangeSchema,
   encodeId,
+  mobileChangeConfirmSchema,
+  mobileChangeSchema,
 } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { userActor } from "../lib/actor";
 import { providersAvailable } from "../lib/auth-config";
-import { appUrl, sendEmail } from "../lib/notify";
+import { appUrl, sendEmail, sendSms } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import { errors, json, jsonBody, MeSchema, pathParam } from "../lib/schemas";
@@ -162,6 +166,130 @@ securityRoutes.openapi(
         url: appUrl(c, session.user.role === "employer" ? "/employer/account" : "/account"),
         footer: `You received this because this address was on a ${BRAND.name} account.`,
       });
+    }
+    const account = await me.account();
+    if (!account) throw new ApiError("unauthenticated", { hint: "Sign in again." });
+    return c.json(meJson(c, account), 200);
+  },
+);
+
+// ---------- Mobile (D-13) ----------
+
+function mobileChangeError(problem: EmailChangeProblem): ApiError {
+  const field = (message: string) =>
+    new ApiError("validation_failed", {
+      detail: message,
+      hint: "Ask for a new code with POST /v1/me/mobile, then send the newest one.",
+      errors: [{ path: "code", message }],
+    });
+  switch (problem) {
+    case "same":
+      return new ApiError("conflict", {
+        detail: "That's already your mobile",
+        hint: "Send a different number.",
+        errors: [{ path: "phoneNumber", message: "That's already your mobile" }],
+      });
+    case "in_use":
+      return new ApiError("conflict", {
+        detail: "That number belongs to another account",
+        hint: "Use a different number, or sign in with that one instead.",
+        errors: [{ path: "phoneNumber", message: "That number belongs to another account" }],
+      });
+    case "expired":
+      return field("That code has expired. Ask for a new one.");
+    case "too_many_attempts":
+      return field("Too many wrong tries. Ask for a new code.");
+    case "invalid_code":
+      return field("That code isn't right. Check it, or ask for a new one.");
+  }
+}
+
+const MobileCodeSentSchema = z
+  .object({ sentTo: z.string().openapi({ example: "+61412345678" }) })
+  .openapi("MobileCodeSent");
+
+securityRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/me/mobile",
+    summary: "Change your mobile: send a code",
+    description:
+      "Sends a 6-digit code by SMS to the new number (an Australian mobile, in any usual format); it lasts 10 minutes. Confirm with POST /v1/me/mobile/confirm. Adds a first mobile to an account that has none. It's the number salons see and SMS codes go to. If another account has the number, nothing is sent (the answer is the same). Shares the sign-in codes' rate limit.",
+    tags: TAGS,
+    request: jsonBody(mobileChangeSchema),
+    responses: {
+      200: json(MobileCodeSentSchema, "Code sent"),
+      400: errors[400],
+      401: errors[401],
+      409: problemResponse("That's already your mobile"),
+      429: problemResponse("Too many codes"),
+    },
+  }),
+  async (c) => {
+    const session = await requireUser(c);
+    const { phoneNumber } = c.req.valid("json");
+    if (phoneNumber === session.user.phoneNumber) throw mobileChangeError("same");
+    if (c.get("dryRun")) return c.json({ sentTo: phoneNumber }, 200);
+    await requireCodeAllowance(c);
+    const db = await c.get("db")();
+    // Someone else's number: say a code went, so nobody can find out who has an account.
+    if (await signIns(db, session.user.id).mobileTakenByOther(phoneNumber)) {
+      return c.json({ sentTo: phoneNumber }, 200);
+    }
+    const result = await requestMobileChange(await c.get("auth")(), phoneNumber);
+    if (!result.ok) throw mobileChangeError(result.problem);
+    return c.json({ sentTo: phoneNumber }, 200);
+  },
+);
+
+securityRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/me/mobile/confirm",
+    summary: "Change your mobile: confirm with the code",
+    description:
+      "The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS. With `dry_run` only the form is checked.",
+    tags: TAGS,
+    request: jsonBody(mobileChangeConfirmSchema),
+    responses: {
+      200: json(MeSchema, "Your account, with its new mobile"),
+      400: problemResponse("Not valid, or the code is wrong or has expired"),
+      401: errors[401],
+      409: problemResponse("That's already your mobile, or another account's"),
+      429: problemResponse("Too many tries"),
+    },
+  }),
+  async (c) => {
+    const session = await requireUser(c);
+    const { phoneNumber, code } = c.req.valid("json");
+    const before = session.user.phoneNumber;
+    if (phoneNumber === before) throw mobileChangeError("same");
+    const db = await c.get("db")();
+    const me = seeker(db, session.user.id);
+    if (c.get("dryRun")) {
+      const account = await me.account();
+      if (!account) throw new ApiError("unauthenticated", { hint: "Sign in again." });
+      return c.json(meJson(c, { ...account, user: { ...account.user, phoneNumber } }), 200);
+    }
+    await requireCodeAllowance(c);
+    const result = await confirmMobileChange(
+      await c.get("auth")(),
+      c.req.raw.headers,
+      phoneNumber,
+      code,
+    );
+    if (!result.ok) throw mobileChangeError(result.problem);
+    await signIns(db, session.user.id).recordMobileChange(
+      before,
+      phoneNumber,
+      userActor(c, session.user.id),
+    );
+    if (before) {
+      sendSms(
+        c,
+        before,
+        `The mobile on your ${BRAND.name} account was changed to one ending ${phoneNumber.slice(-3)}. If you didn't do this, contact ${BRAND.supportEmail} straight away.`,
+      );
     }
     const account = await me.account();
     if (!account) throw new ApiError("unauthenticated", { hint: "Sign in again." });

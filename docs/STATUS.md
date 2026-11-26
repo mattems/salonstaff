@@ -16,7 +16,7 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - `packages/email`: Resend/Mailpit sender, sign-in code and notice templates.
 - `apps/api`: `/v1` (account and profile, checks, jobs + apply/save, salon onboarding, jobs, applicants, candidates,
   directory + claims, salon teams and invites, billing + Stripe webhook, sitemap data, local mock identity/checkout) and `/admin/v1` (overview,
-  checks and claims queues, people, salons, jobs, payments, directory import, staff, passkeys, audit log). 125 tests.
+  checks and claims queues, people, salons, jobs, payments, directory import, staff, passkeys, audit log). 135 tests.
 - `apps/admin`: the admin portal from kaybee, trimmed, with all Salon Staff pages (basic shadcn).
 - `apps/web`: the website (TanStack Start on a Worker, basic shadcn, no design yet): SEO job/salon/landing pages with
   canonical tags, JSON-LD, 301s and `/sitemap.xml`; sign-in (Google, Apple, email code, mobile code, local dev login);
@@ -47,10 +47,35 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   where you're signed in and sign devices out (`/v1/me/sessions`). All audited. Better Auth's own
   `update-user` (which let anyone set their own role), session and unlink endpoints now 404.
 
+- Job seeker profiles (D-13):
+  - `/account` is a list of sections on the left with the chosen one on the right: basics, photo,
+    skills, availability and pay, portfolio, experience and education, endorsements, visibility and
+    sharing, how salons contact you, applications, saved jobs, verification, sign-in and security.
+  - Visibility is public, salons only (the default) or hidden. Seekers can hide from chosen salons.
+  - Public profiles get an unguessable share link (`/p/{code}`, noindex, first name and last
+    initial, no contact details, work rights or pay). The seeker can get a new code, and there's a
+    downloadable post image for Instagram and TikTok, drawn in the browser.
+  - Salons contact seekers by message (emailed, reply-to the sender) or by revealing their
+    verified mobile, as the seeker chooses. Both are recorded, capped per day, and listed for the
+    seeker, who can hide the salon from there.
+  - Endorsements: asked for by email, written once through a link, then shown or hidden by the
+    seeker. Marked "On Salon Staff" when the referee is on a salon's team.
+  - Change or add the mobile with an SMS code (`/v1/me/mobile`, both account pages). Better Auth's
+    own `updatePhoneNumber` is refused.
+  - Pay is a number and period (`payMin`/`payPeriod`), backfilled from the old text. TikTok handle
+    added.
+  - Salons can now open any profile that's open to salons (`/v1/employer/salons/{salonId}/candidates/{userId}`),
+    not only applicants'.
+  - Qualifications are one list (education entries); the Basics box is gone. Each entry is
+    verified with its certificate from the Qualifications section or the Verification page, and
+    shows a "Verified" tick on the profile once staff pass it.
+  - Migrations 0005 and 0006.
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
 ### Known issues
+- Not yet tried for real: SMS to the old number after a mobile change (Twilio), and the share
+  page's preview card on Facebook, LinkedIn or WhatsApp (needs a deploy).
 - Not yet tried in a browser: the multi-salon employer pages, switcher, Team page, invite page and
   employer account page (API tests cover the flows).
 - Not yet tried for real: connecting Google/Apple from the account page (needs keys; the API side is
@@ -70,7 +95,10 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   phones and emails from salons' own websites, reviewed before anything changes.
 
 ### Not done yet
-- Drop `salons.owner_id` in a later migration, once deployed code no longer reads it (D-11).
+- Drop `salons.owner_id` in a later migration, once deployed code no longer reads it (D-11). Likewise
+  `seeker_profiles.phone`, `pay_expectation` and `qualifications` (D-13).
+- Salons searching and browsing job seeker profiles (by role, place, pay, availability): next, maybe a
+  Salon Plan feature (D-13). Reporting spam messages to staff.
 - Nothing runs on GitHub while developing locally: CI only runs when a deploy calls it (none yet). Run
   `bun run ci` before merging. To check pull requests on GitHub again, add `pull_request:` to `.github/workflows/ci.yml`.
 - Directory pages don't yet credit the directory's data sources (Overture, ABS, ABR); needed before importing

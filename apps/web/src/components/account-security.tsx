@@ -2,7 +2,13 @@
  * How someone signs in, on both account pages: their email (changed with a code to the new
  * address), mobile, Google and Apple, and the devices they're signed in on.
  */
-import { BRAND, emailChangeConfirmSchema, emailChangeSchema } from "@salonstaff/shared";
+import {
+  BRAND,
+  emailChangeConfirmSchema,
+  emailChangeSchema,
+  mobileChangeConfirmSchema,
+  mobileChangeSchema,
+} from "@salonstaff/shared";
 import { Badge } from "@salonstaff/ui/components/badge";
 import { Button } from "@salonstaff/ui/components/button";
 import {
@@ -45,6 +51,7 @@ export function AccountSecurity({ methods, sessions }: { methods: Methods; sessi
   return (
     <>
       <EmailCard email={methods.email} />
+      <MobileCard phoneNumber={methods.phoneNumber} />
       <SignInMethods methods={methods} />
       <Sessions sessions={sessions} />
     </>
@@ -165,7 +172,121 @@ function EmailCard({ email }: { email: string | null }) {
 }
 
 // ---------------------------------------------------------------------------
-// Mobile, Google and Apple
+// Mobile
+// ---------------------------------------------------------------------------
+
+/** 0412 345 678, from +61412345678. */
+export const localMobile = (e164: string) =>
+  e164.replace(/^\+61(4\d{2})(\d{3})(\d{3})$/, "0$1 $2 $3");
+
+function MobileCard({ phoneNumber }: { phoneNumber: string | null }) {
+  const refresh = useRefresh();
+  const send = useAction();
+  const confirm = useAction();
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
+  async function sendCode(to: string) {
+    const { sentTo } = unwrap(await api.POST("/v1/me/mobile", { body: { phoneNumber: to } }));
+    setSentTo(sentTo);
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Mobile</CardTitle>
+        <CardDescription>
+          {phoneNumber ? (
+            <>
+              Sign-in codes by SMS go to{" "}
+              <strong className="text-foreground">{localMobile(phoneNumber)}</strong>. It's the
+              number salons see if you let them call you.
+            </>
+          ) : (
+            "No mobile yet. Add one to sign in with an SMS code and let salons call you."
+          )}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {sentTo === null ? (
+          <form
+            className="space-y-4"
+            onSubmit={send.submit(async (form) => {
+              const body = parse(mobileChangeSchema, {
+                phoneNumber: String(form.get("phoneNumber") ?? ""),
+              });
+              await sendCode(body.phoneNumber);
+            })}
+          >
+            <TextField
+              label={phoneNumber ? "New mobile" : "Mobile"}
+              name="phoneNumber"
+              type="tel"
+              autoComplete="tel"
+              placeholder="04xx xxx xxx"
+              required
+              error={send.errors.phoneNumber}
+              hint="We'll text a code to it to make sure it's yours."
+            />
+            <FormMessage message={send.message} />
+            <SubmitButton pending={send.pending}>Send a code</SubmitButton>
+          </form>
+        ) : (
+          <form
+            className="space-y-4"
+            onSubmit={confirm.submit(async (form) => {
+              const body = parse(mobileChangeConfirmSchema, {
+                phoneNumber: sentTo,
+                code: String(form.get("code") ?? ""),
+              });
+              unwrap(await api.POST("/v1/me/mobile/confirm", { body }));
+              setSentTo(null);
+              toast.success(phoneNumber ? "Mobile changed" : "Mobile added");
+              await refresh();
+            })}
+          >
+            <p className="text-sm">
+              We texted a 6-digit code to <strong>{localMobile(sentTo)}</strong>. It lasts 10
+              minutes. If it doesn't arrive, check the number: we can't send one to a number that's
+              already on another account.
+            </p>
+            <TextField
+              label="Code"
+              name="code"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              maxLength={6}
+              required
+              autoFocus
+              error={confirm.errors.code ?? confirm.errors.phoneNumber}
+            />
+            <FormMessage message={confirm.errors.code ? null : confirm.message} />
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+              <SubmitButton pending={confirm.pending}>
+                {phoneNumber ? "Change mobile" : "Add mobile"}
+              </SubmitButton>
+              <Button
+                type="button"
+                variant="link"
+                className="px-0"
+                disabled={send.pending}
+                onClick={() => send.run(() => sendCode(sentTo))}
+              >
+                Send a new code
+              </Button>
+              <Button type="button" variant="link" className="px-0" onClick={() => setSentTo(null)}>
+                Use a different number
+              </Button>
+            </div>
+            <FormMessage message={send.message} />
+          </form>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Google and Apple
 // ---------------------------------------------------------------------------
 
 /** Better Auth's codes when Google or Apple sends someone back without connecting. */
@@ -238,13 +359,9 @@ function SignInMethods({ methods }: { methods: Methods }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <MethodRow
-          title="Mobile"
-          detail={methods.phoneNumber ? `Codes by SMS to ${methods.phoneNumber}` : "Not added"}
-        />
-        {methods.providers.map((item) => (
+        {methods.providers.map((item, i) => (
           <Fragment key={item.provider}>
-            <Separator />
+            {i > 0 && <Separator />}
             <MethodRow
               title={item.label}
               detail={

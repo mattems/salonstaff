@@ -46,3 +46,24 @@ export function verificationReference(): string {
   }
   return `SSV-${chars.slice(0, 4).join("")}-${chars.slice(4).join("")}`;
 }
+
+/** Lowercase letters and digits that can't be mistaken for each other (no 0/o, 1/i/l). */
+const SHARE_ALPHABET = "23456789abcdefghjkmnpqrstuvwxyz";
+
+/**
+ * A job seeker's share code (D-13), e.g. `k7x2m9qd4h`: 10 characters, about 2^49 of them, so
+ * profiles can't be found by guessing. Unbiased, as `verificationReference`.
+ */
+export function shareCode(): string {
+  const chars: string[] = [];
+  const limit = 256 - (256 % SHARE_ALPHABET.length);
+  while (chars.length < 10) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(16))) {
+      if (byte < limit && chars.length < 10)
+        chars.push(SHARE_ALPHABET[byte % SHARE_ALPHABET.length] as string);
+    }
+  }
+  return chars.join("");
+}
+
+export const SHARE_CODE_RE = /^[2-9a-hjkmnp-z]{10}$/;

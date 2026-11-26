@@ -85,7 +85,8 @@ const UserDetail = z
       .object({
         first_name: z.string(),
         last_name: z.string(),
-        phone: z.string().nullable(),
+        visibility: z.enum(["public", "salons", "hidden"]),
+        contact_by: z.enum(["both", "email", "phone"]),
         headline: z.string().nullable(),
         suburb: z.string(),
         state: z.string(),
@@ -95,6 +96,7 @@ const UserDetail = z
         right_to_work: z.string(),
         open_to_work: z.boolean(),
         instagram: z.string().nullable(),
+        tiktok: z.string().nullable(),
         photo_url: z.string().nullable(),
       })
       .nullable(),
@@ -252,7 +254,8 @@ admin.openapi(
           ? {
               first_name: d.profile.firstName,
               last_name: d.profile.lastName,
-              phone: d.profile.phone,
+              visibility: d.profile.visibility,
+              contact_by: d.profile.contactBy,
               headline: d.profile.headline,
               suburb: d.profile.suburb,
               state: d.profile.state,
@@ -262,6 +265,7 @@ admin.openapi(
               right_to_work: d.profile.rightToWork,
               open_to_work: d.profile.openToWork,
               instagram: d.profile.instagram,
+              tiktok: d.profile.tiktok,
               photo_url: mediaUrl(c.env, d.profile.photoKey),
             }
           : null,

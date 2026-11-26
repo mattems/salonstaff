@@ -14,6 +14,7 @@ const LIMITED = new Set([
 
 /**
  * Better Auth endpoints with an audited /v1/me route instead: changing the email (/v1/me/email),
+ * the mobile (/v1/me/mobile: `updatePhoneNumber` on /phone-number/verify is refused below),
  * the name (PATCH /v1/me), sessions (/v1/me/sessions) and disconnecting Google or Apple
  * (/v1/me/sign-in-methods). `update-user` would also let someone set their own role.
  */
@@ -63,6 +64,14 @@ auth.post(`${AUTH_PATH}/dev-login`, async (c) => {
 auth.on(["GET", "POST"], `${AUTH_PATH}/*`, async (c) => {
   const rest = new URL(c.req.url).pathname.slice(AUTH_PATH.length);
   if (HIDDEN.has(rest)) return c.notFound();
+  // Changing the mobile goes through the audited POST /v1/me/mobile/confirm (D-13).
+  if (c.req.method === "POST" && rest === "/phone-number/verify") {
+    const body = (await c.req.raw
+      .clone()
+      .json()
+      .catch(() => ({}))) as { updatePhoneNumber?: unknown };
+    if (body.updatePhoneNumber) return c.notFound();
+  }
   if (c.req.method === "POST" && LIMITED.has(rest) && !(await withinCodeLimit(c)))
     return c.json(
       { code: "rate_limited", message: "Too many attempts. Wait a minute and try again." },

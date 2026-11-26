@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { CONTACT_LIMITS } from "./constants";
+import { SHARE_CODE_RE, shareCode } from "./crypto";
 import {
   boundingBox,
   claimMethods,
+  contactLimitReached,
   distanceKm,
   eligibilityOf,
   entitlementOf,
@@ -9,7 +12,10 @@ import {
   isValidAbn,
   maskEmail,
   nameMatches,
+  publicName,
   roughCoordinate,
+  salonAccessTo,
+  shareLinkWorks,
   verificationLevel,
 } from "./rules";
 
@@ -158,5 +164,69 @@ describe("near me", () => {
     [12.4, "12km"],
   ])("formatDistance(%d) is %s", (km, text) => {
     expect(formatDistance(km)).toBe(text);
+  });
+});
+
+describe("salonAccessTo", () => {
+  const base = {
+    visibility: "salons" as const,
+    applied: false,
+    hiddenFromSalon: false,
+    contactBy: "both" as const,
+    hasEmail: true,
+    hasMobile: true,
+  };
+  const all = { view: true, message: true, phone: true };
+  const none = { view: false, message: false, phone: false };
+  it.each([
+    ["salons only", base, all],
+    ["public", { ...base, visibility: "public" as const }, all],
+    ["hidden", { ...base, visibility: "hidden" as const }, none],
+    ["hidden, but applied here", { ...base, visibility: "hidden" as const, applied: true }, all],
+    ["hidden from this salon", { ...base, hiddenFromSalon: true }, none],
+    ["hidden from this salon, but applied", { ...base, hiddenFromSalon: true, applied: true }, all],
+    ["email only", { ...base, contactBy: "email" as const }, { ...all, phone: false }],
+    ["phone only", { ...base, contactBy: "phone" as const }, { ...all, message: false }],
+    ["no email to send to", { ...base, hasEmail: false }, { ...all, message: false }],
+    ["no mobile to show", { ...base, hasMobile: false }, { ...all, phone: false }],
+  ])("%s", (_label, input, expected) => {
+    expect(salonAccessTo(input)).toEqual(expected);
+  });
+});
+
+describe("share links", () => {
+  it.each([
+    ["public", true],
+    ["salons", false],
+    ["hidden", false],
+  ] as const)("work when %s: %s", (visibility, works) => {
+    expect(shareLinkWorks(visibility)).toBe(works);
+  });
+
+  it("makes unguessable codes from unmistakable characters", () => {
+    const codes = new Set(Array.from({ length: 200 }, shareCode));
+    expect(codes.size).toBe(200);
+    for (const code of codes) expect(code).toMatch(SHARE_CODE_RE);
+  });
+
+  it.each([
+    ["Jess", "Taylor", "Jess T."],
+    [" Jess ", "taylor", "Jess T."],
+    ["Jess", "", "Jess"],
+  ])("names %s %s as %s", (first, last, expected) => {
+    expect(publicName(first, last)).toBe(expected);
+  });
+});
+
+describe("contactLimitReached", () => {
+  const { messagesPerDay, phoneRevealsPerDay } = CONTACT_LIMITS;
+  it.each([
+    [{ kind: "message", salonToday: 0, personToday: 0 }, null],
+    [{ kind: "message", salonToday: 3, personToday: 1 }, "same_person"],
+    [{ kind: "message", salonToday: messagesPerDay, personToday: 0 }, "salon_messages"],
+    [{ kind: "phone", salonToday: phoneRevealsPerDay - 1, personToday: 5 }, null],
+    [{ kind: "phone", salonToday: phoneRevealsPerDay, personToday: 0 }, "salon_reveals"],
+  ] as const)("%o → %s", (input, expected) => {
+    expect(contactLimitReached(input)).toBe(expected);
   });
 });

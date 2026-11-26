@@ -210,4 +210,65 @@ export const PROFILE_LIMITS = {
   brands: 15,
   experience: 15,
   education: 10,
+  /** Endorsements shown on a profile at once. */
+  endorsements: 5,
+  /** Endorsements asked for and not yet written. */
+  endorsementRequests: 10,
+} as const;
+
+/** Who can see a job seeker's profile (D-13). */
+export const PROFILE_VISIBILITY = [
+  {
+    value: "public",
+    label: "Public",
+    description: "Salons can find you, and anyone with your share link can see your profile.",
+  },
+  {
+    value: "salons",
+    label: "Salons only",
+    description: "Salons on Salon Staff can find you. Your share link is off.",
+  },
+  {
+    value: "hidden",
+    label: "Hidden",
+    description: "Only salons you apply to can see your profile.",
+  },
+] as const;
+export type ProfileVisibility = (typeof PROFILE_VISIBILITY)[number]["value"];
+export const PROFILE_VISIBILITY_VALUES = PROFILE_VISIBILITY.map((v) => v.value) as [
+  ProfileVisibility,
+  ...ProfileVisibility[],
+];
+
+/** How salons may contact a job seeker (D-13). */
+export const CONTACT_BY = [
+  { value: "both", label: "Email and phone" },
+  { value: "email", label: "Email only" },
+  { value: "phone", label: "Phone only" },
+] as const;
+export type ContactBy = (typeof CONTACT_BY)[number]["value"];
+export const CONTACT_BY_VALUES = CONTACT_BY.map((v) => v.value) as [ContactBy, ...ContactBy[]];
+
+/** How a referee knows the job seeker. */
+export const ENDORSEMENT_RELATIONSHIPS = [
+  { value: "managed", label: "Managed them" },
+  { value: "worked_with", label: "Worked with them" },
+  { value: "trained", label: "Trained or taught them" },
+  { value: "client", label: "Was their client" },
+] as const;
+export type EndorsementRelationship = (typeof ENDORSEMENT_RELATIONSHIPS)[number]["value"];
+export const ENDORSEMENT_RELATIONSHIP_VALUES = ENDORSEMENT_RELATIONSHIPS.map((r) => r.value) as [
+  EndorsementRelationship,
+  ...EndorsementRelationship[],
+];
+
+/** Keeping salons' contact with job seekers useful and spam-free (D-13). Per salon, per day. */
+export const CONTACT_LIMITS = {
+  messagesPerDay: 25,
+  phoneRevealsPerDay: 50,
+  /** Messages from one salon to the same person. */
+  messagesPerPersonPerDay: 1,
+  /** Endorsement requests a job seeker can send. */
+  endorsementRequestsPerDay: 5,
+  endorsementLinkDays: 30,
 } as const;

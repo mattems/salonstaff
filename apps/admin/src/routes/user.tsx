@@ -267,12 +267,26 @@ export function UserPage() {
                 ...(profile
                   ? ([
                       ["Profile name", `${profile.first_name} ${profile.last_name}`],
-                      ["Contact phone", profile.phone],
+                      [
+                        "Profile visible to",
+                        {
+                          public: "Everyone with the share link, and salons",
+                          salons: "Salons",
+                          hidden: "Only salons they apply to",
+                        }[profile.visibility],
+                      ],
+                      [
+                        "Salons contact them by",
+                        { both: "Email and phone", email: "Email", phone: "Phone" }[
+                          profile.contact_by
+                        ],
+                      ],
                       ["Location", `${profile.suburb}, ${profile.state} ${profile.postcode}`],
                       ["Headline", profile.headline],
                       ["Experience", `${profile.years_experience} years`],
                       ["Work rights", labelFor(RIGHT_TO_WORK, profile.right_to_work)],
                       ["Instagram", profile.instagram ? `@${profile.instagram}` : null],
+                      ["TikTok", profile.tiktok ? `@${profile.tiktok}` : null],
                       ["Open to work", profile.open_to_work ? "Yes" : "No"],
                     ] as [string, string | null][])
                   : ([["Profile", "None yet"]] as [string, string][])),

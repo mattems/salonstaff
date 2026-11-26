@@ -22,3 +22,8 @@ export function userActor(c: Context<AppEnv>, userId: string): Actor {
     requestId: c.get("requestId"),
   };
 }
+
+/** Someone without an account (a referee from their email link), as the audit log records them. */
+export function visitorActor(c: Context<AppEnv>): Actor {
+  return { type: "user", ip: c.req.header("CF-Connecting-IP"), requestId: c.get("requestId") };
+}

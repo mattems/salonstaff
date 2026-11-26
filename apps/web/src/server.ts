@@ -15,7 +15,16 @@ const context = new AsyncLocalStorage<ServerContext>();
 installServerHooks({ current: () => context.getStore(), fetchApi });
 
 /** Pages that are nobody's business but the person signed in. */
-const PRIVATE_PATHS = ["/account", "/employer", "/sign-in", "/claim", "/invite", "/dev"];
+const PRIVATE_PATHS = [
+  "/account",
+  "/employer",
+  "/sign-in",
+  "/claim",
+  "/invite",
+  "/dev",
+  "/endorse",
+  "/p",
+];
 
 function newNonce(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(16));

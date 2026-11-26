@@ -24,6 +24,8 @@ export const ID_PREFIXES = {
   confirmation: "cfm",
   request: "req",
   session: "ses",
+  endorsement: "end",
+  profileContact: "pct",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

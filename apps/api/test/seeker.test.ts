@@ -14,8 +14,10 @@ import { createTestApp, query } from "./helpers";
 interface FullProfile {
   profile: {
     firstName: string;
-    phone: string | null;
     instagram: string | null;
+    tiktok: string | null;
+    payMin: number | null;
+    payPeriod: string;
     photoUrl: string | null;
     specialties: string[];
     travelKm: number | null;
@@ -52,19 +54,19 @@ describe("a job seeker's profile", () => {
     const bad = await me.api<{ errors: { path: string }[] }>(
       "PUT",
       "/v1/me/profile",
-      profileInput({ phone: "12", roles: [] }),
+      profileInput({ postcode: "12", roles: [] }),
     );
     expect(bad.status).toBe(400);
-    expect(bad.body.errors.map((e) => e.path).sort()).toEqual(["phone", "roles"]);
+    expect(bad.body.errors.map((e) => e.path).sort()).toEqual(["postcode", "roles"]);
 
     const saved = await me.api<FullProfile>(
       "PUT",
       "/v1/me/profile",
-      profileInput({ instagram: "@sam.cuts" }),
+      profileInput({ instagram: "@sam.cuts", tiktok: "https://www.tiktok.com/@sam.cuts/" }),
     );
     expect(saved.status).toBe(200);
-    expect(saved.body.profile.phone).toBe("+61412345678");
     expect(saved.body.profile.instagram).toBe("sam.cuts");
+    expect(saved.body.profile.tiktok).toBe("sam.cuts");
     expect(saved.body.verification.identity).toBe("not_started");
 
     const details = await me.api<FullProfile>("PUT", "/v1/me/profile/details", {
@@ -73,8 +75,10 @@ describe("a job seeker's profile", () => {
       availableDays: ["mon", "tue"],
       employmentTypes: ["full_time"],
       travelKm: "",
+      payMin: "38.5",
     });
     expect(details.status).toBe(200);
+    expect(details.body.profile).toMatchObject({ payMin: 38.5, payPeriod: "hour" });
     expect(details.body.profile.specialties).toEqual(["balayage", "Foils"]);
     expect(details.body.profile.travelKm).toBeNull();
 

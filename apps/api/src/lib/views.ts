@@ -5,9 +5,9 @@ import type {
   Candidate,
   CheckSummary,
   Claim,
-  Contact,
+  ContactRecord,
   DirectoryEntry,
-  Education,
+  Endorsement,
   Experience,
   FullProfile,
   Invite,
@@ -19,6 +19,8 @@ import type {
   SalonJob,
   SalonRole,
   SeekerProfile,
+  SharedProfile,
+  ShownEndorsement,
   TeamMember,
 } from "@salonstaff/db";
 import { isClaimed } from "@salonstaff/db";
@@ -28,7 +30,11 @@ import {
   formatPay,
   jobPath,
   maskEmail,
+  profilePath,
+  publicName,
+  type SalonAccess,
   salonPath,
+  shareLinkWorks,
 } from "@salonstaff/shared";
 import type { Env } from "../env";
 import { roundedKm } from "./near";
@@ -66,7 +72,6 @@ export function profileJson(env: Env, row: SeekerProfile) {
   return {
     firstName: row.firstName,
     lastName: row.lastName,
-    phone: row.phone,
     headline: row.headline,
     about: row.about,
     suburb: row.suburb,
@@ -74,8 +79,8 @@ export function profileJson(env: Env, row: SeekerProfile) {
     postcode: row.postcode,
     roles: row.roles,
     yearsExperience: row.yearsExperience,
-    qualifications: row.qualifications,
     instagram: row.instagram,
+    tiktok: row.tiktok,
     rightToWork: row.rightToWork,
     openToWork: row.openToWork,
     photoUrl: mediaUrl(env, row.photoKey),
@@ -85,9 +90,71 @@ export function profileJson(env: Env, row: SeekerProfile) {
     employmentTypes: row.employmentTypes,
     availableFrom: row.availableFrom,
     travelKm: row.travelKm,
-    payExpectation: row.payExpectation,
+    payMin: row.payMin,
+    payPeriod: row.payPeriod,
   };
 }
+
+/** Who sees the profile and how salons contact them: for the job seeker only. */
+export const profileSettingsJson = (row: SeekerProfile) => ({
+  visibility: row.visibility,
+  contactBy: row.contactBy,
+  shareCode: row.shareCode,
+  sharePath: row.shareCode && shareLinkWorks(row.visibility) ? profilePath(row.shareCode) : null,
+});
+
+/**
+ * A shown endorsement. The referee's contact details only with `withContact` (a salon the person
+ * applied to) and only if the referee agreed.
+ */
+export const endorsementJson = (
+  { endorsement: e, refereeSalon }: ShownEndorsement,
+  withContact = false,
+) => ({
+  id: encodeId("endorsement", e.id),
+  refereeName: e.refereeName,
+  refereeTitle: e.refereeTitle,
+  salonName: e.salonName,
+  relationship: e.relationship,
+  body: e.body ?? "",
+  writtenAt: iso(e.writtenAt) ?? e.createdAt.toISOString(),
+  onSalonStaff: refereeSalon ? { name: refereeSalon.name, path: salonPath(refereeSalon) } : null,
+  contact: withContact && e.contactOk ? { email: e.refereeEmail, phone: e.refereePhone } : null,
+});
+
+/** One of the job seeker's own endorsements or requests, with everything about it. */
+export const myEndorsementJson = (e: Endorsement) => ({
+  id: encodeId("endorsement", e.id),
+  status: e.status,
+  refereeName: e.refereeName,
+  refereeEmail: e.refereeEmail,
+  note: e.note,
+  linkExpiresAt: iso(e.tokenExpiresAt),
+  refereeTitle: e.refereeTitle,
+  salonName: e.salonName,
+  relationship: e.relationship,
+  body: e.body,
+  contactOk: e.contactOk,
+  refereePhone: e.refereePhone,
+  onSalonStaff: e.refereeSalonId !== null,
+  writtenAt: iso(e.writtenAt),
+  createdAt: e.createdAt.toISOString(),
+});
+
+/** A salon's message or number reveal, for the job seeker's list (D-13). */
+export const contactRecordJson = ({ contact, salon, hidden }: ContactRecord) => ({
+  id: encodeId("profileContact", contact.id),
+  kind: contact.kind,
+  message: contact.message,
+  createdAt: contact.createdAt.toISOString(),
+  salon: { id: encodeId("salon", salon.id), name: salon.name, path: salonPath(salon) },
+  hidden,
+});
+
+export const contactOptionsJson = (access: SalonAccess) => ({
+  message: access.message,
+  phone: access.phone,
+});
 
 export const experienceJson = (row: Experience) => ({
   id: encodeId("experience", row.id),
@@ -99,11 +166,12 @@ export const experienceJson = (row: Experience) => ({
   description: row.description,
 });
 
-export const educationJson = (row: Education) => ({
+export const educationJson = (row: FullProfile["education"][number]) => ({
   id: encodeId("education", row.id),
   qualification: row.qualification,
   institution: row.institution,
   year: row.year,
+  verification: row.check ? { status: row.check.status, reference: row.check.reference } : null,
 });
 
 export const portfolioJson = (env: Env, row: PortfolioItem) => ({
@@ -112,24 +180,58 @@ export const portfolioJson = (env: Env, row: PortfolioItem) => ({
   caption: row.caption,
 });
 
-export function fullProfileJson(env: Env, full: FullProfile) {
+export function fullProfileJson(
+  env: Env,
+  full: FullProfile,
+  options: { refereeContacts?: boolean } = {},
+) {
   return {
     profile: profileJson(env, full.profile),
     experience: full.experience.map(experienceJson),
     education: full.education.map(educationJson),
     portfolio: full.portfolio.map((item) => portfolioJson(env, item)),
+    endorsements: full.endorsements.map((e) => endorsementJson(e, options.refereeContacts)),
     verification: verificationJson(full.checks),
+  };
+}
+
+/** The job seeker's own profile, with its settings. */
+export const myProfileJson = (env: Env, full: FullProfile) => ({
+  ...fullProfileJson(env, full),
+  settings: profileSettingsJson(full.profile),
+});
+
+/** A profile through its share link: no surname, postcode, work rights, pay or contact details. */
+export function sharedProfileJson(env: Env, { full }: SharedProfile) {
+  const {
+    lastName: _l,
+    postcode: _p,
+    rightToWork: _r,
+    payMin: _m,
+    payPeriod: _pp,
+    ...profile
+  } = profileJson(env, full.profile);
+  const { profile: _, verification, education, ...rest } = fullProfileJson(env, full);
+  return {
+    name: publicName(full.profile.firstName, full.profile.lastName),
+    profile,
+    ...rest,
+    // Passed or not, but not the verification ID: that's for salons.
+    education: education.map((e) => ({
+      ...e,
+      verification: e.verification && { ...e.verification, reference: null },
+    })),
+    verification: {
+      identity: verification.identity,
+      rightToWork: verification.rightToWork,
+      qualification: verification.qualification,
+    },
   };
 }
 
 /** A real address to write to, or null for a mobile-only account's stand-in. */
 export const realEmail = (email: string | null | undefined) =>
   email && !isStandInEmail(email) ? email : null;
-
-export const contactJson = (contact: Contact, profilePhone?: string | null) => ({
-  email: realEmail(contact.email),
-  phone: profilePhone ?? contact.phoneNumber,
-});
 
 // ---------- Salons and jobs ----------
 
@@ -281,8 +383,8 @@ export function applicantJson(env: Env, row: Applicant) {
 
 export const candidateJson = (env: Env, userId: string, candidate: Candidate) => ({
   id: encodeId("user", userId),
-  ...fullProfileJson(env, candidate),
-  contact: contactJson(candidate.contact, candidate.profile.phone),
+  ...fullProfileJson(env, candidate, { refereeContacts: candidate.applications.length > 0 }),
+  contact: contactOptionsJson(candidate.access),
   applications: candidate.applications.map((a) => ({
     id: encodeId("application", a.id),
     jobId: encodeId("job", a.jobId),
