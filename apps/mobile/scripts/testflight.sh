@@ -3,12 +3,18 @@
 # No Expo account or EAS: Xcode signs and uploads with the Apple account it's signed in to.
 # docs/runbooks/testflight.md
 #
-#   APPLE_TEAM_ID=XXXXXXXXXX npm run testflight              # build and upload
-#   APPLE_TEAM_ID=XXXXXXXXXX npm run testflight -- --no-upload  # build the .ipa only
+#   npm run testflight              # build and upload
+#   npm run testflight -- --no-upload  # build the .ipa only
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-: "${APPLE_TEAM_ID:?Set APPLE_TEAM_ID to your Apple team ID (developer.apple.com → Account → Membership details).}"
+# Studio 372 Pty Ltd's team, from app.json; APPLE_TEAM_ID (the environment or .env.local) overrides it.
+if [[ -z "${APPLE_TEAM_ID:-}" && -f .env.local ]]; then
+  APPLE_TEAM_ID="$(sed -n 's/^APPLE_TEAM_ID=//p' .env.local | tr -d '"' | tail -1)"
+fi
+APPLE_TEAM_ID="${APPLE_TEAM_ID:-$(node -p "require('./app.json').expo.ios.appleTeamId ?? ''")}"
+export APPLE_TEAM_ID
+: "${APPLE_TEAM_ID:?Set ios.appleTeamId in app.json (developer.apple.com → Account → Membership details).}"
 destination=upload
 [[ "${1:-}" == "--no-upload" ]] && destination=export
 
@@ -25,11 +31,7 @@ out=build/ios
 archive="$out/SalonStaff.xcarchive"
 rm -rf "$out" && mkdir -p "$out"
 
-# Prebuild rewrites package.json's ios/android scripts; keep ours.
-cp package.json "$out/package.json"
-trap 'cp "$out/package.json" package.json' EXIT
 npx expo prebuild --platform ios --clean --no-install
-cp "$out/package.json" package.json
 (cd ios && pod install)
 
 echo "Building Salon Staff $(node -p "require('./app.json').expo.version") ($IOS_BUILD_NUMBER)"

@@ -97,6 +97,11 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   `Contact` now carries `userId`. Background notices finish before the request's database connection
   closes. The app asks once there's a profile and opens the matching screen when a push is tapped.
   docs/runbooks/push-notifications.md. Not tried against Apple yet: needs Matt's APNs key.
+- The app on your own iPhone against the local API: `bun run ios:device` (a development build, as in the
+  other apps, with `expo-dev-client`; signed with Studio 372 Pty Ltd's team, N2TR84P2TD, in app.json) or `bun run phone`
+  (Expo Go). Both open the API and site to the Wi-Fi on :8891/:5301 while they run and point the app at
+  them (apps/mobile/README.md). Running on Matt's iPhone (the App ID and its profile were made in Xcode
+  once; see the README if a new phone hits the provisioning error).
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
