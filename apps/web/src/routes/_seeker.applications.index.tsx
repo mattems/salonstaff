@@ -43,6 +43,12 @@ function Applications() {
                     {applicationStatusLabel(application.status)}
                   </Badge>
                   {application.job.closed && <Badge variant="outline">Job closed</Badge>}
+                  {application.unreadMessages > 0 && (
+                    <Badge>
+                      {application.unreadMessages} new{" "}
+                      {application.unreadMessages === 1 ? "message" : "messages"}
+                    </Badge>
+                  )}
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-1 text-sm">
@@ -50,6 +56,11 @@ function Applications() {
                   {application.job.salon.name} · {application.job.suburb} {application.job.state}
                 </p>
                 <p className="text-muted-foreground">Applied {formatDate(application.createdAt)}</p>
+                <Button asChild size="sm" variant="outline" className="mt-2">
+                  <Link to="/applications/$id" params={{ id: application.id }}>
+                    {application.unreadMessages > 0 ? "Read messages" : "Messages"}
+                  </Link>
+                </Button>
                 {application.coverNote && (
                   <p className="whitespace-pre-line text-muted-foreground">
                     {application.coverNote}

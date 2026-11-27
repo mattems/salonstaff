@@ -149,6 +149,7 @@ profileRoutes.openapi(
     const { profile } = await profiles.write(tokenHash, input, visitorActor(c));
     const contact = await profiles.contactOf(profile.userId);
     notify(c, contact, {
+      topic: "account",
       subject: `${input.name} wrote you an endorsement`,
       title: `${input.name} endorsed you`,
       body: `Read it and choose whether to show it on your ${BRAND.name} profile.`,

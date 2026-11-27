@@ -27,9 +27,15 @@ function binding(): Fetcher | undefined {
   return (env as { API?: Fetcher }).API;
 }
 
+/** A browser opening a WebSocket (a live conversation, D-18): forwarded with its upgrade. */
+export function isWebSocket(request: Request): boolean {
+  return request.headers.get("Upgrade")?.toLowerCase() === "websocket";
+}
+
 function forwardable(request: Request, target: URL): Request {
   const headers = new Headers(request.headers);
-  for (const name of HOP_HEADERS) headers.delete(name);
+  const keep = isWebSocket(request) ? ["upgrade", "connection"] : [];
+  for (const name of HOP_HEADERS) if (!keep.includes(name)) headers.delete(name);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   return new Request(target, {
     method: request.method,
@@ -54,6 +60,10 @@ export async function fetchApi(request: Request): Promise<Response> {
     }
   }
   response ??= await fetch(forwardable(request, local));
+  // The API's end of the socket, passed straight back to the browser.
+  // (Workers' own Response has `webSocket`; the types here are the browser's.)
+  const socket = (response as { webSocket?: unknown }).webSocket;
+  if (socket) return new Response(null, { status: 101, webSocket: socket } as ResponseInit);
   // A copy whose headers can still be changed on the way out.
   return new Response(response.body, response);
 }

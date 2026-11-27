@@ -290,7 +290,7 @@ export const MeSchema = z
     }),
     unreadMessages: z.number().int().openapi({
       description:
-        "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts).",
+        "What you haven't seen in your inbox: salons' messages on your applications (GET /v1/me/conversations), and their messages and number views (GET /v1/me/profile/contacts).",
     }),
   })
   .openapi("Me");
@@ -399,8 +399,44 @@ export const MyApplicationSchema = z
     coverNote: z.string().nullable(),
     createdAt: Timestamp,
     job: JobSummarySchema,
+    unreadMessages: z
+      .number()
+      .int()
+      .openapi({ description: "The salon's messages on it you haven't read (D-17)." }),
   })
   .openapi("MyApplication");
+
+/** One message in the conversation on an application (D-17). */
+export const ApplicationMessageSchema = z
+  .object({
+    id: z.string().openapi({ example: "msg_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    from: z
+      .enum(["salon", "seeker"])
+      .openapi({ description: "The salon's team, or the applicant." }),
+    senderName: z
+      .string()
+      .nullable()
+      .openapi({ description: "The writer's first name; null once their account is gone." }),
+    body: z.string(),
+    createdAt: Timestamp,
+  })
+  .openapi("ApplicationMessage");
+
+const SendStateSchema = {
+  canSend: z.boolean().openapi({ description: "Whether you can write in it now." }),
+  sendHint: z.string().nullable().openapi({
+    description: "Why not, when you can't (the salon hasn't written yet, today's limit).",
+  }),
+};
+
+export const MyConversationSchema = MyApplicationSchema.extend({
+  lastMessage: orNull(ApplicationMessageSchema),
+}).openapi("MyConversation");
+
+export const MyApplicationThreadSchema = MyApplicationSchema.extend({
+  messages: z.array(ApplicationMessageSchema),
+  ...SendStateSchema,
+}).openapi("MyApplicationThread");
 
 // ---------------------------------------------------------------------------
 // Salons (owner's view)
@@ -522,6 +558,42 @@ export const ApplicantSchema = z
     verification: VerificationSchema,
   })
   .openapi("Applicant");
+
+/** An applicant as the salon's team sees them in its list, with the job and the conversation. */
+export const SalonApplicantSchema = ApplicantSchema.extend({
+  job: z.object({
+    id: z.string(),
+    title: z.string(),
+    path: z.string(),
+    status: z.enum(["draft", "published", "closed"]),
+  }),
+  unreadMessages: z
+    .number()
+    .int()
+    .openapi({ description: "Their messages your team hasn't read (D-17)." }),
+  lastMessageAt: Timestamp.nullable(),
+}).openapi("SalonApplicant");
+
+export const SalonApplicantsSchema = z
+  .object({
+    items: z.array(SalonApplicantSchema),
+    counts: z
+      .record(ApplicationStatusSchema, z.number().int())
+      .openapi({ description: "How many of each status match the other filters." }),
+    total: z.number().int().openapi({ description: "How many match, whatever their status." }),
+    truncated: z
+      .boolean()
+      .openapi({ description: "More match than were returned: narrow the filters." }),
+  })
+  .openapi("SalonApplicants");
+
+export const SalonConversationSchema = z
+  .object({
+    applicant: SalonApplicantSchema,
+    messages: z.array(ApplicationMessageSchema),
+    ...SendStateSchema,
+  })
+  .openapi("SalonConversation");
 
 export const ContactOptionsSchema = z
   .object({

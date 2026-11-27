@@ -1,4 +1,10 @@
-import { AU_STATES, JOB_ROLES, RIGHT_TO_WORK, seekerProfileSchema } from "@salonstaff/shared";
+import {
+  AU_STATES,
+  JOB_ROLES,
+  nameChangeExpiresIdentity,
+  RIGHT_TO_WORK,
+  seekerProfileSchema,
+} from "@salonstaff/shared";
 import { createFileRoute } from "@tanstack/react-router";
 import { SectionCard, useMyProfile, useRefresh } from "@/components/account-profile";
 import { AppLink } from "@/components/app-link";
@@ -32,6 +38,7 @@ function Basics() {
   const full = useMyProfile();
   const { next } = Route.useSearch();
   const p = full?.profile;
+  const idVerified = full?.verification.identity === "verified";
   const refresh = useRefresh();
   const action = useAction();
   const e = action.errors;
@@ -62,8 +69,18 @@ function Basics() {
               roles: formList(form, "roles"),
               openToWork: form.get("openToWork") === "on",
             });
+            // A new name after the ID check means verifying again (D-16).
+            const expiresId = idVerified && p && nameChangeExpiresIdentity(p, body);
+            if (
+              expiresId &&
+              !window.confirm(
+                `Your ID was checked against the name ${p.firstName} ${p.lastName}. With a new name you'll need to verify your ID again, and salons won't see you as verified until you do. Change it?`,
+              )
+            ) {
+              return;
+            }
             unwrap(await api.PUT("/v1/me/profile", { body }));
-            await refresh("Profile saved");
+            await refresh(expiresId ? "Profile saved. Verify your ID again." : "Profile saved");
           })}
         >
           <div className="grid gap-4 sm:grid-cols-2">
@@ -83,6 +100,11 @@ function Basics() {
               hint="A shared profile shows only its first letter."
             />
           </div>
+          {idVerified && (
+            <p className="text-muted-foreground text-sm">
+              Your ID is verified with this name. Changing it means verifying your ID again.
+            </p>
+          )}
           <TextField
             label="Headline"
             name="headline"

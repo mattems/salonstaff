@@ -41,7 +41,8 @@ export PRODUCTION_DATABASE_URL='<migrator role URL>'   # type it in your own ter
 bun run deploy
 ```
 `bun run deploy` migrates the database with the migrator role, then deploys the API, the website and the admin portal.
-The custom domains in each `wrangler.jsonc` are created on first deploy.
+The custom domains in each `wrangler.jsonc` are created on first deploy, and so is the API's Durable Object for
+live conversations (`ConversationRoom`, D-18: its `migrations` entry creates it).
 
 ## 7. First staff member and data
 ```bash

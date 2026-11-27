@@ -1,8 +1,10 @@
 import {
   AU_STATES,
   JOB_ROLES,
+  nameChangeExpiresIdentity,
   RIGHT_TO_WORK,
   seekerProfileSchema,
+  type SeekerProfileInput,
   type AuState,
   type JobRole,
   type RightToWork,
@@ -10,6 +12,7 @@ import {
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -123,11 +126,31 @@ export default function EditProfileScreen() {
       return;
     }
 
+    const before = user.profile;
+    const expiresId =
+      user.verification.identity === 'verified' &&
+      !!before &&
+      nameChangeExpiresIdentity(before, parsed.data);
+    if (expiresId) {
+      Alert.alert(
+        'Verify your ID again?',
+        `Your ID was checked against the name ${before.firstName} ${before.lastName}. With a new name you’ll need to verify your ID again, and salons won’t see you as verified until you do.`,
+        [
+          { text: 'Keep my name', style: 'cancel' },
+          { text: 'Change it', style: 'destructive', onPress: () => void persist(parsed.data, true) },
+        ],
+      );
+      return;
+    }
+    await persist(parsed.data, false);
+  }
+
+  async function persist(input: SeekerProfileInput, expiresId: boolean) {
     setSaving(true);
     try {
-      await api.saveProfile(parsed.data);
+      await api.saveProfile(input);
       await refresh();
-      if (isOnboarding) router.replace('/verification');
+      if (isOnboarding || expiresId) router.replace('/verification');
       else router.back();
     } catch (err) {
       if (err instanceof ApiProblem && err.errors.length) {
@@ -189,6 +212,11 @@ export default function EditProfileScreen() {
               />
             </View>
           </View>
+          {user.verification.identity === 'verified' ? (
+            <Text variant="caption" color="textMuted">
+              Your ID is verified with this name. Changing it means verifying your ID again.
+            </Text>
+          ) : null}
           <TextField
             label="Headline"
             value={form.headline}

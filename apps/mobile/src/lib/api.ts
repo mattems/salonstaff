@@ -3,6 +3,7 @@
  * writes `./api/schema.d.ts`). The app signs in with Better Auth (`/v1/auth/*`, not in the
  * description) and sends the session token as `Authorization: Bearer`.
  */
+import type { LiveSocket } from '@salonstaff/shared';
 import createClient from 'openapi-fetch';
 
 import { API_URL } from '@/lib/config';
@@ -13,6 +14,10 @@ import type { components, paths } from './api/schema';
 
 export type Schemas = components['schemas'];
 export type Me = Schemas['Me'];
+export type NotificationPreferences = Schemas['NotificationPreferences'];
+export type MyConversation = Schemas['MyConversation'];
+export type ApplicationThread = Schemas['MyApplicationThread'];
+export type ApplicationMessage = Schemas['ApplicationMessage'];
 export type SeekerProfile = Schemas['SeekerProfile'];
 export type Verification = Schemas['Verification'];
 export type VerificationStatus = Verification['identity'];
@@ -119,6 +124,18 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
 
 function headersFor(token: string | null | undefined): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+/** A live conversation's socket (D-18) at `path` on the API, signed in with the session's token. */
+export function liveSocket(path: string): LiveSocket {
+  const url = `${API_URL.replace(/^http/, 'ws')}${path}`;
+  // React Native's WebSocket takes headers as a third argument; the DOM types don't know it.
+  const NativeSocket = WebSocket as unknown as new (
+    url: string,
+    protocols: null,
+    options: { headers: Record<string, string> },
+  ) => LiveSocket;
+  return new NativeSocket(url, null, { headers: headersFor(authToken) });
 }
 
 /**
@@ -254,6 +271,14 @@ export const api = {
     unwrap(await client.GET('/v1/me', token ? { headers: headersFor(token) } : {})),
   deleteAccount: async () => unwrap(await client.DELETE('/v1/me')),
   myApplications: async () => unwrap(await client.GET('/v1/me/applications')),
+  // Conversations with salons about applications (D-17)
+  conversations: async () => unwrap(await client.GET('/v1/me/conversations')),
+  application: async (id: string) =>
+    unwrap(await client.GET('/v1/me/applications/{id}', { params: path(id) })),
+  sendApplicationMessage: async (id: string, body: string) =>
+    unwrap(
+      await client.POST('/v1/me/applications/{id}/messages', { params: path(id), body: { body } }),
+    ),
   mySaved: async () => unwrap(await client.GET('/v1/me/saved')),
 
   // Profile
@@ -341,6 +366,9 @@ export const api = {
   registerPushDevice: async (body: Schemas['PushDevice']) =>
     unwrap(await client.PUT('/v1/me/push-device', { body })),
   removePushDevice: async () => unwrap(await client.DELETE('/v1/me/push-device')),
+  notificationPreferences: async () => unwrap(await client.GET('/v1/me/notifications')),
+  saveNotificationPreferences: async (body: NotificationPreferences) =>
+    unwrap(await client.PUT('/v1/me/notifications', { body })),
 
   // Jobs
   jobs: async (query: JobFilters) => unwrap(await client.GET('/v1/jobs', { params: { query } })),

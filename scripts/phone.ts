@@ -6,7 +6,7 @@
  *   bun run ios:device  A development build installed on your plugged-in iPhone, signed with
  *                       Studio 372's Apple team (app.json), as `expo run:ios --device`.
  *
- * While it runs, it opens the API and the site to your Wi-Fi (on :8891 and :5301, forwarding to
+ * While it runs, it opens the API and the site to your Wi-Fi (on :8891 and :8892, forwarding to
  * localhost) and points the app at them. Ctrl-C closes all of it, and the API is back to
  * localhost only. Anyone on the same Wi-Fi can reach the local API meanwhile, including its dev
  * login: use it on a network you trust.
@@ -29,13 +29,41 @@ function lanAddress(): string | undefined {
   return undefined;
 }
 
-/** Forwards everything on `port` (all interfaces) to localhost:`target`. */
+/** Headers a forwarded WebSocket keeps: who's connecting (the app's token, the site's cookie). */
+const SOCKET_HEADERS = ["authorization", "cookie", "origin"];
+
+interface Pipe {
+  upstream: WebSocket;
+  /** What the phone sent before localhost answered. */
+  queue: (string | Buffer)[];
+}
+
+/** A close code that can be sent on (1005 and 1006 only describe a close). */
+const sendable = (code: number) => (code === 1000 || (code >= 3000 && code < 5000) ? code : 1000);
+
+/**
+ * Forwards everything on `port` (all interfaces) to localhost:`target`, WebSockets too (a live
+ * conversation, D-18).
+ */
 function forward(port: number, target: number) {
-  return Bun.serve({
+  return Bun.serve<Pipe>({
     hostname: "0.0.0.0",
     port,
-    async fetch(request) {
+    async fetch(request, server) {
       const url = new URL(request.url);
+      if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
+        const headers: Record<string, string> = {};
+        for (const name of SOCKET_HEADERS) {
+          const value = request.headers.get(name);
+          if (value) headers[name] = value;
+        }
+        const upstream = new WebSocket(`ws://localhost:${target}${url.pathname}${url.search}`, {
+          headers,
+        } as never);
+        if (server.upgrade(request, { data: { upstream, queue: [] } })) return undefined;
+        upstream.close();
+        return new Response("Expected a WebSocket", { status: 400 });
+      }
       const headers = new Headers(request.headers);
       headers.delete("host");
       // Uncompressed, so the response can be passed straight back.
@@ -50,6 +78,26 @@ function forward(port: number, target: number) {
       back.delete("content-encoding");
       back.delete("content-length");
       return new Response(response.body, { status: response.status, headers: back });
+    },
+    websocket: {
+      open(phone) {
+        const { upstream, queue } = phone.data;
+        const flush = () => {
+          for (const frame of queue.splice(0)) upstream.send(frame);
+        };
+        upstream.onopen = flush;
+        upstream.onmessage = (event) => phone.send(event.data as string);
+        upstream.onclose = (event) => phone.close(sendable(event.code), event.reason);
+        if (upstream.readyState === WebSocket.OPEN) flush();
+      },
+      message(phone, frame) {
+        const { upstream, queue } = phone.data;
+        if (upstream.readyState === WebSocket.OPEN) upstream.send(frame);
+        else queue.push(frame);
+      },
+      close(phone) {
+        phone.data.upstream.close();
+      },
     },
   });
 }
@@ -79,7 +127,7 @@ for (const [port, what] of [
 }
 
 const api = forward(8891, 8890);
-const site = forward(5301, 5300);
+const site = forward(8892, 5300);
 const apiUrl = `http://${address}:${api.port}`;
 const siteUrl = `http://${address}:${site.port}`;
 console.log(`• API on your network: ${apiUrl}`);

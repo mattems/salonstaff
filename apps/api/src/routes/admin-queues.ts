@@ -218,6 +218,7 @@ admin.openapi(
       await checks(await c.get("db")()).contactOf(row.user.id),
       decision === "verified"
         ? {
+            topic: "account",
             subject: `Your ${kind} is verified`,
             title: `Your ${kind} is verified`,
             body: "Salons will see it on your profile when you apply.",
@@ -225,6 +226,7 @@ admin.openapi(
             url: appUrl(c, "/account/verify"),
           }
         : {
+            topic: "account",
             subject: `We couldn't verify your ${kind}`,
             title: `We couldn't verify your ${kind}`,
             body: `${note ?? ""} You can send it again from your account.`.trim(),

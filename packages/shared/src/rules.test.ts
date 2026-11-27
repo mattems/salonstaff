@@ -8,9 +8,12 @@ import {
   distanceKm,
   eligibilityOf,
   entitlementOf,
+  fillQuickReply,
   formatDistance,
   isValidAbn,
   maskEmail,
+  messageBlockerOf,
+  nameChangeExpiresIdentity,
   nameMatches,
   publicName,
   roughCoordinate,
@@ -101,6 +104,20 @@ describe("verification", () => {
     [{ firstName: "Sam", lastName: "Lee" }, { firstName: "Sam", lastName: "Li" }, false],
     [{ firstName: "Sam", lastName: "Lee" }, { firstName: null, lastName: "Lee" }, false],
   ])("nameMatches %j %j", (profile, id, match) => expect(nameMatches(profile, id)).toBe(match));
+});
+
+describe("nameChangeExpiresIdentity", () => {
+  const jess = { firstName: "Jess", lastName: "O'Brien" };
+  it.each([
+    [{ firstName: "Jess", lastName: "O'Brien" }, false],
+    [{ firstName: "jess", lastName: "OBrien" }, false],
+    [{ firstName: " Jéss ", lastName: "o'brien" }, false],
+    [{ firstName: "Jessica", lastName: "O'Brien" }, true],
+    [{ firstName: "Jess", lastName: "Smith" }, true],
+    [{ firstName: "Sam", lastName: "Smith" }, true],
+  ])("Jess O'Brien → %j: %s", (after, expires) =>
+    expect(nameChangeExpiresIdentity(jess, after)).toBe(expires),
+  );
 });
 
 it("ABN checksum", () => {
@@ -229,4 +246,29 @@ describe("contactLimitReached", () => {
   ] as const)("%o → %s", (input, expected) => {
     expect(contactLimitReached(input)).toBe(expected);
   });
+});
+
+describe("messageBlockerOf", () => {
+  const ok = { salonActive: true, salonHasWritten: true };
+  it.each([
+    ["salon", ok, null],
+    ["salon", { ...ok, salonHasWritten: false }, null],
+    ["seeker", ok, null],
+    ["seeker", { ...ok, salonHasWritten: false }, "wait_for_salon"],
+    ["salon", { ...ok, salonActive: false }, "salon_suspended"],
+    ["seeker", { ...ok, salonActive: false }, "salon_suspended"],
+  ] as const)("%s %j → %s", (side, input, blocker) =>
+    expect(messageBlockerOf({ side, ...input })).toBe(blocker),
+  );
+});
+
+it("fillQuickReply", () => {
+  expect(
+    fillQuickReply("Hi {firstName}, about {job}. {salon}", {
+      firstName: "Jess",
+      job: "Senior Colourist",
+      salon: "Willow & Ash",
+    }),
+  ).toBe("Hi Jess, about Senior Colourist. Willow & Ash");
+  expect(fillQuickReply("Hi {firstName}", { firstName: " ", job: "", salon: "" })).toBe("Hi there");
 });

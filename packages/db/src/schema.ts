@@ -5,6 +5,7 @@ import {
   type EmploymentType,
   type EndorsementRelationship,
   type JobRole,
+  type NotificationTopic,
   type PayPeriod,
   type ProfileVisibility,
   type RightToWork,
@@ -166,6 +167,24 @@ export const pushDevices = pgTable(
     updatedAt: updatedAt(),
   },
   (table) => [index("push_devices_user_id_idx").on(table.userId)],
+);
+
+/**
+ * What someone chose to hear about (D-15), one row per topic they've set. No row: push and email
+ * both on.
+ */
+export const notificationPreferences = pgTable(
+  "notification_preferences",
+  {
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    topic: text("topic").$type<NotificationTopic>().notNull(),
+    push: boolean("push").notNull(),
+    email: boolean("email").notNull(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.topic] })],
 );
 
 // ---------------------------------------------------------------------------
@@ -661,12 +680,37 @@ export const applications = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     coverNote: text("cover_note"),
     status: text("status").$type<ApplicationStatus>().notNull().default("submitted"),
+    /** The newest message in its conversation (D-17), for sorting. */
+    lastMessageAt: ts("last_message_at"),
+    /** When the salon's team last read the conversation: the applicant's messages after it are unread. */
+    salonReadAt: ts("salon_read_at"),
+    /** When the applicant last read it: the salon's messages after it are unread. */
+    seekerReadAt: ts("seeker_read_at"),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
   },
   (table) => [
     uniqueIndex("applications_job_seeker_uq").on(table.jobId, table.seekerId),
     index("applications_seeker_idx").on(table.seekerId, table.createdAt),
+  ],
+);
+
+/** The conversation on an application, between the salon's team and the applicant (D-17). */
+export const applicationMessages = pgTable(
+  "application_messages",
+  {
+    id: id(),
+    applicationId: uuid("application_id")
+      .notNull()
+      .references(() => applications.id, { onDelete: "cascade" }),
+    from: text("from").$type<"salon" | "seeker">().notNull(),
+    /** Who wrote it: the applicant, or someone on the salon's team. Null once their account is gone. */
+    senderId: uuid("sender_id").references(() => users.id, { onDelete: "set null" }),
+    body: text("body").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("application_messages_application_idx").on(table.applicationId, table.createdAt),
   ],
 );
 

@@ -2,6 +2,7 @@
 import { isStandInEmail } from "@salonstaff/auth";
 import type {
   Applicant,
+  ApplicationMessage,
   Candidate,
   CheckSummary,
   Claim,
@@ -13,9 +14,11 @@ import type {
   Invite,
   Job,
   JobWithSalon,
+  MyApplication,
   PageOf,
   PortfolioItem,
   Salon,
+  SalonApplicant,
   SalonJob,
   SalonRole,
   SeekerProfile,
@@ -29,6 +32,7 @@ import {
   entitlementOf,
   formatPay,
   jobPath,
+  type MessageBlocker,
   maskEmail,
   profilePath,
   publicName,
@@ -410,4 +414,46 @@ export const claimJson = (claim: Claim, salon: Pick<Salon, "email">) => ({
   decisionNote: claim.decisionNote,
   createdAt: claim.createdAt.toISOString(),
   decidedAt: iso(claim.decidedAt),
+});
+
+// ---------- Conversations on applications (D-17) ----------
+
+export const messageJson = (m: ApplicationMessage) => ({
+  id: encodeId("message", m.id),
+  from: m.from,
+  senderName: m.senderName,
+  body: m.body,
+  createdAt: m.createdAt.toISOString(),
+});
+
+const SEND_HINTS: Record<MessageBlocker, string> = {
+  salon_suspended: "This salon can't send or receive messages right now.",
+  wait_for_salon:
+    "You can reply once the salon writes to you. Your cover note is with them already.",
+};
+
+export const sendStateJson = (blocker: MessageBlocker | null) => ({
+  canSend: blocker === null,
+  sendHint: blocker ? SEND_HINTS[blocker] : null,
+});
+
+export const salonApplicantJson = (env: Env, row: SalonApplicant) => ({
+  ...applicantJson(env, row),
+  job: {
+    id: encodeId("job", row.job.id),
+    title: row.job.title,
+    path: jobPath(row.job),
+    status: row.job.status,
+  },
+  unreadMessages: row.unread,
+  lastMessageAt: row.lastMessageAt?.toISOString() ?? null,
+});
+
+export const myApplicationJson = (env: Env, row: MyApplication) => ({
+  id: encodeId("application", row.application.id),
+  status: row.application.status,
+  coverNote: row.application.coverNote,
+  createdAt: row.application.createdAt.toISOString(),
+  job: jobSummaryJson(env, row),
+  unreadMessages: row.unread,
 });

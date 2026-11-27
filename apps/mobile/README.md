@@ -52,7 +52,7 @@ bun run phone
 Expo Go instead: scan the QR code with the Camera (install Expo Go from the App Store first). No
 build, but no push notifications or Google sign-in.
 
-Both open the local API and site to your Wi-Fi on :8891 and :5301 while they run, and point the
+Both open the local API and site to your Wi-Fi on :8891 and :8892 while they run, and point the
 app at them; Ctrl-C closes them again. The phone must be on the same Wi-Fi as the Mac. Anyone on
 that Wi-Fi can reach the local API meanwhile, dev login included, so use it on a network you
 trust. The first time, macOS may ask whether `bun` can accept incoming connections: allow it.
@@ -120,14 +120,17 @@ src/
     _layout.tsx           theme, AuthProvider, Stack.Protected guards
     +native-intent.tsx    handles salonstaff://verify-complete
     (auth)/               sign-in (email) → verify-code (6 digits)
-    (app)/                signed-in stack (onboarding nudge lives in _layout)
-      (tabs)/             Jobs · Saved · Applications · Profile
+    (app)/                signed-in stack (onboarding nudge, pushes, Inbox badge refresh in _layout)
+      (tabs)/             native tab bar: (jobs) · (saved) · (applications) · (inbox) · (profile),
+                          each a group with its own stack for the title bar
       jobs/[id].tsx       job detail by path (save, apply, the API's `blocker` as the next step)
       apply/[id].tsx      apply modal with optional cover note
       edit-profile.tsx    SeekerProfileInput form (validated with seekerProfileSchema)
       profile/            the website's account sections: photo, skills, availability, portfolio,
                           experience, endorsements, sharing, contact, security
-      inbox/              salons' messages and number views (index, [id])
+      inbox/[id].tsx      one message or number view (the list is the Inbox tab)
+      applications/[id]   an application and the conversation with the salon (D-17)
+      settings.tsx        notifications, appearance, version, developer details
       verification.tsx    Verification centre (ID, right to work, a certificate per qualification)
   components/             small presentational components
   hooks/                  theme, debounce, useRequest

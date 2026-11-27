@@ -2,6 +2,7 @@ import { APPLICATION_STATUSES, labelFor, type ApplicationStatus } from '@salonst
 import { useRouter } from 'expo-router';
 import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 
+import { Button } from '@/components/button';
 import { JobCard } from '@/components/job-card';
 import { Pill, type Tone } from '@/components/pill';
 import { EmptyView, ErrorView, LoadingView } from '@/components/state-views';
@@ -42,9 +43,15 @@ export default function ApplicationsScreen() {
                 label={labelFor(APPLICATION_STATUSES, item.status)}
                 tone={STATUS_TONES[item.status] ?? 'neutral'}
               />
-              <Text variant="caption" color="textMuted">
+              <Text variant="caption" color="textMuted" style={styles.flex}>
                 Applied {formatDate(item.createdAt)}
               </Text>
+              <Button
+                title={item.unreadMessages > 0 ? `Messages (${item.unreadMessages})` : 'Messages'}
+                size="sm"
+                variant={item.unreadMessages > 0 ? 'primary' : 'ghost'}
+                onPress={() => router.push({ pathname: '/applications/[id]', params: { id: item.id } })}
+              />
             </View>
           }
         />
@@ -77,11 +84,12 @@ function Separator() {
 }
 
 const styles = StyleSheet.create({
+  flex: { flex: 1 },
   list: { padding: Spacing.four, paddingBottom: Spacing.seven, flexGrow: 1 },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: Spacing.two,
     paddingTop: Spacing.three,
     borderTopWidth: StyleSheet.hairlineWidth,
   },

@@ -3,7 +3,17 @@ import { checks, housekeeping } from "@salonstaff/db";
 import { decodeId, uuidv7 } from "@salonstaff/shared";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
-import { form, PDF, type Person, PNG, seekerWithProfile } from "./fixtures";
+import {
+  form,
+  PDF,
+  type Person,
+  PNG,
+  profileInput,
+  readySeeker,
+  seekerWithProfile,
+  uid,
+  verifyIdentity,
+} from "./fixtures";
 import { createTestApp, query, withDb } from "./helpers";
 
 interface Checks {
@@ -274,5 +284,49 @@ describe("verification checks", () => {
     const after = (await seeker.api<Checks>("GET", "/v1/me/checks")).body;
     expect(after.checks.find((c) => c.id === certCheck)?.educationId).toBeNull();
     expect(after.verification.qualification).toBe("verified");
+  });
+});
+
+describe("a new name after the ID check (D-16)", () => {
+  it("expires the ID check; the same name written differently doesn't", async () => {
+    const app = createTestApp();
+    const seeker = await readySeeker(app, "Renamed");
+    const verification = async () =>
+      (
+        await seeker.api<{ verification: { identity: string; level: number } }>(
+          "GET",
+          "/v1/me/checks",
+        )
+      ).body.verification;
+    expect((await verification()).identity).toBe("verified");
+    const { profile } = (
+      await seeker.api<{ profile: { firstName: string; lastName: string } }>(
+        "GET",
+        "/v1/me/profile",
+      )
+    ).body;
+
+    const sameName = profileInput({
+      firstName: profile.firstName.toLowerCase(),
+      lastName: profile.lastName.toUpperCase(),
+    });
+    expect((await seeker.api("PUT", "/v1/me/profile", sameName)).status).toBe(200);
+    expect((await verification()).identity).toBe("verified");
+
+    const renamed = profileInput({ firstName: profile.firstName, lastName: `Other${uid()}` });
+    expect((await seeker.api("PUT", "/v1/me/profile", renamed)).status).toBe(200);
+    expect(await verification()).toMatchObject({ identity: "expired", level: 0 });
+    const userId = (
+      await query<{ id: string }>(sql`select id from users where email = ${seeker.email}`)
+    )[0]?.id;
+    const audited = await query<{ reason: string }>(
+      sql`select a.reason from audit_log a join seeker_checks c on c.id::text = a.target_id
+          where c.user_id = ${userId} and a.action = 'check.expired'`,
+    );
+    expect(audited).toEqual([{ reason: "name_changed" }]);
+
+    // They can verify again, and pass with the new name.
+    await verifyIdentity(seeker);
+    expect((await verification()).identity).toBe("verified");
   });
 });

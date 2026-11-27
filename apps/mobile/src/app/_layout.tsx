@@ -9,9 +9,12 @@ import { Text } from '@/components/text';
 import { Colors, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { restoreAppearance } from '@/lib/appearance';
 import { AuthProvider, useAuth } from '@/lib/auth';
 
 SplashScreen.preventAutoHideAsync();
+// Light or dark as chosen in Settings, while the splash screen is still up.
+void restoreAppearance();
 
 function navigationTheme(dark: boolean): Theme {
   const base = dark ? DarkTheme : DefaultTheme;

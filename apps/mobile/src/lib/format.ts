@@ -34,6 +34,7 @@ export const VERIFICATION_STATUS_LABELS: Record<VerificationStatus, string> = {
   requires_input: 'Action needed',
   verified: 'Verified',
   failed: 'Failed',
+  expired: 'Verify again',
 };
 
 export function initials(first?: string | null, last?: string | null, fallback = '?') {

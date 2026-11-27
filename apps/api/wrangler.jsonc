@@ -45,6 +45,11 @@
     }
   ],
   "triggers": { "crons": ["17 3 * * *"] },
+  // Live conversations (D-18): one room per application. Repeated in env.production, as wrangler asks.
+  "durable_objects": {
+    "bindings": [{ "name": "CONVERSATIONS", "class_name": "ConversationRoom" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ConversationRoom"] }],
 
   "env": {
     "production": {
@@ -90,7 +95,11 @@
           "simple": { "limit": 30, "period": 60 }
         }
       ],
-      "triggers": { "crons": ["17 3 * * *"] }
+      "triggers": { "crons": ["17 3 * * *"] },
+      "durable_objects": {
+        "bindings": [{ "name": "CONVERSATIONS", "class_name": "ConversationRoom" }]
+      },
+      "migrations": [{ "tag": "v1", "new_sqlite_classes": ["ConversationRoom"] }]
     }
   }
 }

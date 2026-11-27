@@ -16,7 +16,13 @@
   pushes. A token Apple calls gone is forgotten; a token another account registers moves to it.
 - **Opening one:** a push carries the website link its email has. The app opens its own screen for it
   (`/inbox`, `/applications`, `/account/verify`, `/account/endorsements`), or the website for the rest.
-- **Asking:** the app asks permission once the person has a profile (not during onboarding).
+- **Choosing:** for each topic (messages from salons, your applications, verification and
+  endorsements) a push switch and an email switch, saved on the account (`notification_preferences`,
+  `GET`/`PUT /v1/me/notifications`; no row means on). Email covers the text sent instead when there's no
+  email. Sign-in, security and salons' own notices have no topic and always go. The app's Settings has
+  the switches; the website can show the same later.
+- **Asking:** the app asks permission once the person has a profile (not during onboarding), and Settings
+  offers it again or links to the phone's settings when it's off.
 - iOS only for now. Android, later, sends through Firebase Cloud Messaging the same way.
 
 **Why.** Job seekers need to hear from a salon fast, and phones read push before email. Sending direct keeps

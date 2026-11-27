@@ -151,16 +151,6 @@ export default function ProfileScreen() {
         </Card>
       )}
 
-      <Card style={styles.menu}>
-        <ListRow
-          icon="inbox"
-          title="Inbox"
-          subtitle="Salons that messaged you or looked at your number"
-          onPress={() => router.push('/inbox')}
-          right={user.unreadMessages ? <Pill label={String(user.unreadMessages)} tone="brand" /> : undefined}
-        />
-      </Card>
-
       {MENU.map((group) => (
         <View key={group.label} style={styles.group}>
           <Text variant="overline" color="textMuted">
@@ -231,6 +221,7 @@ const MENU: { label: string; items: MenuItem[] }[] = [
     items: [
       { href: '/verification', title: 'Verification', subtitle: 'Identity, right to work, qualifications', icon: 'shield' },
       { href: '/profile/security', title: 'Sign-in and security', subtitle: 'Email, mobile, Google, Apple, devices', icon: 'lock' },
+      { href: '/settings', title: 'Settings', subtitle: 'Notifications, appearance, about the app', icon: 'settings' },
     ],
   },
 ];

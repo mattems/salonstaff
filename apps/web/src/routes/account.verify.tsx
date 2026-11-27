@@ -49,6 +49,7 @@ const STATUS: Record<Status, string> = {
   requires_input: "Needs another try",
   verified: "Verified",
   failed: "Not verified",
+  expired: "Verify again",
 };
 
 function StatusBadge({ status }: { status: Status }) {
@@ -136,6 +137,12 @@ function Identity({ status, hasProfile }: { status: Status; hasProfile: boolean 
         <div className="space-y-3">
           {(status === "failed" || status === "requires_input") && (
             <p className="text-sm">The last check didn't go through. You can try again.</p>
+          )}
+          {status === "expired" && (
+            <p className="text-sm">
+              Your name changed after your ID was checked, so verify it again with the ID in your
+              new name.
+            </p>
           )}
           <FormMessage message={action.message} />
           <Button

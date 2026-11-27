@@ -9,7 +9,7 @@ import { securityHeaderLines } from "@salonstaff/config/security-headers";
 import handler from "@tanstack/react-start/server-entry";
 import { installServerHooks, type ServerContext } from "./lib/server-context";
 import { MEDIA_ORIGIN } from "./lib/site";
-import { fetchApi } from "./lib/upstream";
+import { fetchApi, isWebSocket } from "./lib/upstream";
 
 const context = new AsyncLocalStorage<ServerContext>();
 installServerHooks({ current: () => context.getStore(), fetchApi });
@@ -52,6 +52,9 @@ function withSecurityHeaders(request: Request, response: Response, nonce: string
 
 export default {
   async fetch(request: Request): Promise<Response> {
+    // A live conversation's socket (D-18) goes straight to the API, around the page framework.
+    const path = new URL(request.url).pathname;
+    if (path.startsWith("/api/") && isWebSocket(request)) return fetchApi(request);
     const nonce = newNonce();
     const response = await context.run({ request, nonce }, () => handler.fetch(request));
     return withSecurityHeaders(request, response, nonce);

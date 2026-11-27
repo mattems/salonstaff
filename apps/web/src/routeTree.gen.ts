@@ -49,11 +49,14 @@ import { Route as SalonsIndexRouteImport } from './routes/salons.index'
 import { Route as SalonsSplatRouteImport } from './routes/salons.$'
 import { Route as SitemapsNameRouteImport } from './routes/sitemaps.$name'
 import { Route as SeekerApplicationsIndexRouteImport } from './routes/_seeker.applications.index'
+import { Route as SeekerApplicationsIdRouteImport } from './routes/_seeker.applications.$id'
 import { Route as SeekerApplicationsSavedRouteImport } from './routes/_seeker.applications.saved'
 import { Route as EmployerSalonIdIndexRouteImport } from './routes/employer.$salonId.index'
+import { Route as EmployerSalonIdApplicantsRouteImport } from './routes/employer.$salonId.applicants'
 import { Route as EmployerSalonIdBillingRouteImport } from './routes/employer.$salonId.billing'
 import { Route as EmployerSalonIdSettingsRouteImport } from './routes/employer.$salonId.settings'
 import { Route as EmployerSalonIdTeamRouteImport } from './routes/employer.$salonId.team'
+import { Route as EmployerSalonIdApplicationsIdRouteImport } from './routes/employer.$salonId.applications.$id'
 import { Route as EmployerSalonIdCandidatesIdRouteImport } from './routes/employer.$salonId.candidates.$id'
 import { Route as EmployerSalonIdJobsNewRouteImport } from './routes/employer.$salonId.jobs.new'
 import { Route as EmployerSalonIdJobsIdIndexRouteImport } from './routes/employer.$salonId.jobs.$id.index'
@@ -258,6 +261,11 @@ const SeekerApplicationsIndexRoute = SeekerApplicationsIndexRouteImport.update({
   path: '/',
   getParentRoute: () => SeekerApplicationsRoute,
 } as any)
+const SeekerApplicationsIdRoute = SeekerApplicationsIdRouteImport.update({
+  id: '/$id',
+  path: '/$id',
+  getParentRoute: () => SeekerApplicationsRoute,
+} as any)
 const SeekerApplicationsSavedRoute = SeekerApplicationsSavedRouteImport.update({
   id: '/saved',
   path: '/saved',
@@ -268,6 +276,12 @@ const EmployerSalonIdIndexRoute = EmployerSalonIdIndexRouteImport.update({
   path: '/',
   getParentRoute: () => EmployerSalonIdRoute,
 } as any)
+const EmployerSalonIdApplicantsRoute =
+  EmployerSalonIdApplicantsRouteImport.update({
+    id: '/applicants',
+    path: '/applicants',
+    getParentRoute: () => EmployerSalonIdRoute,
+  } as any)
 const EmployerSalonIdBillingRoute = EmployerSalonIdBillingRouteImport.update({
   id: '/billing',
   path: '/billing',
@@ -283,6 +297,12 @@ const EmployerSalonIdTeamRoute = EmployerSalonIdTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => EmployerSalonIdRoute,
 } as any)
+const EmployerSalonIdApplicationsIdRoute =
+  EmployerSalonIdApplicationsIdRouteImport.update({
+    id: '/applications/$id',
+    path: '/applications/$id',
+    getParentRoute: () => EmployerSalonIdRoute,
+  } as any)
 const EmployerSalonIdCandidatesIdRoute =
   EmployerSalonIdCandidatesIdRouteImport.update({
     id: '/candidates/$id',
@@ -346,12 +366,15 @@ export interface FileRoutesByFullPath {
   '/employer/': typeof EmployerIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/salons/': typeof SalonsIndexRoute
+  '/applications/$id': typeof SeekerApplicationsIdRoute
   '/applications/saved': typeof SeekerApplicationsSavedRoute
+  '/employer/$salonId/applicants': typeof EmployerSalonIdApplicantsRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
   '/applications/': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
+  '/employer/$salonId/applications/$id': typeof EmployerSalonIdApplicationsIdRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
   '/employer/$salonId/jobs/$id/edit': typeof EmployerSalonIdJobsIdEditRoute
@@ -392,12 +415,15 @@ export interface FileRoutesByTo {
   '/employer': typeof EmployerIndexRoute
   '/jobs': typeof JobsIndexRoute
   '/salons': typeof SalonsIndexRoute
+  '/applications/$id': typeof SeekerApplicationsIdRoute
   '/applications/saved': typeof SeekerApplicationsSavedRoute
+  '/employer/$salonId/applicants': typeof EmployerSalonIdApplicantsRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
   '/applications': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId': typeof EmployerSalonIdIndexRoute
+  '/employer/$salonId/applications/$id': typeof EmployerSalonIdApplicationsIdRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
   '/employer/$salonId/jobs/$id/edit': typeof EmployerSalonIdJobsIdEditRoute
@@ -444,12 +470,15 @@ export interface FileRoutesById {
   '/employer/': typeof EmployerIndexRoute
   '/jobs/': typeof JobsIndexRoute
   '/salons/': typeof SalonsIndexRoute
+  '/_seeker/applications/$id': typeof SeekerApplicationsIdRoute
   '/_seeker/applications/saved': typeof SeekerApplicationsSavedRoute
+  '/employer/$salonId/applicants': typeof EmployerSalonIdApplicantsRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
   '/_seeker/applications/': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
+  '/employer/$salonId/applications/$id': typeof EmployerSalonIdApplicationsIdRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
   '/employer/$salonId/jobs/$id/edit': typeof EmployerSalonIdJobsIdEditRoute
@@ -496,12 +525,15 @@ export interface FileRouteTypes {
     | '/employer/'
     | '/jobs/'
     | '/salons/'
+    | '/applications/$id'
     | '/applications/saved'
+    | '/employer/$salonId/applicants'
     | '/employer/$salonId/billing'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
     | '/applications/'
     | '/employer/$salonId/'
+    | '/employer/$salonId/applications/$id'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
     | '/employer/$salonId/jobs/$id/edit'
@@ -542,12 +574,15 @@ export interface FileRouteTypes {
     | '/employer'
     | '/jobs'
     | '/salons'
+    | '/applications/$id'
     | '/applications/saved'
+    | '/employer/$salonId/applicants'
     | '/employer/$salonId/billing'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
     | '/applications'
     | '/employer/$salonId'
+    | '/employer/$salonId/applications/$id'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
     | '/employer/$salonId/jobs/$id/edit'
@@ -593,12 +628,15 @@ export interface FileRouteTypes {
     | '/employer/'
     | '/jobs/'
     | '/salons/'
+    | '/_seeker/applications/$id'
     | '/_seeker/applications/saved'
+    | '/employer/$salonId/applicants'
     | '/employer/$salonId/billing'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
     | '/_seeker/applications/'
     | '/employer/$salonId/'
+    | '/employer/$salonId/applications/$id'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
     | '/employer/$salonId/jobs/$id/edit'
@@ -911,6 +949,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SeekerApplicationsIndexRouteImport
       parentRoute: typeof SeekerApplicationsRoute
     }
+    '/_seeker/applications/$id': {
+      id: '/_seeker/applications/$id'
+      path: '/$id'
+      fullPath: '/applications/$id'
+      preLoaderRoute: typeof SeekerApplicationsIdRouteImport
+      parentRoute: typeof SeekerApplicationsRoute
+    }
     '/_seeker/applications/saved': {
       id: '/_seeker/applications/saved'
       path: '/saved'
@@ -923,6 +968,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/employer/$salonId/'
       preLoaderRoute: typeof EmployerSalonIdIndexRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/$salonId/applicants': {
+      id: '/employer/$salonId/applicants'
+      path: '/applicants'
+      fullPath: '/employer/$salonId/applicants'
+      preLoaderRoute: typeof EmployerSalonIdApplicantsRouteImport
       parentRoute: typeof EmployerSalonIdRoute
     }
     '/employer/$salonId/billing': {
@@ -944,6 +996,13 @@ declare module '@tanstack/react-router' {
       path: '/team'
       fullPath: '/employer/$salonId/team'
       preLoaderRoute: typeof EmployerSalonIdTeamRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/$salonId/applications/$id': {
+      id: '/employer/$salonId/applications/$id'
+      path: '/applications/$id'
+      fullPath: '/employer/$salonId/applications/$id'
+      preLoaderRoute: typeof EmployerSalonIdApplicationsIdRouteImport
       parentRoute: typeof EmployerSalonIdRoute
     }
     '/employer/$salonId/candidates/$id': {
@@ -978,11 +1037,13 @@ declare module '@tanstack/react-router' {
 }
 
 interface SeekerApplicationsRouteChildren {
+  SeekerApplicationsIdRoute: typeof SeekerApplicationsIdRoute
   SeekerApplicationsSavedRoute: typeof SeekerApplicationsSavedRoute
   SeekerApplicationsIndexRoute: typeof SeekerApplicationsIndexRoute
 }
 
 const SeekerApplicationsRouteChildren: SeekerApplicationsRouteChildren = {
+  SeekerApplicationsIdRoute: SeekerApplicationsIdRoute,
   SeekerApplicationsSavedRoute: SeekerApplicationsSavedRoute,
   SeekerApplicationsIndexRoute: SeekerApplicationsIndexRoute,
 }
@@ -1037,10 +1098,12 @@ const AccountRouteWithChildren =
   AccountRoute._addFileChildren(AccountRouteChildren)
 
 interface EmployerSalonIdRouteChildren {
+  EmployerSalonIdApplicantsRoute: typeof EmployerSalonIdApplicantsRoute
   EmployerSalonIdBillingRoute: typeof EmployerSalonIdBillingRoute
   EmployerSalonIdSettingsRoute: typeof EmployerSalonIdSettingsRoute
   EmployerSalonIdTeamRoute: typeof EmployerSalonIdTeamRoute
   EmployerSalonIdIndexRoute: typeof EmployerSalonIdIndexRoute
+  EmployerSalonIdApplicationsIdRoute: typeof EmployerSalonIdApplicationsIdRoute
   EmployerSalonIdCandidatesIdRoute: typeof EmployerSalonIdCandidatesIdRoute
   EmployerSalonIdJobsNewRoute: typeof EmployerSalonIdJobsNewRoute
   EmployerSalonIdJobsIdEditRoute: typeof EmployerSalonIdJobsIdEditRoute
@@ -1048,10 +1111,12 @@ interface EmployerSalonIdRouteChildren {
 }
 
 const EmployerSalonIdRouteChildren: EmployerSalonIdRouteChildren = {
+  EmployerSalonIdApplicantsRoute: EmployerSalonIdApplicantsRoute,
   EmployerSalonIdBillingRoute: EmployerSalonIdBillingRoute,
   EmployerSalonIdSettingsRoute: EmployerSalonIdSettingsRoute,
   EmployerSalonIdTeamRoute: EmployerSalonIdTeamRoute,
   EmployerSalonIdIndexRoute: EmployerSalonIdIndexRoute,
+  EmployerSalonIdApplicationsIdRoute: EmployerSalonIdApplicationsIdRoute,
   EmployerSalonIdCandidatesIdRoute: EmployerSalonIdCandidatesIdRoute,
   EmployerSalonIdJobsNewRoute: EmployerSalonIdJobsNewRoute,
   EmployerSalonIdJobsIdEditRoute: EmployerSalonIdJobsIdEditRoute,

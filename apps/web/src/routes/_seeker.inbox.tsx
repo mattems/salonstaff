@@ -20,7 +20,13 @@ export const Route = createFileRoute("/_seeker/inbox")({
   validateSearch: (search: Record<string, unknown>): { id?: string | undefined } => ({
     id: typeof search.id === "string" ? search.id : undefined,
   }),
-  loader: async () => unwrap(await api.GET("/v1/me/profile/contacts")),
+  loader: async () => {
+    const [contacts, conversations] = await Promise.all([
+      api.GET("/v1/me/profile/contacts"),
+      api.GET("/v1/me/conversations"),
+    ]);
+    return { items: unwrap(contacts).items, conversations: unwrap(conversations).items };
+  },
   head: () => privatePage("Inbox"),
   component: Inbox,
 });
@@ -31,7 +37,7 @@ const summary = (item: Item) =>
   item.kind === "message" ? (item.message ?? "") : "Looked at your number";
 
 function Inbox() {
-  const { items } = Route.useLoaderData();
+  const { items, conversations } = Route.useLoaderData();
   const { id } = Route.useSearch();
   const refresh = useRefresh();
   const unread = items.filter((item) => !item.read).length;
@@ -62,7 +68,7 @@ function Inbox() {
     <div className="space-y-6">
       <PageHeader
         title="Inbox"
-        description="Salons that messaged you or looked at your number. Reply to a message by email."
+        description="Salons writing about your applications, and salons that found your profile."
         actions={
           unread > 0 && (
             <Button variant="outline" size="sm" onClick={markAll}>
@@ -71,16 +77,19 @@ function Inbox() {
           )
         }
       />
+      {conversations.length > 0 && <Conversations items={conversations} />}
       {items.length === 0 ? (
-        <EmptyState
-          title="Nothing yet"
-          description="When a salon messages you or looks at your number, it shows here."
-          action={
-            <Button asChild variant="outline">
-              <Link to="/account/sharing">Check who can see your profile</Link>
-            </Button>
-          }
-        />
+        conversations.length === 0 && (
+          <EmptyState
+            title="Nothing yet"
+            description="When a salon messages you or looks at your number, it shows here."
+            action={
+              <Button asChild variant="outline">
+                <Link to="/account/sharing">Check who can see your profile</Link>
+              </Button>
+            }
+          />
+        )
       ) : (
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
           <Card className={cn("py-0", selected && "hidden lg:block")}>
@@ -224,5 +233,54 @@ function Opened({ item }: { item: Item }) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+/** Conversations about their applications (D-17): opening one goes to the application. */
+function Conversations({ items }: { items: Schemas["MyConversation"][] }) {
+  return (
+    <section className="space-y-2" aria-label="About your applications">
+      <h2 className="font-medium text-sm">About your applications</h2>
+      <Card className="py-0">
+        <ul className="divide-y">
+          {items.map((item) => (
+            <li key={item.id}>
+              <Link
+                to="/applications/$id"
+                params={{ id: item.id }}
+                className="flex gap-3 px-4 py-3 text-sm hover:bg-muted"
+              >
+                <span
+                  className={cn(
+                    "mt-1.5 size-2 shrink-0 rounded-full",
+                    item.unreadMessages > 0 ? "bg-primary" : "bg-transparent",
+                  )}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-2">
+                    <span className={cn("truncate", item.unreadMessages > 0 && "font-semibold")}>
+                      {item.job.salon.name} · {item.job.title}
+                    </span>
+                    {item.lastMessage && (
+                      <span className="shrink-0 text-muted-foreground text-xs">
+                        {ago(item.lastMessage.createdAt)}
+                      </span>
+                    )}
+                  </span>
+                  {item.lastMessage && (
+                    <span className="block truncate text-muted-foreground">
+                      {item.lastMessage.from === "seeker" ? "You: " : ""}
+                      {item.lastMessage.body}
+                    </span>
+                  )}
+                  {item.unreadMessages > 0 && <span className="sr-only">Unread</span>}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      </Card>
+    </section>
   );
 }

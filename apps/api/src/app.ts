@@ -21,6 +21,7 @@ import "./routes/admin-queues";
 import { auth } from "./routes/auth";
 import { billingRoutes } from "./routes/billing";
 import { checksRoutes } from "./routes/checks";
+import { conversationRoutes } from "./routes/conversations";
 import { devRoutes } from "./routes/dev";
 import { directoryRoutes } from "./routes/directory";
 import { docs } from "./routes/docs";
@@ -136,6 +137,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/", checksRoutes);
   app.route("/", jobsRoutes);
   app.route("/", employerRoutes);
+  app.route("/", conversationRoutes);
   app.route("/", teamRoutes);
   app.route("/", directoryRoutes);
   app.route("/", profileRoutes);
