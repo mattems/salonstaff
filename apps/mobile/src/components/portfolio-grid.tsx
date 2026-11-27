@@ -1,4 +1,4 @@
-import type { PortfolioItem } from '@salonstaff/shared';
+import type { PortfolioItem } from '@/lib/api';
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';

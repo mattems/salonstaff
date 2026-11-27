@@ -45,6 +45,13 @@ const ICONS = {
   add: { ios: 'plus', android: 'add' },
   scissors: { ios: 'scissors', android: 'content_cut' },
   travel: { ios: 'car', android: 'directions_car' },
+  phone: { ios: 'phone', android: 'call' },
+  inbox: { ios: 'tray', android: 'inbox' },
+  share: { ios: 'square.and.arrow.up', android: 'share' },
+  eye: { ios: 'eye', android: 'visibility' },
+  chat: { ios: 'bubble.left', android: 'chat' },
+  lock: { ios: 'lock', android: 'lock' },
+  quote: { ios: 'quote.bubble', android: 'format_quote' },
 } as const satisfies Record<string, Exclude<SymbolName, string>>;
 
 export type IconName = keyof typeof ICONS;

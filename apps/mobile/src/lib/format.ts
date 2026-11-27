@@ -23,7 +23,7 @@ export function formatDate(iso: string): string {
 }
 
 export const VERIFICATION_LEVELS = {
-  0: { label: 'Email only', description: 'Verify your ID so salons know you’re real.' },
+  0: { label: 'Not verified', description: 'Verify your ID so salons know you’re real.' },
   1: { label: 'ID verified', description: 'Add right to work to become work-ready.' },
   2: { label: 'Work-ready', description: 'Identity and right to work confirmed.' },
 } as const;

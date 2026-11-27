@@ -1,4 +1,3 @@
-import type { AuthResponse, Me } from '@salonstaff/shared';
 import {
   createContext,
   use,
@@ -11,10 +10,11 @@ import {
 
 import {
   api,
-  ApiClientError,
+  ApiProblem,
   setApiToken,
   setUnauthorizedHandler,
   type CodeTarget,
+  type Me,
   type OAuthProvider,
 } from '@/lib/api';
 import { tokenStore } from '@/lib/token-store';
@@ -33,14 +33,14 @@ type AuthContextValue = {
   /** Only non-null while signed in. */
   user: Me | null;
   unreachableMessage: string | null;
-  requestCode: (target: CodeTarget) => Promise<void>;
+  sendCode: (target: CodeTarget) => Promise<void>;
   verifyCode: (target: CodeTarget, code: string) => Promise<Me>;
-  /** Native Google / Apple sign-in: exchange the provider's ID token for a session. */
+  /** Native Google / Apple sign-in: the provider's ID token becomes a session. */
   signInWithOAuth: (provider: OAuthProvider, idToken: string, name?: string) => Promise<Me>;
-  /** Re-fetch `/me` (e.g. after a profile update or verification). */
+  /** Local development only: the demo job seeker, without a code. */
+  devLogin: () => Promise<Me>;
+  /** Re-fetch `/v1/me` (e.g. after a profile update or verification). */
   refresh: () => Promise<Me | null>;
-  /** Replace the cached user with a fresh `Me` returned by the API. */
-  setUser: (user: Me) => void;
   /** Ends the session. Pass `{ revoke: false }` when the token is already invalid. */
   signOut: (opts?: { revoke?: boolean }) => Promise<void>;
   /** Retry loading the account after an `unreachable` launch. */
@@ -80,11 +80,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
       const user = await api.me(token);
       setState({ status: 'signedIn', token, user });
     } catch (err) {
-      if (err instanceof ApiClientError && err.status === 401) {
+      if (err instanceof ApiProblem && err.status === 401) {
         await clearStoredToken();
         setState({ status: 'signedOut' });
       } else {
-        const message = err instanceof ApiClientError ? err.error : 'Could not load your account.';
+        const message = err instanceof ApiProblem ? err.message : 'Could not load your account.';
         setState({ status: 'unreachable', token, message });
       }
     }
@@ -118,11 +118,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
     return () => setUnauthorizedHandler(null);
   }, []);
 
-  const requestCode = useCallback(async (target: CodeTarget) => {
-    await api.requestCode(target);
-  }, []);
+  const sendCode = useCallback((target: CodeTarget) => api.sendCode(target), []);
 
-  const startSession = useCallback(async ({ token, user }: AuthResponse) => {
+  /** A new session token: keep it, then load the account with it. */
+  const startSession = useCallback(async (token: string) => {
+    const user = await api.me(token);
     await tokenStore.set(TOKEN_KEY, token);
     setApiToken(token);
     setState({ status: 'signedIn', token, user });
@@ -136,9 +136,11 @@ export function AuthProvider({ children }: PropsWithChildren) {
 
   const signInWithOAuth = useCallback(
     async (provider: OAuthProvider, idToken: string, name?: string) =>
-      startSession(await api.oauth(provider, idToken, name)),
+      startSession(await api.signInWithIdToken(provider, idToken, name)),
     [startSession],
   );
+
+  const devLogin = useCallback(async () => startSession(await api.devLogin()), [startSession]);
 
   const refresh = useCallback(async () => {
     try {
@@ -154,13 +156,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     }
   }, []);
 
-  const setUser = useCallback((user: Me) => {
-    setState((prev) => (prev.status === 'signedIn' ? { ...prev, user } : prev));
-  }, []);
-
   const signOut = useCallback(async ({ revoke = true }: { revoke?: boolean } = {}) => {
-    // Best effort: revoke the token server-side, but never block signing out on it.
-    if (revoke) api.logout().catch(() => {});
+    // Best effort: end the session on the server, but never block signing out on it.
+    // (The token is read as the call starts, before it's cleared below.)
+    if (revoke) api.signOut().catch(() => {});
     await clearStoredToken();
     setState({ status: 'signedOut' });
   }, []);
@@ -176,15 +175,15 @@ export function AuthProvider({ children }: PropsWithChildren) {
       status: state.status,
       user: state.status === 'signedIn' ? state.user : null,
       unreachableMessage: state.status === 'unreachable' ? state.message : null,
-      requestCode,
+      sendCode,
       verifyCode,
       signInWithOAuth,
+      devLogin,
       refresh,
-      setUser,
       signOut,
       retry,
     }),
-    [state, requestCode, verifyCode, signInWithOAuth, refresh, setUser, signOut, retry],
+    [state, sendCode, verifyCode, signInWithOAuth, devLogin, refresh, signOut, retry],
   );
 
   return <AuthContext value={value}>{children}</AuthContext>;

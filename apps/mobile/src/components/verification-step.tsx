@@ -17,6 +17,11 @@ const STATUS_TONES: Record<VerificationStatus, Tone> = {
   failed: 'danger',
 };
 
+/** A check's status as a coloured pill. */
+export function StatusPill({ status }: { status: VerificationStatus }) {
+  return <Pill label={VERIFICATION_STATUS_LABELS[status]} tone={STATUS_TONES[status]} />;
+}
+
 export function VerificationStep({
   step,
   icon,
@@ -54,7 +59,7 @@ export function VerificationStep({
           </Text>
           <Text variant="subheading">{title}</Text>
         </View>
-        <Pill label={VERIFICATION_STATUS_LABELS[status]} tone={STATUS_TONES[status]} />
+        <StatusPill status={status} />
       </View>
       <Text variant="small" color="textSecondary">
         {description}

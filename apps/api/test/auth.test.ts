@@ -70,3 +70,56 @@ describe("sign in with an SMS code", () => {
     expect(body.user.email).toMatch(/@phone\.salonstaff\.invalid$/);
   });
 });
+
+describe("the mobile app (bearer token)", () => {
+  // No Origin and no cookies: what a native app sends.
+  const native = (body: unknown, token?: string) => ({
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(body),
+  });
+
+  it("signs in with an email code and uses the session token as a bearer", async () => {
+    const { call, sent } = createTestApp();
+    const email = `app-${crypto.randomUUID().slice(0, 8)}@example.test`;
+    const asked = await call(
+      "/v1/auth/email-otp/send-verification-otp",
+      native({ email, type: "sign-in" }),
+    );
+    expect(asked.status).toBe(200);
+    const signedIn = await call(
+      "/v1/auth/sign-in/email-otp",
+      native({ email, otp: codeFor(sent, email) }),
+    );
+    expect(signedIn.status).toBe(200);
+    const token = signedIn.headers.get("set-auth-token");
+    expect(token).toBeTruthy();
+
+    const bearer = { Authorization: `Bearer ${token}` };
+    const me = await call("/v1/me", { headers: bearer });
+    expect(me.status).toBe(200);
+    expect(((await me.json()) as { email: string }).email).toBe(email);
+
+    // A change with a bearer token needs no Origin.
+    const named = await call("/v1/me", {
+      ...native({ name: "App Person" }, token ?? ""),
+      method: "PATCH",
+    });
+    expect(named.status).toBe(200);
+
+    expect((await call("/v1/auth/sign-out", native({}, token ?? ""))).status).toBe(200);
+    expect((await call("/v1/me", { headers: bearer })).status).toBe(401);
+  });
+
+  it("gets a bearer token from the local dev login", async () => {
+    const { call } = createTestApp();
+    const email = `dev-${crypto.randomUUID().slice(0, 8)}@example.test`;
+    const login = await call("/v1/auth/dev-login", native({ email, role: "seeker" }));
+    const { token } = (await login.json()) as { token: string };
+    const me = await call("/v1/me", { headers: { Authorization: `Bearer ${token}` } });
+    expect(me.status).toBe(200);
+  });
+});

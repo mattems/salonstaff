@@ -1,4 +1,4 @@
-import { EMPLOYMENT_TYPES, formatPay, labelFor, type JobSummary } from '@salonstaff/shared';
+import { EMPLOYMENT_TYPES, labelFor } from '@salonstaff/shared';
 import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -9,13 +9,15 @@ import { Text } from '@/components/text';
 import { VerifiedTick } from '@/components/verified-tick';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import type { JobSummary } from '@/lib/api';
+import { mediaUrl } from '@/lib/config';
 import { timeAgo } from '@/lib/format';
 
 export function SalonLogo({ name, uri, size = 44 }: { name: string; uri: string | null; size?: number }) {
   const theme = useTheme();
   const style = { width: size, height: size, borderRadius: size / 4 };
   if (uri) {
-    return <Image source={{ uri }} style={[style, { backgroundColor: theme.surfaceMuted }]} contentFit="cover" />;
+    return <Image source={{ uri: mediaUrl(uri) }} style={[style, { backgroundColor: theme.surfaceMuted }]} contentFit="cover" />;
   }
   return (
     <View style={[style, styles.logoFallback, { backgroundColor: theme.brandSoft }]}>
@@ -29,13 +31,12 @@ export function SalonLogo({ name, uri, size = 44 }: { name: string; uri: string 
 export function JobCard({ job, footer }: { job: JobSummary; footer?: React.ReactNode }) {
   const theme = useTheme();
   const router = useRouter();
-  const pay = formatPay(job.payMin, job.payMax, job.payPeriod);
 
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`${job.title} at ${job.salon.name}`}
-      onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: job.id } })}
+      onPress={() => router.push({ pathname: '/jobs/[id]', params: { id: job.id, path: job.path } })}
       style={({ pressed }) => [
         styles.card,
         {
@@ -61,7 +62,7 @@ export function JobCard({ job, footer }: { job: JobSummary; footer?: React.React
 
       <View style={styles.metaRow}>
         <Meta icon="location" text={`${job.suburb}, ${job.state}`} />
-        {pay ? <Meta icon="pay" text={pay} /> : null}
+        {job.pay ? <Meta icon="pay" text={job.pay} /> : null}
       </View>
 
       <View style={styles.footerRow}>
@@ -70,7 +71,7 @@ export function JobCard({ job, footer }: { job: JobSummary; footer?: React.React
           <Pill label={labelFor(EMPLOYMENT_TYPES, job.employmentType)} />
         </View>
         <Text variant="caption" color="textMuted">
-          {timeAgo(job.publishedAt)}
+          {job.closed ? 'Closed' : job.publishedAt ? timeAgo(job.publishedAt) : ''}
         </Text>
       </View>
       {footer}

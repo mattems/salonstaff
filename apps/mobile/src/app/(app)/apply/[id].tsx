@@ -11,7 +11,7 @@ import { TextField } from '@/components/text-field';
 import { VerificationBadge } from '@/components/verification-badge';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiClientError, api, errorMessage } from '@/lib/api';
+import { ApiProblem, api, errorMessage } from '@/lib/api';
 import { useUser } from '@/lib/auth';
 
 const MAX_NOTE = 1500;
@@ -37,12 +37,11 @@ export default function ApplyScreen() {
     }
     setSubmitting(true);
     try {
-      await api.apply(id, parsed.data);
+      await api.apply(id, parsed.data.coverNote);
       setDone(true);
     } catch (err) {
-      if (err instanceof ApiClientError && err.fieldErrors?.coverNote?.length) {
-        setFieldError(err.fieldErrors.coverNote[0]);
-      }
+      const field = err instanceof ApiProblem ? err.field('coverNote') : undefined;
+      if (field) setFieldError(field);
       setError(errorMessage(err));
     } finally {
       setSubmitting(false);

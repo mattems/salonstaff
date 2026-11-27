@@ -9,8 +9,9 @@ import { VERIFICATION_LEVELS } from '@/lib/format';
 type Level = 0 | 1 | 2;
 
 /** Big, prominent badge for the seeker's verification level. */
-export function VerificationBadge({ level, compact = false }: { level: Level; compact?: boolean }) {
+export function VerificationBadge({ level: raw, compact = false }: { level: number; compact?: boolean }) {
   const theme = useTheme();
+  const level = Math.min(2, Math.max(0, Math.trunc(raw))) as Level;
   const info = VERIFICATION_LEVELS[level];
   const palette =
     level === 2

@@ -1,19 +1,21 @@
 import { JOB_ROLES, RIGHT_TO_WORK, labelFor } from '@salonstaff/shared';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useRouter, type Href } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import type { IconName } from '@/components/icon';
 import { ListRow } from '@/components/list-row';
 import { Pill } from '@/components/pill';
+import { ProfilePhoto } from '@/components/profile-photo';
 import { Text } from '@/components/text';
 import { VerificationBadge } from '@/components/verification-badge';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
-import { initials } from '@/lib/format';
+import { formatAuMobile } from '@/lib/format';
 
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -23,6 +25,7 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const profile = user.profile;
+  const signedInAs = user.email ?? (user.phoneNumber ? formatAuMobile(user.phoneNumber) : '');
 
   useFocusEffect(
     useCallback(() => {
@@ -37,7 +40,7 @@ export default function ProfileScreen() {
   }
 
   function confirmSignOut() {
-    Alert.alert('Sign out?', 'You can sign back in any time with your email.', [
+    Alert.alert('Sign out?', 'You can sign back in any time.', [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Sign out', style: 'destructive', onPress: () => void signOut() },
     ]);
@@ -81,17 +84,24 @@ export default function ProfileScreen() {
         />
       }>
       <View style={styles.header}>
-        <View style={[styles.avatar, { backgroundColor: theme.brand }]}>
-          <Text variant="title" style={{ color: theme.onBrand }}>
-            {initials(profile?.firstName, profile?.lastName, user.email)}
-          </Text>
-        </View>
+        <Pressable
+          onPress={() => router.push(profile ? '/profile/photo' : '/edit-profile')}
+          accessibilityRole="button"
+          accessibilityLabel="Your photo">
+          <ProfilePhoto
+            photoUrl={profile?.photoUrl}
+            firstName={profile?.firstName}
+            lastName={profile?.lastName}
+            fallback={signedInAs}
+            size={64}
+          />
+        </Pressable>
         <View style={styles.headerText}>
           <Text variant="title" numberOfLines={1}>
             {name}
           </Text>
           <Text variant="small" color="textSecondary" numberOfLines={1}>
-            {profile?.headline || user.email}
+            {profile?.headline || signedInAs}
           </Text>
         </View>
       </View>
@@ -117,9 +127,9 @@ export default function ProfileScreen() {
             value={`${profile.yearsExperience} ${profile.yearsExperience === 1 ? 'year' : 'years'}`}
           />
           <Row label="Right to work" value={labelFor(RIGHT_TO_WORK, profile.rightToWork)} />
-          {profile.phone ? <Row label="Mobile" value={profile.phone} /> : null}
+          {user.phoneNumber ? <Row label="Mobile" value={formatAuMobile(user.phoneNumber)} /> : null}
           {profile.instagram ? <Row label="Instagram" value={`@${profile.instagram.replace(/^@/, '')}`} /> : null}
-          {profile.qualifications ? <Row label="Qualifications" value={profile.qualifications} /> : null}
+          {profile.tiktok ? <Row label="TikTok" value={`@${profile.tiktok.replace(/^@/, '')}`} /> : null}
           <View style={styles.roles}>
             {profile.roles.map((r) => (
               <Pill key={r} label={labelFor(JOB_ROLES, r)} tone="brand" />
@@ -142,18 +152,38 @@ export default function ProfileScreen() {
       )}
 
       <Card style={styles.menu}>
-        <ListRow icon="edit" title="Edit profile" onPress={() => router.push('/edit-profile')} />
-        <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <ListRow
-          icon="shield"
-          title="Verification centre"
-          subtitle="Identity, right to work, qualifications"
-          onPress={() => router.push('/verification')}
+          icon="inbox"
+          title="Inbox"
+          subtitle="Salons that messaged you or looked at your number"
+          onPress={() => router.push('/inbox')}
+          right={user.unreadMessages ? <Pill label={String(user.unreadMessages)} tone="brand" /> : undefined}
         />
       </Card>
 
+      {MENU.map((group) => (
+        <View key={group.label} style={styles.group}>
+          <Text variant="overline" color="textMuted">
+            {group.label}
+          </Text>
+          <Card style={styles.menu}>
+            {group.items.map((item, i) => (
+              <View key={item.title}>
+                {i > 0 ? <View style={[styles.divider, { backgroundColor: theme.border }]} /> : null}
+                <ListRow
+                  icon={item.icon}
+                  title={item.title}
+                  subtitle={item.subtitle}
+                  onPress={() => router.push(item.needsProfile && !profile ? '/edit-profile' : item.href)}
+                />
+              </View>
+            ))}
+          </Card>
+        </View>
+      ))}
+
       <Card style={styles.menu}>
-        <ListRow icon="signOut" title="Sign out" subtitle={user.email} onPress={confirmSignOut} />
+        <ListRow icon="signOut" title="Sign out" subtitle={signedInAs} onPress={confirmSignOut} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
         <ListRow
           icon="trash"
@@ -165,6 +195,45 @@ export default function ProfileScreen() {
     </ScrollView>
   );
 }
+
+type MenuItem = {
+  href: Href;
+  title: string;
+  subtitle?: string;
+  icon: IconName;
+  /** Opens profile setup instead until there's a profile. */
+  needsProfile?: true;
+};
+
+/** The same sections as the website's account pages. */
+const MENU: { label: string; items: MenuItem[] }[] = [
+  {
+    label: 'Your profile',
+    items: [
+      { href: '/edit-profile', title: 'Basics', subtitle: 'Name, place, roles, work rights', icon: 'edit' },
+      { href: '/profile/photo', title: 'Photo', icon: 'camera', needsProfile: true },
+      { href: '/profile/skills', title: 'Skills', subtitle: 'Specialties and brands', icon: 'sparkles', needsProfile: true },
+      { href: '/profile/availability', title: 'Availability and pay', icon: 'calendar', needsProfile: true },
+      { href: '/profile/portfolio', title: 'Portfolio', subtitle: 'Photos of your work', icon: 'photos', needsProfile: true },
+      { href: '/profile/experience', title: 'Experience and qualifications', icon: 'jobs', needsProfile: true },
+      { href: '/profile/endorsements', title: 'Endorsements', icon: 'quote', needsProfile: true },
+    ],
+  },
+  {
+    label: 'Who sees it',
+    items: [
+      { href: '/profile/sharing', title: 'Visibility and sharing', subtitle: 'Your share link, salons you hide from', icon: 'eye', needsProfile: true },
+      { href: '/profile/contact', title: 'How salons contact you', icon: 'chat', needsProfile: true },
+    ],
+  },
+  {
+    label: 'Account',
+    items: [
+      { href: '/verification', title: 'Verification', subtitle: 'Identity, right to work, qualifications', icon: 'shield' },
+      { href: '/profile/security', title: 'Sign-in and security', subtitle: 'Email, mobile, Google, Apple, devices', icon: 'lock' },
+    ],
+  },
+];
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -182,13 +251,6 @@ function Row({ label, value }: { label: string; value: string }) {
 const styles = StyleSheet.create({
   content: { padding: Spacing.four, gap: Spacing.four, paddingBottom: Spacing.seven },
   header: { flexDirection: 'row', alignItems: 'center', gap: Spacing.four },
-  avatar: {
-    width: 64,
-    height: 64,
-    borderRadius: Radius.pill,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   headerText: { flex: 1, gap: 2 },
   cardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   row: { flexDirection: 'row', gap: Spacing.three },
@@ -196,5 +258,6 @@ const styles = StyleSheet.create({
   rowValue: { flex: 1 },
   roles: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   menu: { paddingVertical: Spacing.one, gap: 0 },
+  group: { gap: Spacing.two },
   divider: { height: StyleSheet.hairlineWidth, marginLeft: 34 },
 });

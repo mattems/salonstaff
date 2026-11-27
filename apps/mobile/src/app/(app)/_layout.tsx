@@ -43,6 +43,17 @@ export default function AppLayout() {
       />
       <Stack.Screen name="edit-profile" options={{ title: 'Edit profile' }} />
       <Stack.Screen name="verification" options={{ title: 'Verification centre' }} />
+      <Stack.Screen name="profile/photo" options={{ title: 'Photo' }} />
+      <Stack.Screen name="profile/skills" options={{ title: 'Skills' }} />
+      <Stack.Screen name="profile/availability" options={{ title: 'Availability and pay' }} />
+      <Stack.Screen name="profile/portfolio" options={{ title: 'Portfolio' }} />
+      <Stack.Screen name="profile/experience" options={{ title: 'Experience' }} />
+      <Stack.Screen name="profile/endorsements" options={{ title: 'Endorsements' }} />
+      <Stack.Screen name="profile/sharing" options={{ title: 'Visibility and sharing' }} />
+      <Stack.Screen name="profile/contact" options={{ title: 'How salons contact you' }} />
+      <Stack.Screen name="profile/security" options={{ title: 'Sign-in and security' }} />
+      <Stack.Screen name="inbox/index" options={{ title: 'Inbox' }} />
+      <Stack.Screen name="inbox/[id]" options={{ title: '' }} />
       <Stack.Screen name="verify-complete" options={{ headerShown: false }} />
     </Stack>
   );

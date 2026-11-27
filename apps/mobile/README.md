@@ -4,43 +4,56 @@ Expo SDK 58 + Expo Router app for job seekers on Salon Staff. Every seeker is
 identity-verified, so the app is built around sign-in by email code, a profile,
 and the Verification centre (identity, right to work, qualifications).
 
-It talks to the API documented in [`docs/api.md`](../../docs/api.md) and shares types,
-constants and zod schemas with the web app via `@salonstaff/shared`
+It talks to the API's `/v1` (reference: http://localhost:8890/docs locally) with types generated
+from its OpenAPI description, and shares constants and zod schemas with the website via `@salonstaff/shared`
 (`packages/shared`, resolved through `tsconfig.json` paths + `metro.config.js`).
 
 > This is a standalone npm project (not a root workspace member) with its own `node_modules`.
 
 ## Run it
 
+Start the API first: `bun dev` from the repo root (the API is `wrangler dev` on :8890). Then:
+
 ```bash
 cd apps/mobile
 npm install
-cp .env.example .env        # optional, see below
-npx expo start              # then press i (iOS simulator) or a (Android emulator)
+npx expo start --ios          # installs Expo Go on the simulator and opens the app
 ```
 
-Start the web/API server first (`npm run dev` from the repo root). In local dev the
-6-digit sign-in code is printed in the server console and at
-`http://localhost:3000/dev/outbox`.
+Locally the sign-in screen has a **Demo job seeker** button (the API's dev login, local only).
+Email codes land in Mailpit (linked from the springboard, http://localhost:4100); SMS codes too.
 
 ### API URL
 
-`EXPO_PUBLIC_API_URL` is the server origin (without `/api/v1`):
+`EXPO_PUBLIC_API_URL` is the API's origin (it serves `/v1/*`):
 
 | Where you run the app | Value |
 |---|---|
-| iOS simulator | `http://localhost:3000` (default) |
-| Android emulator | `http://10.0.2.2:3000` (default on Android when unset) |
-| Physical device | your computer's LAN address, e.g. `http://192.168.1.20:3000` |
+| iOS simulator | `http://localhost:8890` (default in development) |
+| Android emulator | `http://10.0.2.2:8890` (default on Android in development) |
+| Physical device | your computer's LAN address, e.g. `http://192.168.1.20:8890` |
+| Release build | `https://api.salonstaff.com.au` (default when not in development) |
 
-`EXPO_PUBLIC_*` values are inlined at bundle time — restart `expo start` (with `-c`) after changing it.
+`EXPO_PUBLIC_SITE_URL` is the website, for share links and salon pages: `http://localhost:5300`
+in development (`10.0.2.2` on Android), `https://salonstaff.com.au` in release builds.
+
+`EXPO_PUBLIC_*` values are inlined at bundle time: restart `expo start` (with `-c`) after changing it.
+
+### How it talks to the API
+
+- Types come from the API's OpenAPI description: `bun run api:types` at the repo root writes
+  `src/lib/api/schema.d.ts`. Run it after any API change, then `npx tsc --noEmit` here.
+- Sign-in is Better Auth at `/v1/auth/*` (email code, SMS code, Google/Apple ID tokens). The
+  session token comes back in the `set-auth-token` header and is sent as `Authorization: Bearer`;
+  it's kept in SecureStore. Cookies are never sent.
+- Google and Apple appear only when the build can use them (Apple on iOS; Google needs
+  `EXPO_PUBLIC_GOOGLE_*_CLIENT_ID` and a development build). The API needs the matching client IDs.
 
 ### Native modules
 
-`expo-secure-store`, `expo-document-picker`, `expo-file-system` and `expo-web-browser` are
-Expo SDK modules normally bundled in Expo Go, so Expo Go should work for development. A development build
-(`npx expo run:ios` / `npx expo run:android`) is recommended for testing the
-`salonstaff://verify-complete` deep link used by identity verification.
+`expo-secure-store`, `expo-document-picker`, `expo-file-system` and `expo-web-browser` are in
+Expo Go. A development build (`npx expo run:ios` / `npx expo run:android`) is needed for Google
+sign-in and recommended for the `salonstaff://verify-complete` deep link used by the ID check.
 
 ## Checks
 
@@ -72,13 +85,17 @@ src/
     (auth)/               sign-in (email) → verify-code (6 digits)
     (app)/                signed-in stack (onboarding nudge lives in _layout)
       (tabs)/             Jobs · Saved · Applications · Profile
-      jobs/[id].tsx       job detail (save, apply, "can't apply" CTA)
+      jobs/[id].tsx       job detail by path (save, apply, the API's `blocker` as the next step)
       apply/[id].tsx      apply modal with optional cover note
       edit-profile.tsx    SeekerProfileInput form (validated with seekerProfileSchema)
-      verification.tsx    Verification centre
+      profile/            the website's account sections: photo, skills, availability, portfolio,
+                          experience, endorsements, sharing, contact, security
+      inbox/              salons' messages and number views (index, [id])
+      verification.tsx    Verification centre (ID, right to work, a certificate per qualification)
   components/             small presentational components
   hooks/                  theme, debounce, useRequest
-  lib/api.ts              typed fetch client (ApiClientError with status/error/fieldErrors)
+  lib/api.ts              typed client (openapi-fetch) + Better Auth sign-in; ApiProblem errors
+  lib/api/schema.d.ts     generated by `bun run api:types`, never edited by hand
   lib/auth.tsx            token in SecureStore, user: Me, refresh(), signOut(); 401 → signed out
-  lib/config.ts           API base URL resolution
+  lib/config.ts           API URL, picture URLs
 ```

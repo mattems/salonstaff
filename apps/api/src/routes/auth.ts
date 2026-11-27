@@ -53,7 +53,9 @@ auth.post(`${AUTH_PATH}/dev-login`, async (c) => {
     { ipAddress: c.req.header("CF-Connecting-IP"), userAgent: c.req.header("User-Agent") },
   );
   c.header("Set-Cookie", cookie, { append: true });
-  return c.json({ signed_in: true });
+  // The mobile app signs in with the same session as a bearer token (the cookie's signed value).
+  const token = decodeURIComponent(cookie.slice(cookie.indexOf("=") + 1, cookie.indexOf(";")));
+  return c.json({ signed_in: true, token });
 });
 
 /**

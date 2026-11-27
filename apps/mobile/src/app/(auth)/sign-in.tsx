@@ -6,7 +6,6 @@ import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
-import { DevOAuthSheet } from '@/components/dev-oauth-sheet';
 import { Icon } from '@/components/icon';
 import { SegmentedControl } from '@/components/segmented-control';
 import { SocialButton } from '@/components/social-button';
@@ -36,7 +35,7 @@ export default function SignInScreen() {
   const theme = useTheme();
   const dark = useIsDark();
   const router = useRouter();
-  const { requestCode, signInWithOAuth } = useAuth();
+  const { sendCode, signInWithOAuth, devLogin } = useAuth();
 
   const [mode, setMode] = useState<Mode>('email');
   const [email, setEmail] = useState('');
@@ -44,8 +43,7 @@ export default function SignInScreen() {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [busyProvider, setBusyProvider] = useState<OAuthProvider | null>(null);
-  const [mockProvider, setMockProvider] = useState<OAuthProvider | null>(null);
+  const [busyProvider, setBusyProvider] = useState<OAuthProvider | 'dev' | null>(null);
   const [appleNative, setAppleNative] = useState(false);
 
   useEffect(() => {
@@ -58,11 +56,9 @@ export default function SignInScreen() {
     };
   }, []);
 
-  const googleNative = isGoogleConfigured();
-  // In production, only offer providers this build can actually use. In dev, unconfigured
-  // providers fall back to a mock token the dev server accepts.
-  const showApple = appleNative || __DEV__;
-  const showGoogle = googleNative || __DEV__;
+  // Only offer providers this build can actually use.
+  const showApple = appleNative;
+  const showGoogle = isGoogleConfigured();
 
   async function finishOAuth(provider: OAuthProvider, idToken: string, name?: string) {
     setError(null);
@@ -75,10 +71,6 @@ export default function SignInScreen() {
   }
 
   async function onApple() {
-    if (!appleNative) {
-      setMockProvider('apple');
-      return;
-    }
     setError(null);
     setBusyProvider('apple');
     try {
@@ -92,18 +84,27 @@ export default function SignInScreen() {
   }
 
   async function onGoogle() {
-    if (!googleNative) {
-      setMockProvider('google');
-      return;
-    }
     setError(null);
     setBusyProvider('google');
     try {
       const credential = await signInWithGoogle();
       if (credential) await finishOAuth('google', credential.idToken, credential.name);
     } catch (err) {
-      if (err instanceof ProviderUnavailableError && __DEV__) setMockProvider('google');
-      else setError(errorMessage(err));
+      setError(
+        err instanceof ProviderUnavailableError ? err.message : errorMessage(err),
+      );
+    } finally {
+      setBusyProvider(null);
+    }
+  }
+
+  async function onDevLogin() {
+    setError(null);
+    setBusyProvider('dev');
+    try {
+      await devLogin();
+    } catch (err) {
+      setError(errorMessage(err));
     } finally {
       setBusyProvider(null);
     }
@@ -128,10 +129,10 @@ export default function SignInScreen() {
     setSubmitting(true);
     try {
       if (mode === 'email') {
-        await requestCode({ email: target });
+        await sendCode({ email: target });
         router.push({ pathname: '/verify-code', params: { email: target } });
       } else {
-        await requestCode({ phone: target });
+        await sendCode({ phone: target });
         router.push({ pathname: '/verify-code', params: { phone: target } });
       }
     } catch (err) {
@@ -165,31 +166,22 @@ export default function SignInScreen() {
 
           <View style={styles.providers}>
             {showApple ? (
-              appleNative ? (
-                <AppleAuthentication.AppleAuthenticationButton
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                  buttonStyle={
-                    dark
-                      ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                      : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                  }
-                  cornerRadius={25}
-                  style={styles.appleButton}
-                  onPress={onApple}
-                />
-              ) : (
-                <SocialButton
-                  provider="apple"
-                  label="Continue with Apple (dev)"
-                  onPress={onApple}
-                  loading={busyProvider === 'apple'}
-                />
-              )
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                buttonStyle={
+                  dark
+                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                }
+                cornerRadius={25}
+                style={styles.appleButton}
+                onPress={onApple}
+              />
             ) : null}
             {showGoogle ? (
               <SocialButton
                 provider="google"
-                label={googleNative ? 'Continue with Google' : 'Continue with Google (dev)'}
+                label="Continue with Google"
                 onPress={onGoogle}
                 loading={busyProvider === 'google'}
                 disabled={busyProvider === 'apple'}
@@ -268,17 +260,24 @@ export default function SignInScreen() {
               No password needed. New here? We’ll create your account as you sign in.
             </Text>
           </View>
+
+          {__DEV__ ? (
+            <View style={[styles.dev, { borderColor: theme.border }]}>
+              <Text variant="caption" color="textMuted">
+                Development only: works against a local API.
+              </Text>
+              <Button
+                title="Demo job seeker"
+                variant="outline"
+                size="sm"
+                loading={busyProvider === 'dev'}
+                onPress={onDevLogin}
+              />
+            </View>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <DevOAuthSheet
-        provider={mockProvider}
-        onClose={() => setMockProvider(null)}
-        onSubmit={async (provider, idToken, name) => {
-          await finishOAuth(provider, idToken, name);
-          setMockProvider(null);
-        }}
-      />
     </SafeAreaView>
   );
 }
@@ -300,6 +299,13 @@ const styles = StyleSheet.create({
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   divider: { flex: 1, height: StyleSheet.hairlineWidth },
   form: { gap: Spacing.four },
+  dev: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+  },
   trust: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -6,7 +6,6 @@ import {
   type AuState,
   type JobRole,
   type RightToWork,
-  type SeekerProfile,
 } from '@salonstaff/shared';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -29,7 +28,7 @@ import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiClientError, api, errorMessage } from '@/lib/api';
+import { ApiProblem, api, errorMessage, type SeekerProfile } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
 
 const MAX_ROLES = 6;
@@ -37,7 +36,6 @@ const MAX_ROLES = 6;
 type Form = {
   firstName: string;
   lastName: string;
-  phone: string;
   headline: string;
   about: string;
   suburb: string;
@@ -45,8 +43,8 @@ type Form = {
   postcode: string;
   roles: JobRole[];
   yearsExperience: string;
-  qualifications: string;
   instagram: string;
+  tiktok: string;
   rightToWork: RightToWork | undefined;
   openToWork: boolean;
 };
@@ -57,7 +55,6 @@ function initialForm(p: SeekerProfile | null): Form {
   return {
     firstName: p?.firstName ?? '',
     lastName: p?.lastName ?? '',
-    phone: p?.phone ?? '',
     headline: p?.headline ?? '',
     about: p?.about ?? '',
     suburb: p?.suburb ?? '',
@@ -65,8 +62,8 @@ function initialForm(p: SeekerProfile | null): Form {
     postcode: p?.postcode ?? '',
     roles: p?.roles ?? [],
     yearsExperience: p ? String(p.yearsExperience) : '',
-    qualifications: p?.qualifications ?? '',
     instagram: p?.instagram ?? '',
+    tiktok: p?.tiktok ?? '',
     rightToWork: p?.rightToWork,
     openToWork: p?.openToWork ?? true,
   };
@@ -84,7 +81,7 @@ export default function EditProfileScreen() {
   const theme = useTheme();
   const router = useRouter();
   const user = useUser();
-  const { setUser } = useAuth();
+  const { refresh } = useAuth();
   const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
   const isOnboarding = onboarding === '1';
 
@@ -109,7 +106,7 @@ export default function EditProfileScreen() {
     const raw = {
       ...form,
       instagram: form.instagram.trim().replace(/^@+/, ''),
-      phone: form.phone.replace(/[\s()-]/g, ''),
+      tiktok: form.tiktok.trim().replace(/^@+/, ''),
       yearsExperience: form.yearsExperience.trim() === '' ? undefined : form.yearsExperience.trim(),
     };
     const parsed = seekerProfileSchema.safeParse(raw);
@@ -128,15 +125,16 @@ export default function EditProfileScreen() {
 
     setSaving(true);
     try {
-      const me = await api.updateProfile(parsed.data);
-      setUser(me);
+      await api.saveProfile(parsed.data);
+      await refresh();
       if (isOnboarding) router.replace('/verification');
       else router.back();
     } catch (err) {
-      if (err instanceof ApiClientError && err.fieldErrors) {
+      if (err instanceof ApiProblem && err.errors.length) {
         const next: FieldErrors = {};
-        for (const [key, messages] of Object.entries(err.fieldErrors)) {
-          if (messages[0]) next[key as keyof Form] = messages[0];
+        for (const { path, message } of err.errors) {
+          const key = path.split('.')[0] as keyof Form;
+          next[key] ??= message;
         }
         setErrors(next);
       }
@@ -191,17 +189,6 @@ export default function EditProfileScreen() {
               />
             </View>
           </View>
-          <TextField
-            label="Mobile"
-            value={form.phone}
-            onChangeText={(v) => set('phone', v)}
-            placeholder="0412 345 678"
-            keyboardType="phone-pad"
-            autoComplete="tel"
-            textContentType="telephoneNumber"
-            hint="Optional. Only shared with salons you apply to."
-            error={errors.phone}
-          />
           <TextField
             label="Headline"
             value={form.headline}
@@ -285,16 +272,6 @@ export default function EditProfileScreen() {
             error={errors.yearsExperience}
           />
           <TextField
-            label="Qualifications"
-            value={form.qualifications}
-            onChangeText={(v) => set('qualifications', v)}
-            placeholder="e.g. Cert III in Hairdressing (2019)"
-            multiline
-            maxLength={500}
-            style={styles.shortMultiline}
-            error={errors.qualifications}
-          />
-          <TextField
             label="Instagram"
             value={form.instagram}
             onChangeText={(v) => set('instagram', v)}
@@ -304,6 +281,17 @@ export default function EditProfileScreen() {
             maxLength={60}
             hint="Optional. A great way to show your work."
             error={errors.instagram}
+          />
+          <TextField
+            label="TikTok"
+            value={form.tiktok}
+            onChangeText={(v) => set('tiktok', v)}
+            placeholder="@yourhandle"
+            autoCapitalize="none"
+            autoCorrect={false}
+            maxLength={60}
+            hint="Optional."
+            error={errors.tiktok}
           />
         </Section>
 
@@ -407,7 +395,6 @@ const styles = StyleSheet.create({
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   fieldLabel: { gap: 2 },
   inlineError: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  shortMultiline: { minHeight: 80 },
   radioCard: { paddingVertical: 0, gap: 0 },
   radioRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three, minHeight: 52 },
   radio: {

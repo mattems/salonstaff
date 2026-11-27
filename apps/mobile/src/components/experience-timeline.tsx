@@ -1,4 +1,4 @@
-import type { ExperienceItem } from '@salonstaff/shared';
+import type { Experience as ExperienceItem } from '@/lib/api';
 import { StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/text';

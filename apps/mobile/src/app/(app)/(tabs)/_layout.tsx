@@ -3,6 +3,7 @@ import type { ColorValue } from 'react-native';
 
 import { Icon, type IconName } from '@/components/icon';
 import { useTheme } from '@/hooks/use-theme';
+import { useAuth } from '@/lib/auth';
 
 function tabIcon(outline: IconName, filled: IconName) {
   function TabIcon({ focused, color }: { focused: boolean; color: ColorValue }) {
@@ -13,6 +14,8 @@ function tabIcon(outline: IconName, filled: IconName) {
 
 export default function TabsLayout() {
   const theme = useTheme();
+  const { user } = useAuth();
+  const unread = user?.unreadMessages ?? 0;
   return (
     <Tabs
       screenOptions={{
@@ -38,7 +41,12 @@ export default function TabsLayout() {
       />
       <Tabs.Screen
         name="profile"
-        options={{ title: 'Profile', tabBarIcon: tabIcon('profile', 'profileFill') }}
+        options={{
+          title: 'Profile',
+          tabBarIcon: tabIcon('profile', 'profileFill'),
+          tabBarBadge: unread > 0 ? unread : undefined,
+          tabBarBadgeStyle: { backgroundColor: theme.brand },
+        }}
       />
     </Tabs>
   );
