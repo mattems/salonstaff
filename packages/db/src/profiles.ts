@@ -57,7 +57,7 @@ export function publicProfiles(db: Db) {
     /** Where to tell the job seeker something. */
     async contactOf(userId: string): Promise<Contact | null> {
       const [row] = await db
-        .select({ email: users.email, phoneNumber: users.phoneNumber })
+        .select({ userId: users.id, email: users.email, phoneNumber: users.phoneNumber })
         .from(users)
         .where(eq(users.id, userId));
       return row ?? null;

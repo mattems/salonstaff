@@ -16,8 +16,8 @@ export const NO_BILLING = {
 };
 
 /**
- * Nor do tests reach anything else outside: the business register, Twilio or Resend. A local
- * .dev.vars may hold real values for trying them by hand.
+ * Nor do tests reach anything else outside: the business register, Twilio, Resend or Apple's push
+ * service. A local .dev.vars may hold real values for trying them by hand.
  */
 export const NO_OUTSIDE_SERVICES = {
   ABR_GUID: undefined,
@@ -25,6 +25,8 @@ export const NO_OUTSIDE_SERVICES = {
   TWILIO_AUTH_TOKEN: undefined,
   TWILIO_FROM: undefined,
   RESEND_API_KEY: undefined,
+  APNS_KEY_ID: undefined,
+  APNS_PRIVATE_KEY: undefined,
   IDENTITY_PROVIDER: "mock" as const,
 };
 

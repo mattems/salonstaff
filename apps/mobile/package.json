@@ -7,6 +7,7 @@
     "@react-native-google-signin/google-signin": "^17.0.0",
     "expo": "~58.0.26",
     "expo-apple-authentication": "~58.0.3",
+    "expo-application": "~58.1.2",
     "expo-constants": "~58.0.16",
     "expo-device": "~58.0.5",
     "expo-document-picker": "~58.0.5",
@@ -16,6 +17,7 @@
     "expo-image": "~58.0.18",
     "expo-image-picker": "~58.0.10",
     "expo-linking": "~58.0.17",
+    "expo-notifications": "~58.1.10",
     "expo-router": "~58.0.32",
     "expo-secure-store": "~58.0.3",
     "expo-splash-screen": "~58.0.14",
@@ -46,7 +48,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "lint": "expo lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "testflight": "./scripts/testflight.sh"
   },
   "private": true
 }

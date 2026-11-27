@@ -1214,6 +1214,36 @@
         },
         "required": ["signedOut"]
       },
+      "PushDeviceRegistered": {
+        "type": "object",
+        "properties": {
+          "registered": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["registered"]
+      },
+      "PushDevice": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": ["ios"]
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64,200}$",
+            "example": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+          },
+          "sandbox": {
+            "type": "boolean",
+            "default": false,
+            "description": "True for a development build: its token only works with Apple's sandbox."
+          }
+        },
+        "required": ["platform", "token"]
+      },
       "Checks": {
         "type": "object",
         "properties": {
@@ -5536,6 +5566,82 @@
           },
           "409": {
             "description": "That's this device",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/push-device": {
+      "put": {
+        "summary": "Get push notifications on this phone",
+        "description": "Send the phone's push token after signing in, and again on every launch (tokens can change). It belongs to the session you send it with: signing out stops the pushes. The same notices go by email too.",
+        "tags": ["Push notifications"],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PushDevice"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Pushes will come to this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PushDeviceRegistered"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "Stop push notifications on this phone",
+        "description": "Signing out stops them too. Notices still go by email.",
+        "tags": ["Push notifications"],
+        "responses": {
+          "200": {
+            "description": "No more pushes to this phone",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Deleted"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
             "content": {
               "application/problem+json": {
                 "schema": {

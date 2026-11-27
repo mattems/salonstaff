@@ -469,7 +469,7 @@ export function checks(db: Db) {
     /** Whether the person has an account that isn't banned (for notifying them). */
     async contactOf(userId: string) {
       const [row] = await db
-        .select({ email: users.email, phoneNumber: users.phoneNumber })
+        .select({ userId: users.id, email: users.email, phoneNumber: users.phoneNumber })
         .from(users)
         .where(and(eq(users.id, userId), sql`${users.suspendedAt} is null`));
       return row ?? null;

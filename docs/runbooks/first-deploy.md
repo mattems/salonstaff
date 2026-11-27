@@ -31,7 +31,8 @@ bunx wrangler secret put AUTH_SECRET --env production        # openssl rand -bas
 bunx wrangler secret put RESEND_API_KEY --env production      # resend.md
 bunx wrangler secret put ABR_GUID --env production            # abn-lookup.md
 ```
-Later, as each is set up: Google/Apple ([set-up-sign-in.md](set-up-sign-in.md)), Twilio ([twilio.md](twilio.md)),
+Later, as each is set up: Google/Apple ([set-up-sign-in.md](set-up-sign-in.md)), push notifications
+([push-notifications.md](push-notifications.md)), Twilio ([twilio.md](twilio.md)),
 Stripe ([stripe.md](stripe.md)).
 
 ## 6. Deploy

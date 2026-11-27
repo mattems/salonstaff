@@ -61,6 +61,8 @@
         "APP_ORIGINS": "https://salonstaff.com.au,https://admin.salonstaff.com.au",
         "EMAIL_FROM": "Salon Staff <hello@salonstaff.com.au>",
         "MEDIA_URL": "https://cdn.salonstaff.com.au",
+        // The iOS app's bundle ID: Apple ID tokens from the app carry it as their audience.
+        "APPLE_BUNDLE_ID": "au.com.salonstaff.app",
         // Cloudflare Access in front of the admin portal (docs/runbooks/cloudflare-access.md). Not secrets.
         "ACCESS_TEAM_DOMAIN": "",
         "ACCESS_AUD": ""

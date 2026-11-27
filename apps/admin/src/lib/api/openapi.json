@@ -1214,6 +1214,36 @@
         },
         "required": ["signedOut"]
       },
+      "PushDeviceRegistered": {
+        "type": "object",
+        "properties": {
+          "registered": {
+            "type": "boolean",
+            "enum": [true]
+          }
+        },
+        "required": ["registered"]
+      },
+      "PushDevice": {
+        "type": "object",
+        "properties": {
+          "platform": {
+            "type": "string",
+            "enum": ["ios"]
+          },
+          "token": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64,200}$",
+            "example": "a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90"
+          },
+          "sandbox": {
+            "type": "boolean",
+            "default": false,
+            "description": "True for a development build: its token only works with Apple's sandbox."
+          }
+        },
+        "required": ["platform", "token"]
+      },
       "Checks": {
         "type": "object",
         "properties": {

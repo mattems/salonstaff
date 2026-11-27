@@ -86,6 +86,17 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   visibility and sharing (the share link through the phone's share sheet; no post image), how salons
   contact you, verification, and sign-in and security (email and mobile by code, Google/Apple, devices).
   An inbox of salons' messages and number views, with the unread count on the Profile tab.
+- Mobile app ready for TestFlight, built and uploaded on Matt's Mac (no EAS):
+  `apps/mobile/scripts/testflight.sh` (`npm run testflight`) prebuilds, archives with Xcode, refuses a
+  bundle that doesn't point at the production API, and uploads; the build number is the UTC time.
+  docs/runbooks/testflight.md. Production now sets `APPLE_BUNDLE_ID` for the app's Apple tokens. Not signed
+  or uploaded yet: it needs Matt's Apple account in Xcode and the first deploy.
+- Push notifications (D-15): the API sends the notices it emails as pushes too, straight to Apple (APNs key
+  and JWT, no Expo push service); locally to Mailpit as `push+<userId>@local.test`. `push_devices` (migration
+  0008) has one row per signed-in app session (`PUT`/`DELETE /v1/me/push-device`), deleted with the session.
+  `Contact` now carries `userId`. Background notices finish before the request's database connection
+  closes. The app asks once there's a profile and opens the matching screen when a push is tapped.
+  docs/runbooks/push-notifications.md. Not tried against Apple yet: needs Matt's APNs key.
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
@@ -120,6 +131,6 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - Directory pages don't yet credit the directory's data sources (Overture, ABS, ABR); needed before importing
   the built CSVs in production (tools/directory/README.md).
 - No Cloudflare account, PlanetScale database or deploy yet (docs/runbooks/first-deploy.md).
-- Google, Apple, Twilio, Stripe and Resend keys (Matt sets them).
+- Google, Apple, APNs, Twilio, Stripe and Resend keys (Matt sets them).
 - Mobile app: not tried on Android or a physical device; Google/Apple sign-in and connecting them not tried
   (needs keys and a development build). No post image for Instagram/TikTok (the website draws it).

@@ -56,6 +56,8 @@ export interface AbnCheck {
 }
 
 export interface Contact {
+  /** Their account, for push notifications to their phones (D-15). */
+  userId: string;
   /** May be a stand-in address (an account made with a mobile number): check with `isStandInEmail`. */
   email: string;
   phoneNumber: string | null;
@@ -386,7 +388,7 @@ export function salonScope(db: Db, salonId: string) {
     });
     return {
       access,
-      contact: { email: person.email, phoneNumber: person.phoneNumber },
+      contact: { userId, email: person.email, phoneNumber: person.phoneNumber },
       applied: Boolean(applied),
     };
   };
@@ -675,7 +677,12 @@ export function salonScope(db: Db, salonId: string) {
               status: isNew && options.markViewed ? "viewed" : r.application.status,
             },
             isNew,
-            user: { id: r.application.seekerId, email: r.email, phoneNumber: r.phoneNumber },
+            user: {
+              id: r.application.seekerId,
+              userId: r.application.seekerId,
+              email: r.email,
+              phoneNumber: r.phoneNumber,
+            },
             profile: r.profile,
             checks: checks.get(r.application.seekerId) as CheckSummary,
           };
@@ -750,7 +757,11 @@ export function salonScope(db: Db, salonId: string) {
           application: updated as Application,
           before: row.application.status,
           job: row.job,
-          contact: { email: row.email, phoneNumber: row.phoneNumber },
+          contact: {
+            userId: row.application.seekerId,
+            email: row.email,
+            phoneNumber: row.phoneNumber,
+          },
         };
       });
     },
@@ -875,7 +886,7 @@ export function salonScope(db: Db, salonId: string) {
       const chosen = job.notifyUserIds;
       if (chosen && chosen.length === 0) return [];
       return db
-        .select({ email: users.email, phoneNumber: users.phoneNumber })
+        .select({ userId: users.id, email: users.email, phoneNumber: users.phoneNumber })
         .from(salonMembers)
         .innerJoin(users, eq(users.id, salonMembers.userId))
         .where(

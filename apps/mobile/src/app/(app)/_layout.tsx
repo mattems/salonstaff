@@ -1,8 +1,11 @@
+import { useLastNotificationResponse } from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useRef } from 'react';
 
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { destinationOf, registerForPush } from '@/lib/push-notifications';
 
 export const unstable_settings = { anchor: '(tabs)' };
 
@@ -19,6 +22,31 @@ export default function AppLayout() {
     nudged.current = true;
     router.push({ pathname: '/edit-profile', params: { onboarding: '1' } });
   }, [needsProfile, router]);
+
+  // Push notifications (D-15): once there's a profile (not in the middle of onboarding), ask
+  // permission and send this phone's token; again on each launch, as tokens change.
+  const hasProfile = !!user?.profile;
+  useEffect(() => {
+    if (!hasProfile) return;
+    registerForPush().catch((error: unknown) => {
+      // Pushes are a bonus: every notice also goes by email.
+      if (__DEV__) console.warn('Push notifications not set up:', error);
+    });
+  }, [hasProfile]);
+
+  // A tapped push opens its screen (also when it launched the app).
+  const response = useLastNotificationResponse();
+  const handled = useRef<string | null>(null);
+  useEffect(() => {
+    if (!response || !user) return;
+    const id = response.notification.request.identifier;
+    if (handled.current === id) return;
+    handled.current = id;
+    const destination = destinationOf(response);
+    if (!destination) return;
+    if ('screen' in destination) router.push(destination.screen);
+    else WebBrowser.openBrowserAsync(destination.web);
+  }, [response, user, router]);
 
   // Signing out: render nothing while the auth guard redirects, so screens that
   // rely on `useUser()` never render without a user.

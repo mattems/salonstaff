@@ -90,3 +90,22 @@ export function smsAsEmail(props: { phoneNumber: string; body: string }): EmailM
     text: props.body,
   };
 }
+
+/**
+ * Local development only: a push notification delivered to Mailpit as an email to
+ * `push+<userId>@local.test`, when the API has no APNs key.
+ */
+export function pushAsEmail(props: {
+  userId: string;
+  title: string;
+  body: string;
+  url: string;
+}): EmailMessage {
+  const text = `${props.title}\n${props.body}\n\nOpens: ${props.url}`;
+  return {
+    to: `push+${props.userId}@local.test`,
+    subject: `Push: ${props.title}`,
+    html: `<pre>${text.replace(/</g, "&lt;")}</pre>`,
+    text,
+  };
+}

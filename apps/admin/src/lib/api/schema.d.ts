@@ -3482,6 +3482,21 @@ export interface components {
       /** @description How many devices. */
       signedOut: number;
     };
+    PushDeviceRegistered: {
+      /** @enum {boolean} */
+      registered: true;
+    };
+    PushDevice: {
+      /** @enum {string} */
+      platform: "ios";
+      /** @example a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90 */
+      token: string;
+      /**
+       * @description True for a development build: its token only works with Apple's sandbox.
+       * @default false
+       */
+      sandbox: boolean;
+    };
     Checks: {
       verification: components["schemas"]["Verification"];
       checks: components["schemas"]["Check"][];

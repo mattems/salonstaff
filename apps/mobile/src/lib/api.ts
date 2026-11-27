@@ -337,6 +337,11 @@ export const api = {
     unwrap(await client.DELETE('/v1/me/sessions/{id}', { params: path(id) })),
   signOutOthers: async () => unwrap(await client.DELETE('/v1/me/sessions')),
 
+  // Push notifications (D-15): this phone, for the session it's signed in with
+  registerPushDevice: async (body: Schemas['PushDevice']) =>
+    unwrap(await client.PUT('/v1/me/push-device', { body })),
+  removePushDevice: async () => unwrap(await client.DELETE('/v1/me/push-device')),
+
   // Jobs
   jobs: async (query: JobFilters) => unwrap(await client.GET('/v1/jobs', { params: { query } })),
   /**
