@@ -56,6 +56,10 @@ export interface Env {
   APPLE_KEY_ID?: string;
   APPLE_PRIVATE_KEY?: string;
   APPLE_BUNDLE_ID?: string;
+  /** Apple push notifications (APNs, D-15): a key with APNs enabled. Uses APPLE_TEAM_ID and APPLE_BUNDLE_ID. */
+  APNS_KEY_ID?: string;
+  /** The APNs key's .p8 contents. */
+  APNS_PRIVATE_KEY?: string;
   /** Australian Business Register lookup GUID. Without it ABNs are only checksum-checked. */
   ABR_GUID?: string;
   STRIPE_SECRET_KEY?: string;
@@ -69,6 +73,8 @@ export interface Variables extends TimingVariables {
   dryRun: boolean;
   /** Opens the database connection on first use; closed automatically after the response. */
   db: () => Promise<Db>;
+  /** Work to finish after the response (notices). The database connection closes after it. */
+  background: (task: Promise<unknown>) => void;
   email: () => EmailSender;
   sms: () => SmsSender;
   auth: () => Promise<Auth>;

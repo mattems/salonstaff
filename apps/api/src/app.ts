@@ -31,6 +31,7 @@ import { meRoutes } from "./routes/me";
 import { mediaRoutes } from "./routes/media";
 import { myProfileRoutes } from "./routes/my-profile";
 import { profileRoutes } from "./routes/profiles";
+import { pushRoutes } from "./routes/push";
 import { root } from "./routes/root";
 import { securityRoutes } from "./routes/security";
 import { siteRoutes } from "./routes/site";
@@ -131,6 +132,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/", meRoutes);
   app.route("/", myProfileRoutes);
   app.route("/", securityRoutes);
+  app.route("/", pushRoutes);
   app.route("/", checksRoutes);
   app.route("/", jobsRoutes);
   app.route("/", employerRoutes);

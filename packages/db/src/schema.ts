@@ -142,6 +142,32 @@ export const verifications = pgTable(
   (table) => [index("verifications_identifier_idx").on(table.identifier)],
 );
 
+/**
+ * A phone that gets push notifications (D-15): one per signed-in app session, so signing out (or the
+ * session ending) removes it. The token is Apple's (APNs) device token.
+ */
+export const pushDevices = pgTable(
+  "push_devices",
+  {
+    id: id(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .unique()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    platform: text("platform").$type<"ios">().notNull(),
+    /** A phone has one token; signing in to another account on it moves the token there. */
+    token: text("token").notNull().unique(),
+    /** Development builds get tokens for Apple's sandbox, which only it accepts. */
+    sandbox: boolean("sandbox").notNull().default(false),
+    createdAt: createdAt(),
+    updatedAt: updatedAt(),
+  },
+  (table) => [index("push_devices_user_id_idx").on(table.userId)],
+);
+
 // ---------------------------------------------------------------------------
 // Job seekers
 // ---------------------------------------------------------------------------

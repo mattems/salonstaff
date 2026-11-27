@@ -54,6 +54,8 @@ in development (`10.0.2.2` on Android), `https://salonstaff.com.au` in release b
 `expo-secure-store`, `expo-document-picker`, `expo-file-system` and `expo-web-browser` are in
 Expo Go. A development build (`npx expo run:ios` / `npx expo run:android`) is needed for Google
 sign-in and recommended for the `salonstaff://verify-complete` deep link used by the ID check.
+Push notifications also need one: Expo Go can't receive this app's pushes
+([docs/runbooks/push-notifications.md](../../docs/runbooks/push-notifications.md)).
 
 ## Checks
 
@@ -63,14 +65,13 @@ npx expo lint      # eslint (eslint-config-expo, incl. React Compiler rules)
 npx expo export --platform ios --output-dir /tmp/salonstaff-export   # bundle smoke test
 ```
 
-## Build & release with EAS
+## Build & release
+
+Releases are built on your Mac with Xcode, not on EAS. To put the iOS app on TestFlight, follow
+[docs/runbooks/testflight.md](../../docs/runbooks/testflight.md):
 
 ```bash
-npx eas-cli@latest login
-npx eas-cli@latest build:configure          # creates eas.json, links the project
-npx eas-cli@latest env:create --name EXPO_PUBLIC_API_URL --value https://<api-host> --environment production
-npx eas-cli@latest build --platform all --profile production
-npx eas-cli@latest submit --platform ios    # / android
+APPLE_TEAM_ID=<team id> npm run testflight
 ```
 
 Bundle identifier / package: `au.com.salonstaff.app`. Deep-link scheme: `salonstaff`.

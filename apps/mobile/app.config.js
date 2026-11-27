@@ -19,5 +19,9 @@ module.exports = ({ config }) => {
     ]);
   }
 
-  return { ...config, plugins };
+  // Release builds (scripts/testflight.sh) set a new build number each time.
+  const buildNumber = process.env.IOS_BUILD_NUMBER?.trim();
+  const ios = buildNumber ? { ...config.ios, buildNumber } : config.ios;
+
+  return { ...config, ios, plugins };
 };

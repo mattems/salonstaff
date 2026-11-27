@@ -43,10 +43,17 @@ export interface OpenClaim {
 
 async function contactOf(tx: Executor, userId: string): Promise<Contact | null> {
   const [row] = await tx
-    .select({ email: users.email, phoneNumber: users.phoneNumber, suspendedAt: users.suspendedAt })
+    .select({
+      userId: users.id,
+      email: users.email,
+      phoneNumber: users.phoneNumber,
+      suspendedAt: users.suspendedAt,
+    })
     .from(users)
     .where(eq(users.id, userId));
-  return row && !row.suspendedAt ? { email: row.email, phoneNumber: row.phoneNumber } : null;
+  return row && !row.suspendedAt
+    ? { userId: row.userId, email: row.email, phoneNumber: row.phoneNumber }
+    : null;
 }
 
 async function roleOn(tx: Executor, userId: string, salonId: string) {
@@ -89,7 +96,11 @@ export function claims(db: Db) {
         .innerJoin(users, eq(users.id, salonClaims.userId))
         .where(inArray(salonClaims.status, OPEN))
         .orderBy(salonClaims.createdAt);
-      return rows.map(({ claim, salon, ...claimant }) => ({ claim, salon, claimant }));
+      return rows.map(({ claim, salon, ...claimant }) => ({
+        claim,
+        salon,
+        claimant: { ...claimant, userId: claimant.id },
+      }));
     },
 
     /** The person's most recent claim on a listing. */

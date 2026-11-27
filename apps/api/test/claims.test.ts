@@ -219,7 +219,9 @@ describe("claiming a directory listing", () => {
       claims(db).approve(decodeId("claim", second.body.id) as string, uuidv7()),
     );
     // Both are owners now; the listing keeps the terms it had.
-    expect(decision.otherOwners).toEqual([{ email: original.email, phoneNumber: null }]);
+    expect(decision.otherOwners).toEqual([
+      { userId: expect.any(String), email: original.email, phoneNumber: null },
+    ]);
     expect(decision.salon.freeUntil).toEqual(freeUntil);
     const team = await successor.api<{ members: { role: string; you: boolean }[] }>(
       "GET",

@@ -60,7 +60,7 @@ export async function ownerContacts(
   except?: string,
 ): Promise<Contact[]> {
   return tx
-    .select({ email: users.email, phoneNumber: users.phoneNumber })
+    .select({ userId: users.id, email: users.email, phoneNumber: users.phoneNumber })
     .from(salonMembers)
     .innerJoin(users, eq(users.id, salonMembers.userId))
     .where(

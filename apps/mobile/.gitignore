@@ -44,3 +44,6 @@ example
 
 # env (EXPO_PUBLIC_* values are inlined into the bundle; keep local URLs out of git)
 .env
+
+# Local release builds (scripts/testflight.sh)
+/build

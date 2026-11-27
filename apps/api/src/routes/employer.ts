@@ -23,7 +23,7 @@ import {
 } from "@salonstaff/shared";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
-import { appUrl, notify, sendEmail } from "../lib/notify";
+import { appUrl, notify, push, sendEmail } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import {
@@ -665,9 +665,14 @@ employerRoutes.openapi(
       { message, senderId: session.user.id },
       actor,
     );
+    const sender = session.user.name || "Someone";
+    push(c, userId, {
+      title: `${sender} from ${salon.name}`,
+      body: message,
+      url: appUrl(c, "/inbox"),
+    });
     const to = realEmail(contact.email);
     if (to) {
-      const sender = session.user.name || "Someone";
       sendEmail(c, to, {
         subject: `${salon.name} sent you a message`,
         title: `${sender} from ${salon.name} sent you a message`,

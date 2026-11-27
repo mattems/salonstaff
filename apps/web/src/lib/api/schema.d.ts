@@ -2547,6 +2547,99 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/me/push-device": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /**
+     * Get push notifications on this phone
+     * @description Send the phone's push token after signing in, and again on every launch (tokens can change). It belongs to the session you send it with: signing out stops the pushes. The same notices go by email too.
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": components["schemas"]["PushDevice"];
+        };
+      };
+      responses: {
+        /** @description Pushes will come to this phone */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["PushDeviceRegistered"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    post?: never;
+    /**
+     * Stop push notifications on this phone
+     * @description Signing out stops them too. Notices still go by email.
+     */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description No more pushes to this phone */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["Deleted"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/me/checks": {
     parameters: {
       query?: never;
@@ -6252,6 +6345,21 @@ export interface components {
     SignedOut: {
       /** @description How many devices. */
       signedOut: number;
+    };
+    PushDeviceRegistered: {
+      /** @enum {boolean} */
+      registered: true;
+    };
+    PushDevice: {
+      /** @enum {string} */
+      platform: "ios";
+      /** @example a1b2c3d4e5f60718293a4b5c6d7e8f90a1b2c3d4e5f60718293a4b5c6d7e8f90 */
+      token: string;
+      /**
+       * @description True for a development build: its token only works with Apple's sandbox.
+       * @default false
+       */
+      sandbox: boolean;
     };
     Checks: {
       verification: components["schemas"]["Verification"];
