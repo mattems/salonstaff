@@ -6,7 +6,7 @@ to the production API, and uploads it to App Store Connect. Xcode signs it with 
 signed in to; nothing here goes in chat or git.
 
 ## Before the first build
-- **Apple Developer Program** membership, and Xcode signed in to that Apple account (Xcode → Settings →
+- **Apple Developer Program** membership (Studio 372 Pty Ltd's), and Xcode signed in to that Apple account (Xcode → Settings →
   Accounts). The account needs the Admin or App Manager role.
 - Xcode, CocoaPods (`brew install cocoapods`) and the mobile app's packages (`npm install` in `apps/mobile`).
 - **The production API is live** at `https://api.salonstaff.com.au` ([first-deploy.md](first-deploy.md)). The
@@ -17,12 +17,13 @@ signed in to; nothing here goes in chat or git.
    step 1 of [set-up-sign-in.md](set-up-sign-in.md)).
 2. App Store Connect → Apps → **+ New App**: iOS, name "Salon Staff", bundle ID `au.com.salonstaff.app`,
    any SKU (e.g. `salonstaff`).
-3. Note your **team ID** (developer.apple.com → Account → Membership details).
+3. The app belongs to **Studio 372 Pty Ltd**'s Apple team (`N2TR84P2TD`, `ios.appleTeamId` in
+   `app.json`); `bun run ios:device` signs with it too. Xcode must be signed in to an account on it.
 
 ## 2. Build and upload
 ```bash
 cd apps/mobile
-APPLE_TEAM_ID=<team id> npm run testflight
+npm run testflight
 ```
 It takes 10–20 minutes. Xcode makes the signing certificate and profile itself the first time
 (`-allowProvisioningUpdates`). The build number is the time in UTC (e.g. `202611271530`), so every run is
@@ -71,7 +72,8 @@ App Store Connect → the app → **TestFlight**:
 - The demo login and the other local stand-ins aren't in release builds.
 
 ## If it fails
-- **No account / no team:** sign in to Xcode (Settings → Accounts) and check `APPLE_TEAM_ID`.
+- **No account / no team:** sign in to Xcode (Settings → Accounts) with an account on Studio 372's
+  team.
 - **"No suitable application records were found":** the app isn't in App Store Connect yet (step 1).
 - **"The app's bundle doesn't point at the production API":** the script stops rather than upload a build that
   talks to a local API. Check nothing sets `EXPO_PUBLIC_API_URL` over the script's value.

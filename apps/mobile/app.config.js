@@ -21,7 +21,13 @@ module.exports = ({ config }) => {
 
   // Release builds (scripts/testflight.sh) set a new build number each time.
   const buildNumber = process.env.IOS_BUILD_NUMBER?.trim();
-  const ios = buildNumber ? { ...config.ios, buildNumber } : config.ios;
+  // The Apple team that signs builds: Studio 372 Pty Ltd's, in app.json. APPLE_TEAM_ID overrides it.
+  const appleTeamId = process.env.APPLE_TEAM_ID?.trim();
+  const ios = {
+    ...config.ios,
+    ...(buildNumber ? { buildNumber } : {}),
+    ...(appleTeamId ? { appleTeamId } : {}),
+  };
 
   return { ...config, ios, plugins };
 };

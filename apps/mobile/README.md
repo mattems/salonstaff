@@ -23,6 +23,41 @@ npx expo start --ios          # installs Expo Go on the simulator and opens the 
 Locally the sign-in screen has a **Demo job seeker** button (the API's dev login, local only).
 Email codes land in Mailpit (linked from the springboard, http://localhost:4100); SMS codes too.
 
+### On your phone
+
+With `bun dev` running, in another terminal at the repo root, either:
+
+```bash
+bun run ios:device
+```
+
+A development build installed on your iPhone, as in the other apps (`expo run:ios --device`),
+with push notifications and Sign in with Apple. It's signed with Studio 372 Pty Ltd's Apple team
+(`ios.appleTeamId` in `app.json`), so Xcode must be signed in to an Apple account on that team
+(Xcode → Settings → Accounts). Plug the phone in (or pair it in Xcode) and unlock it. The first time, turn on Developer Mode on the
+phone (Settings → Privacy & Security) and pick it from the list. Run it again whenever you want to
+use the app: later builds only redo what changed.
+
+If it fails with `Provisioning Profile "iOS Team Provisioning Profile: *" does not support the Push
+Notifications capability` (the first time, or with a new phone): the team's App ID and profile for
+`au.com.salonstaff.app` aren't set up yet, and `expo run:ios` doesn't let Xcode make them when the
+team is set in `app.json`. Open the project once in Xcode (`xed apps/mobile/ios`), select the
+SalonStaff target → Signing & Capabilities, keep automatic signing with Studio 372 Pty Ltd, wait for
+Xcode to fix the profile, then run `bun run ios:device` again.
+
+```bash
+bun run phone
+```
+
+Expo Go instead: scan the QR code with the Camera (install Expo Go from the App Store first). No
+build, but no push notifications or Google sign-in.
+
+Both open the local API and site to your Wi-Fi on :8891 and :5301 while they run, and point the
+app at them; Ctrl-C closes them again. The phone must be on the same Wi-Fi as the Mac. Anyone on
+that Wi-Fi can reach the local API meanwhile, dev login included, so use it on a network you
+trust. The first time, macOS may ask whether `bun` can accept incoming connections: allow it.
+Sign in with the demo job seeker, or an email code from Mailpit on the Mac (http://localhost:8036).
+
 ### API URL
 
 `EXPO_PUBLIC_API_URL` is the API's origin (it serves `/v1/*`):
@@ -31,7 +66,7 @@ Email codes land in Mailpit (linked from the springboard, http://localhost:4100)
 |---|---|
 | iOS simulator | `http://localhost:8890` (default in development) |
 | Android emulator | `http://10.0.2.2:8890` (default on Android in development) |
-| Physical device | your computer's LAN address, e.g. `http://192.168.1.20:8890` |
+| Your phone | set for you by `bun run phone` (below) |
 | Release build | `https://api.salonstaff.com.au` (default when not in development) |
 
 `EXPO_PUBLIC_SITE_URL` is the website, for share links and salon pages: `http://localhost:5300`
@@ -52,7 +87,8 @@ in development (`10.0.2.2` on Android), `https://salonstaff.com.au` in release b
 ### Native modules
 
 `expo-secure-store`, `expo-document-picker`, `expo-file-system` and `expo-web-browser` are in
-Expo Go. A development build (`npx expo run:ios` / `npx expo run:android`) is needed for Google
+Expo Go. A development build (`npm run ios` / `npm run android` here, or `bun run ios:device` at the
+root for your phone) is needed for Google
 sign-in and recommended for the `salonstaff://verify-complete` deep link used by the ID check.
 Push notifications also need one: Expo Go can't receive this app's pushes
 ([docs/runbooks/push-notifications.md](../../docs/runbooks/push-notifications.md)).
@@ -71,7 +107,7 @@ Releases are built on your Mac with Xcode, not on EAS. To put the iOS app on Tes
 [docs/runbooks/testflight.md](../../docs/runbooks/testflight.md):
 
 ```bash
-APPLE_TEAM_ID=<team id> npm run testflight
+npm run testflight
 ```
 
 Bundle identifier / package: `au.com.salonstaff.app`. Deep-link scheme: `salonstaff`.

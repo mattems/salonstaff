@@ -11,6 +11,7 @@
     "primaryColor": "#9d174d",
     "ios": {
       "bundleIdentifier": "au.com.salonstaff.app",
+      "appleTeamId": "N2TR84P2TD",
       "icon": "./assets/expo.icon",
       "config": {
         "usesNonExemptEncryption": false
