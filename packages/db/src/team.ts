@@ -3,9 +3,10 @@
  * `salonTeam(db, salonId)` is for the salon's own people; `invites(db)` is for whoever opens a link.
  * A salon always keeps at least one owner.
  */
-import { ApiError, randomToken, sha256Hex } from "@salonstaff/shared";
+import { ApiError, CONTACT_LIMITS, randomToken, sha256Hex } from "@salonstaff/shared";
 import { and, asc, eq, gt, inArray, isNull, ne, sql } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
+import { codeLimits } from "./code-limits";
 import type { Db } from "./index";
 import { type Contact, makeEmployer } from "./salon";
 import { type SalonRole, salonInvites, salonMembers, salons, users } from "./schema";
@@ -135,7 +136,17 @@ export async function unclaimSalon(tx: Executor, salonId: string): Promise<Salon
   await tx.delete(salonInvites).where(eq(salonInvites.salonId, salonId));
   const [row] = await tx
     .update(salons)
-    .set({ claimedAt: null, source: "directory" })
+    // The next owner mustn't inherit the last one's plan, credits or Stripe customer (its
+    // invoices and card). The caller cancels the subscription at Stripe first.
+    .set({
+      claimedAt: null,
+      source: "directory",
+      listingCredits: 0,
+      stripeCustomerId: null,
+      stripeSubscriptionId: null,
+      subscriptionStatus: null,
+      subscriptionCurrentPeriodEnd: null,
+    })
     .where(eq(salons.id, salonId))
     .returning();
   return row as Salon;
@@ -220,6 +231,18 @@ export function salonTeam(db: Db, salonId: string) {
           throw new ApiError("conflict", {
             detail: "Someone with that email is already on the team",
             hint: "Change their role with PATCH /v1/employer/salons/{salonId}/team/{userId}.",
+          });
+        }
+        // Each invite emails someone: a salon gets only so many a day. Counted apart from the
+        // invites themselves, which go when they're accepted or cancelled.
+        const allowed = await codeLimits(tx).allow(`invite:${salonId}`, {
+          perHour: CONTACT_LIMITS.invitesPerDay,
+          perDay: CONTACT_LIMITS.invitesPerDay,
+        });
+        if (!allowed) {
+          throw new ApiError("rate_limited", {
+            detail: `A salon can invite up to ${CONTACT_LIMITS.invitesPerDay} people a day`,
+            hint: "Try again tomorrow.",
           });
         }
         const token = randomToken(24);

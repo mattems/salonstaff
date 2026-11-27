@@ -282,6 +282,27 @@ export const jobFiltersSchema = z.object({
 export type JobFilters = z.infer<typeof jobFiltersSchema>;
 
 // ---------- Employer ----------
+/**
+ * A website as someone typed it ("fade.com.au", "https://fade.com.au/book"), as a full http(s)
+ * address, or null when it isn't one. It's shown as a link, so nothing else (`javascript:`,
+ * `data:`) may ever be stored.
+ */
+export function webAddress(value: string): string | null {
+  const text = value.trim();
+  if (!text) return null;
+  try {
+    const url = new URL(/^[a-z][a-z0-9+.-]*:/i.test(text) ? text : `https://${text}`);
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    if (!url.hostname.includes(".") || url.username || url.password) return null;
+    // No trailing slash on a bare site: "https://fade.com.au", as people write it.
+    return url.pathname === "/" && !url.search && !url.hash ? url.origin : url.toString();
+  } catch {
+    return null;
+  }
+}
+
+const NOT_A_WEBSITE = "Not a web address, like https://yoursalon.com.au";
+
 export const salonSchema = z.object({
   name: trimmed(120).min(2, "Required"),
   abn: z
@@ -290,7 +311,9 @@ export const salonSchema = z.object({
     .pipe(z.string().regex(/^\d{11}$/, "ABN must be 11 digits")),
   contactName: trimmed(120).min(1, "Required"),
   phone: trimmed(20).min(8, "Required"),
-  website: optionalText(200),
+  website: optionalText(200)
+    .refine((v) => !v || webAddress(v) !== null, NOT_A_WEBSITE)
+    .transform((v) => (v ? (webAddress(v) ?? undefined) : v)),
   instagram: optionalText(60),
   suburb: trimmed(80).min(1, "Required"),
   state: z.enum(AU_STATE_VALUES),
@@ -308,7 +331,9 @@ const clearableText = (max: number) =>
 
 /** Changing a salon: send only what changes. A blank website, Instagram or about clears it. */
 export const salonUpdateSchema = salonSchema.partial().extend({
-  website: clearableText(200),
+  website: clearableText(200)
+    .refine((v) => !v || webAddress(v) !== null, NOT_A_WEBSITE)
+    .transform((v) => (v ? webAddress(v) : v)),
   instagram: clearableText(60),
   about: clearableText(2000),
 });

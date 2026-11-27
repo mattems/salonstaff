@@ -36,8 +36,10 @@ cd packages/db
 read -s "DATABASE_URL?Connection string: " && export DATABASE_URL
 ```
 ```bash
-bun scripts/staff.ts --email you@example.com --name "Your Name" --role owner
+ALLOW_REMOTE_DATABASE=1 bun scripts/staff.ts --email you@example.com --name "Your Name" --role owner
 ```
+The script refuses a database that isn't on your machine without `ALLOW_REMOTE_DATABASE=1`. When
+you're done, `unset DATABASE_URL` (or close the terminal), so nothing else you run reaches production.
 
 The script can also change a role (run it again with a different `--role`), remove someone (`--email someone@example.com --remove`) and list staff (`--list`).
 

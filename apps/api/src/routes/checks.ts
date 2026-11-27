@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { type Check, checks, seeker, summarise } from "@salonstaff/db";
-import { ApiError, encodeId, randomBase62, rightToWorkSchema } from "@salonstaff/shared";
+import { ApiError, encodeId, LIMITS, randomBase62, rightToWorkSchema } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { allowedOrigins, userActor } from "../lib/actor";
@@ -154,6 +154,13 @@ checksRoutes.openapi(
         hint: "Set IDENTITY_PROVIDER=stripe and the Stripe keys (docs/runbooks/stripe.md).",
       });
     }
+    // Each one is a paid check at the provider.
+    if ((await checks(db).identityStartedToday(session.user.id)) >= LIMITS.identityChecksPerDay) {
+      throw new ApiError("rate_limited", {
+        detail: `You can start up to ${LIMITS.identityChecksPerDay} ID checks a day`,
+        hint: "Try again tomorrow, or contact support if something keeps going wrong.",
+      });
+    }
     if (c.get("dryRun")) return c.json({ url: back }, 200);
     const actor = userActor(c, session.user.id);
     if (provider === "stripe") {
@@ -245,11 +252,12 @@ checksRoutes.openapi(
       "education entry",
       "Add the qualification to your education (POST /v1/me/education), then send its `id`.",
     );
+    // Before the dry run too: it reads the whole file like the real thing.
+    await requireUploadAllowance(c.env, session.user.id);
     if (c.get("dryRun")) {
       await inspectUpload(file, ["image", "pdf"]);
       return c.json(await checksJson(c, session.user.id), 201);
     }
-    await requireUploadAllowance(c.env, session.user.id);
     const { key } = await storeUpload(c.env, file, { bucket: "private", allow: ["image", "pdf"] });
     try {
       await checks(await c.get("db")()).submitQualification(

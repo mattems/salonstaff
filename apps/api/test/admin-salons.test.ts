@@ -195,9 +195,10 @@ describe("billing levers", () => {
       support,
       "POST",
       `/salons/${id(salon)}/unclaim`,
+      { confirmation: SKIP },
     );
     expect(unclaimed.body).toMatchObject({ owner: null, source: "directory" });
-    expect((await admin(support, "POST", `/salons/${id(salon)}/unclaim`)).status).toBe(409);
+    expect((await admin(support, "POST", `/salons/${id(salon)}/unclaim`, {})).status).toBe(409);
     const noAbn = await seedSalon();
     expect(
       (await admin(support, "POST", `/salons/${id(noAbn)}/abn`, { status: "verified" })).status,
@@ -261,7 +262,13 @@ describe("the directory", () => {
       support,
       "PATCH",
       path,
-      { suburb: "Greenway", address: "25 Reed St", email: "Hi@Placeholder.Example", phone: "" },
+      {
+        suburb: "Greenway",
+        address: "25 Reed St",
+        email: "Hi@Placeholder.Example",
+        phone: "",
+        confirmation: SKIP,
+      },
     );
     expect(changed.status).toBe(200);
     expect(changed.body).toMatchObject({ suburb: "Greenway", postcode: "2900" });

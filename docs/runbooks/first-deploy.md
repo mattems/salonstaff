@@ -40,13 +40,15 @@ Stripe ([stripe.md](stripe.md)).
 export PRODUCTION_DATABASE_URL='<migrator role URL>'   # type it in your own terminal
 bun run deploy
 ```
-`bun run deploy` migrates the database with the migrator role, then deploys the API, the website and the admin portal.
+`bun run deploy` deploys only a clean `main` that matches `origin/main`, after lint, typecheck and the tests
+(which need the local Postgres running). `bun run deploy -- --any-tree` deploys what's in the folder anyway and
+`--skip-tests` leaves the tests out. It migrates the database with the migrator role, then deploys the API, the website and the admin portal.
 The custom domains in each `wrangler.jsonc` are created on first deploy, and so is the API's Durable Object for
 live conversations (`ConversationRoom`, D-18: its `migrations` entry creates it).
 
 ## 7. First staff member and data
 ```bash
-DATABASE_URL="$PRODUCTION_DATABASE_URL" bun --cwd packages/db scripts/staff.ts --email you@salonstaff.com.au --name "Matt" --role owner
+ALLOW_REMOTE_DATABASE=1 DATABASE_URL="$PRODUCTION_DATABASE_URL" bun --cwd packages/db scripts/staff.ts --email you@salonstaff.com.au --name "Matt" --role owner
 ```
 Add the same address to the Access policy. Import directory listings from the admin portal (Directory import).
 

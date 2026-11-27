@@ -21,6 +21,18 @@ import { admin, findStaff } from "./admin";
 /** Every staff role has this: a passkey is your own, whatever else you may do. */
 const ANYONE = "audit:read";
 
+/**
+ * Registering a passkey can't be tried out: a dry run skips the passkey confirmation, and the
+ * registration it started would be a real one.
+ */
+function refuseDryRun(c: Context<AppEnv>) {
+  if (!c.get("dryRun")) return;
+  throw new ApiError("validation_failed", {
+    detail: "Registering a passkey can't be tried out",
+    hint: "Send the request without dry_run.",
+  });
+}
+
 const Passkey = z
   .object({
     id: z.string().openapi({ example: "pk_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
@@ -145,6 +157,7 @@ admin.openapi(
   }),
   async (c) => {
     const ctx = await requireStaff(c, ANYONE);
+    refuseDryRun(c);
     if ((await ctx.data.passkeys.list(ctx.staff.id)).length > 0) {
       await requireConfirmation(c, ctx, "passkey.add", "new", c.req.valid("json").confirmation);
     }
@@ -168,6 +181,7 @@ admin.openapi(
   }),
   async (c) => {
     const ctx = await requireStaff(c, ANYONE);
+    refuseDryRun(c);
     return c.json(passkeyJson(await finishRegistration(c, ctx, c.req.valid("json"))), 201);
   },
 );

@@ -113,7 +113,8 @@ export function createAuth(config: AuthConfig) {
         otpLength: 6,
         expiresIn: codeTtl,
         allowedAttempts: LIMITS.otpMaxAttempts,
-        phoneNumberValidator: (value) => /^\+61[2-478]\d{8}$/.test(value),
+        // Mobiles only (04…): a code is never texted to a landline.
+        phoneNumberValidator: (value) => /^\+614\d{8}$/.test(value),
         sendOTP: async ({ phoneNumber: number, code }) => {
           await config.sendSmsCode({ phoneNumber: number, code });
         },
@@ -136,7 +137,9 @@ export function createAuth(config: AuthConfig) {
     account: {
       accountLinking: {
         enabled: true,
-        trustedProviders: ["google", "apple"],
+        // No trusted providers: a Google or Apple sign-in joins an existing account by email only
+        // when the provider says that address is verified. Trusting them by name would skip
+        // that check.
         // Connecting Google or Apple from the account page: its address needn't be the account's
         // (a mobile-only account has none, and people use a different Gmail for work).
         allowDifferentEmails: true,

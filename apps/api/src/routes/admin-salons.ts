@@ -25,6 +25,7 @@ import {
   jobPath,
   salonPath,
   VERIFICATION_STATUSES,
+  webAddress,
 } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
@@ -33,6 +34,7 @@ import { decodeCursor, PaginationQuery } from "../lib/pagination";
 import { Confirmation, requireConfirmation } from "../lib/staff-confirmation";
 import { requireStaff } from "../lib/staff-context";
 import { mediaUrl } from "../lib/storage";
+import { cancelSubscriptions } from "../lib/stripe";
 import {
   admin,
   body,
@@ -595,9 +597,9 @@ admin.openapi(
     path: `${LIST}/{id}/unclaim`,
     summary: "Detach a salon's team",
     description:
-      "Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay.",
+      "Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay. Confirmed with a passkey (action `salon.unclaim`, target the salon's ID).",
     tags: ["Admin"],
-    request: { params: IdParams },
+    request: { params: IdParams, body: body(z.object({ confirmation: Confirmation })) },
     responses: {
       200: ok(Salon, "The salon, unclaimed"),
       ...errors,
@@ -606,7 +608,8 @@ admin.openapi(
     },
   }),
   async (c) => {
-    const { data, actor } = await requireStaff(c, "salons:moderate");
+    const ctx = await requireStaff(c, "salons:moderate");
+    const { data } = ctx;
     const salon = await findSalon(c, data);
     if (!isClaimed(salon)) {
       throw new ApiError("conflict", {
@@ -616,7 +619,20 @@ admin.openapi(
     }
     const unclaimed = { ...salon, claimedAt: null, source: "directory" as const };
     if (c.get("dryRun")) return c.json(await salonRow(data, unclaimed), 200);
-    return c.json(await salonRow(data, await data.salons.unclaim(salon, actor)), 200);
+    const actor = await requireConfirmation(
+      c,
+      ctx,
+      "salon.unclaim",
+      encodeId("salon", salon.id),
+      c.req.valid("json").confirmation,
+    );
+    const row = await data.salons.unclaim(salon, actor);
+    // The listing's next owner mustn't inherit a plan someone else is paying for.
+    await cancelSubscriptions(
+      c.env,
+      salon.stripeSubscriptionId ? [salon.stripeSubscriptionId] : [],
+    );
+    return c.json(await salonRow(data, row), 200);
   },
 );
 
@@ -645,9 +661,12 @@ const SalonChanges = z
     email: clearable(254)
       .refine((v) => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), "Not an email address")
       .transform((v) => (v ? v.toLowerCase() : v)),
-    website: clearable(300),
+    website: clearable(300)
+      .refine((v) => !v || webAddress(v) !== null, "Not a web address")
+      .transform((v) => (v ? webAddress(v) : v)),
     instagram: clearable(100),
     about: clearable(2000),
+    confirmation: Confirmation,
   })
   .openapi("AdminSalonChanges");
 
@@ -657,15 +676,27 @@ admin.openapi(
     path: `${LIST}/{id}`,
     summary: "Change a salon's details",
     description:
-      "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing.",
+      "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing, so changing it is confirmed with a passkey (action `salon.change_email`, target the salon's ID).",
     tags: ["Admin"],
     request: { params: IdParams, body: body(SalonChanges) },
     responses: { 200: ok(Salon, "The salon, changed"), ...errors, ...notFound },
   }),
   async (c) => {
-    const { data, actor } = await requireStaff(c, "salons:moderate");
+    const ctx = await requireStaff(c, "salons:moderate");
+    const { data } = ctx;
     const salon = await findSalon(c, data);
-    const changes = c.req.valid("json");
+    const { confirmation, ...changes } = c.req.valid("json");
+    // Claim links go to this address, so a new one decides who can take the listing over.
+    const emailChanges = changes.email !== undefined && changes.email !== salon.email;
+    const actor = emailChanges
+      ? await requireConfirmation(
+          c,
+          ctx,
+          "salon.change_email",
+          encodeId("salon", salon.id),
+          confirmation,
+        )
+      : ctx.actor;
     if (c.get("dryRun")) {
       const given = Object.entries(changes).filter(([, value]) => value !== undefined);
       return c.json(await salonRow(data, { ...salon, ...Object.fromEntries(given) }), 200);
@@ -694,7 +725,9 @@ const Listing = z
     address: text(300),
     phone: text(40),
     email: text(254),
-    website: text(300),
+    website: text(300)
+      .refine((v) => !v || webAddress(v) !== null, "Not a web address")
+      .transform((v) => (v ? (webAddress(v) ?? undefined) : v)),
     instagram: text(100),
     abn: text(20),
     about: text(2000),

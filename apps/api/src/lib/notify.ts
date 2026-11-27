@@ -1,6 +1,12 @@
-import { type Contact, notificationSettings, pushDevicesOf } from "@salonstaff/db";
+import { type Contact, codeLimits, notificationSettings, pushDevicesOf } from "@salonstaff/db";
 import { noticeEmail } from "@salonstaff/email";
-import { BRAND, encodeId, type NotificationTopic } from "@salonstaff/shared";
+import {
+  BRAND,
+  CONTACT_LIMITS,
+  encodeId,
+  type NotificationTopic,
+  plainLine,
+} from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { pushSenderFromEnv } from "./push";
@@ -22,6 +28,16 @@ export interface Notice {
   topic?: NotificationTopic;
 }
 
+/**
+ * Subjects and headings carry names people typed (a salon, a person, a job): one line each, with
+ * no web addresses, so a notice can't be made to carry someone's link (`plainLine`).
+ */
+const tidy = (notice: Notice): Notice => ({
+  ...notice,
+  subject: plainLine(notice.subject),
+  title: plainLine(notice.title),
+});
+
 /** Whether someone wants this topic by this channel. No topic: always. */
 async function wanted(
   c: Context<AppEnv>,
@@ -40,8 +56,8 @@ async function wanted(
  */
 export function notify(c: Context<AppEnv>, contact: Contact | null, notice: Notice): void {
   if (!contact) return;
-  const { topic, ...message } = notice;
-  push(c, contact.userId, { title: notice.title, body: notice.body, url: notice.url }, topic);
+  const { topic, ...message } = tidy(notice);
+  push(c, contact.userId, { title: message.title, body: notice.body, url: notice.url }, topic);
   const email = realEmail(contact.email);
   const phone = contact.phoneNumber;
   if (!email && !phone) return;
@@ -52,9 +68,15 @@ export function notify(c: Context<AppEnv>, contact: Contact | null, notice: Noti
         .get("email")()
         .send(await noticeEmail({ to: email, ...message }));
     } else if (phone) {
+      // Texts cost money each: one mobile gets only so many notices an hour and a day.
+      const allowed = await codeLimits(await c.get("db")()).allow(`sms-notice:${phone}`, {
+        perHour: CONTACT_LIMITS.smsNoticesPerHour,
+        perDay: CONTACT_LIMITS.smsNoticesPerDay,
+      });
+      if (!allowed) return;
       await c
         .get("sms")()
-        .send({ to: phone, body: `${notice.title} ${notice.url}`.slice(0, 320) });
+        .send({ to: phone, body: `${message.title} ${notice.url}`.slice(0, 320) });
     }
   })().catch((error: unknown) => logFailure(c, error));
   c.get("background")(task);
@@ -100,7 +122,7 @@ export function sendEmail(
   to: string | { email: string; userId: string },
   notice: Notice,
 ): void {
-  const { topic, ...message } = notice;
+  const { topic, ...message } = tidy(notice);
   const address = typeof to === "string" ? to : to.email;
   const task = (async () => {
     if (typeof to !== "string" && !(await wanted(c, to.userId, topic, "email"))) return;

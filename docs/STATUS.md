@@ -140,6 +140,7 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
 ### Known issues
+- Security audit (2026-11-27): 34 findings in docs/security-audit.md. Most are fixed (its "Where it stands" lists them; migrations 0012 and 0013); what's left needs Matt's decision, a setting in Stripe, Twilio or R2, or is listed there as not done.
 - Not yet tried for real: SMS to the old number after a mobile change (Twilio), and the share
   page's preview card on Facebook, LinkedIn or WhatsApp (needs a deploy).
 - Not yet tried: a live conversation on a real iPhone through `bun run ios:device`'s forwarder, and a

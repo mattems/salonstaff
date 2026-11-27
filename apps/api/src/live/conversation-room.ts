@@ -13,6 +13,8 @@ import { type LiveEvent, PARTICIPANT_HEADER, type Participant, type Side } from 
 
 /** Frames bigger than this from a view are ignored: views only ever say they're typing. */
 const MAX_FRAME = 256;
+/** Open views one person may have of a conversation. */
+const MAX_VIEWS = 5;
 
 export class ConversationRoom extends DurableObject<Env> {
   constructor(ctx: DurableObjectState, env: Env) {
@@ -29,6 +31,15 @@ export class ConversationRoom extends DurableObject<Env> {
     if (!participant || request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("Expected a WebSocket from the API", { status: 400 });
     }
+    // A person's oldest views make way for new ones: nobody needs more than a few open.
+    const theirs = this.ctx.getWebSockets(participant.userId);
+    for (const old of theirs.slice(0, Math.max(0, theirs.length - (MAX_VIEWS - 1)))) {
+      try {
+        old.close(1008, "Too many views");
+      } catch {
+        // Already closing.
+      }
+    }
     const { 0: client, 1: server } = new WebSocketPair();
     this.ctx.acceptWebSocket(server, [participant.side, participant.userId]);
     server.serializeAttachment(participant);
@@ -36,14 +47,20 @@ export class ConversationRoom extends DurableObject<Env> {
   }
 
   /**
-   * A new message, to every open view (the sender's other tabs too; views ignore one they have).
+   * A new message, to every open view of someone in `allowed` (the others are closed) (the sender's other tabs too; views ignore one they have).
    * Returns who has the conversation open, so the API can skip telling them by push and email.
    */
-  async broadcast(event: LiveEvent): Promise<string[]> {
+  async broadcast(event: LiveEvent, allowed?: string[]): Promise<string[]> {
     const frame = JSON.stringify(event);
     const present = new Set<string>();
     for (const socket of this.ctx.getWebSockets()) {
       try {
+        const { userId } = socket.deserializeAttachment() as Participant;
+        // Access is checked when a view opens; `allowed` is who still has it now.
+        if (allowed && !allowed.includes(userId)) {
+          socket.close(1008, "No longer allowed");
+          continue;
+        }
         socket.send(frame);
         present.add((socket.deserializeAttachment() as Participant).userId);
       } catch {

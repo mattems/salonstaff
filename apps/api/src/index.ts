@@ -26,6 +26,19 @@ export default {
   /** Daily clean-up (wrangler.jsonc `triggers`). */
   async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext) {
     const { db, close } = await connect(env.HYPERDRIVE.connectionString);
-    ctx.waitUntil(housekeeping(db, env).finally(() => close()));
+    ctx.waitUntil(
+      housekeeping(db, env)
+        // A failed clean-up is an event to alert on, not a stray rejection.
+        .catch((error: unknown) =>
+          console.error(
+            JSON.stringify({
+              level: "error",
+              event: "housekeeping_failed",
+              message: error instanceof Error ? error.message : String(error),
+            }),
+          ),
+        )
+        .finally(() => close()),
+    );
   },
 } satisfies ExportedHandler<Env>;

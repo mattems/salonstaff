@@ -29,8 +29,9 @@ import {
   billingPortalUrl,
   createCheckout,
   createCustomer,
+  currentSubscription,
+  expireCheckout,
   identityName,
-  periodEndOf,
   redactIdentitySession,
   type StripeEvent,
   subscriptionPeriodEnd,
@@ -194,6 +195,20 @@ billingRoutes.openapi(
       });
       await scope.setStripeCustomer(customerId, actor);
     }
+    // One open plan checkout at a time: two finished side by side would be two subscriptions.
+    if (kind === "salon_plan") {
+      for (const open of await scope.openPlanCheckouts()) {
+        // Closed at Stripe first. One Stripe won't close has been paid and is waiting for its
+        // webhook: voiding it here would take the money and grant nothing.
+        if (open.checkoutRef && !(await expireCheckout(c.env, open.checkoutRef))) {
+          throw new ApiError("conflict", {
+            detail: "A payment for the Salon Plan is still being confirmed",
+            hint: "Wait a minute and check GET /v1/employer/salons/{salonId}/billing before trying again.",
+          });
+        }
+        await scope.endCheckout(open.id, actor);
+      }
+    }
     const payment = await scope.startPayment(
       { kind: paymentKind, amountCents, provider: "stripe" },
       actor,
@@ -263,8 +278,12 @@ async function handle(c: Context<AppEnv>, event: StripeEvent): Promise<void> {
   const db = await c.get("db")();
   const system = { type: "system" as const, requestId: c.get("requestId") };
   switch (event.type) {
-    case "checkout.session.completed": {
+    case "checkout.session.completed":
+    case "checkout.session.async_payment_succeeded": {
       const session = event.data.object;
+      // A delayed method (a bank debit) completes checkout before the money arrives: wait for
+      // `async_payment_succeeded`.
+      if (session.payment_status === "unpaid") return;
       const subscriptionId =
         typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
       const periodEnd = subscriptionId ? await subscriptionPeriodEnd(c.env, subscriptionId) : null;
@@ -275,18 +294,16 @@ async function handle(c: Context<AppEnv>, event: StripeEvent): Promise<void> {
       );
       return;
     }
+    case "checkout.session.async_payment_failed":
     case "checkout.session.expired":
       await billing(db).fail(event.data.object.id, system);
       return;
     case "customer.subscription.updated":
     case "customer.subscription.deleted": {
-      const subscription = event.data.object;
-      await billing(db).syncSubscription(
-        subscription.id,
-        subscription.status,
-        periodEndOf(subscription),
-        system,
-      );
+      // The event says only that something changed: what it changed to is asked of Stripe.
+      const subscriptionId = event.data.object.id;
+      const now = await currentSubscription(c.env, subscriptionId);
+      await billing(db).syncSubscription(subscriptionId, now.status, now.periodEnd, system);
       return;
     }
     case "identity.verification_session.verified": {
@@ -303,6 +320,8 @@ async function handle(c: Context<AppEnv>, event: StripeEvent): Promise<void> {
       return;
     case "identity.verification_session.canceled":
       await checks(db).completeIdentity(event.data.object.id, { status: "failed" }, system);
+      // Nothing is kept of an attempt that's over, either (D-03).
+      await redactIdentitySession(c.env, event.data.object.id).catch(() => {});
       return;
     default:
       return;

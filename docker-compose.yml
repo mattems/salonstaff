@@ -11,7 +11,7 @@ services:
       POSTGRES_PASSWORD: salonstaff
       POSTGRES_DB: salonstaff
     ports:
-      - "${POSTGRES_PORT:-54349}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-54349}:5432"
     volumes:
       # Postgres 18 images keep their data under /var/lib/postgresql/<version>.
       - postgres18-data:/var/lib/postgresql
@@ -25,8 +25,8 @@ services:
     # Catches every email (and, locally, every SMS code) the app sends. Inbox at http://localhost:8036
     image: axllent/mailpit:latest
     ports:
-      - "8036:8025"
-      - "1036:1025"
+      - "127.0.0.1:8036:8025"
+      - "127.0.0.1:1036:1025"
 
 volumes:
   postgres18-data:

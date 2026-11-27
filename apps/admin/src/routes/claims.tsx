@@ -15,6 +15,7 @@ import {
   useCursors,
 } from "@/components/page";
 import { api, errorMessage, unwrap } from "@/lib/api";
+import { confirmWithPasskey } from "@/lib/confirm";
 import { CLAIM_STATUSES, formatDate } from "@/lib/format";
 import { type Claim, claimsQuery } from "@/lib/queries";
 
@@ -104,14 +105,15 @@ function ClaimCard({ claim }: { claim: Claim }) {
                 required: false,
               }}
               disabled={claim.salon.has_owner}
-              run={async (note) =>
-                unwrap(
+              run={async (note) => {
+                const confirmation = await confirmWithPasskey("claim.approve", claim.id);
+                return unwrap(
                   await api.POST("/admin/v1/claims/{id}/approve", {
                     params: { path: { id: claim.id } },
-                    body: note ? { note } : {},
+                    body: { ...(note ? { note } : {}), confirmation },
                   }),
-                )
-              }
+                );
+              }}
               done="Claim approved"
             />
             <ActionDialog

@@ -1,5 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
+  type AbnCheck,
   type Job,
   roomOf,
   type Salon,
@@ -12,6 +13,7 @@ import {
   APPLICATION_STATUSES,
   ApiError,
   type ApplicationStatus,
+  abnNameMatches,
   applicationStatusSchema,
   decodeId,
   entitlementOf,
@@ -22,11 +24,14 @@ import {
   PRICING,
   type SalonInput,
   type SalonUpdate,
+  salonAbnStatus,
   salonPath,
   salonSchema,
   salonUpdateSchema,
   slugify,
 } from "@salonstaff/shared";
+import type { Context } from "hono";
+import type { AppEnv } from "../env";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
 import { broadcast } from "../lib/live";
@@ -64,6 +69,41 @@ const abnProblem = () =>
     hint: "Check the 11 digits at abr.business.gov.au.",
     errors: [{ path: "abn", message: "Not a valid ABN" }],
   });
+
+/**
+ * The register's answer for an ABN, with the status this salon gets from it (`salonAbnStatus`):
+ * an active ABN is anyone's to type, so it's verified only when the salon's name is the ABN's or
+ * the person already owns a verified salon with it. Otherwise staff check it ("ABNs to check").
+ */
+async function abnFor(
+  c: Context<AppEnv>,
+  abn: string,
+  salonName: string,
+  userId: string,
+  exceptSalonId?: string,
+  /** The salon as it is, when only its name is changing (the ABN stays). */
+  renaming?: Pick<Salon, "abnStatus" | "abnEntityName">,
+): Promise<AbnCheck> {
+  const found = await lookupAbn(c.env, abn);
+  // The register didn't answer (or isn't set up): a rename is judged by the name it gave us
+  // before, rather than losing what was verified.
+  if (found.status === "pending" && renaming?.abnStatus === "verified") {
+    const matches = abnNameMatches(salonName, [renaming.abnEntityName ?? ""]);
+    return { status: matches ? "verified" : "pending", entityName: renaming.abnEntityName };
+  }
+  if (found.status !== "verified") return found;
+  const status = salonAbnStatus({
+    register: found.status,
+    salonName,
+    registeredNames: found.names ?? [],
+    ownsVerifiedSalonWithAbn: await salonsFor(await c.get("db")()).ownsVerifiedWithAbn(
+      userId,
+      abn,
+      exceptSalonId,
+    ),
+  });
+  return { ...found, status };
+}
 
 /** What a salon would look like, for a dry run. */
 function previewSalon(input: SalonInput): Salon {
@@ -138,7 +178,7 @@ employerRoutes.openapi(
       });
     }
     if (c.get("dryRun")) return c.json(mySalonJson(c.env, previewSalon(input), "owner"), 201);
-    const abn = await lookupAbn(c.env, input.abn);
+    const abn = await abnFor(c, input.abn, input.name, session.user.id);
     const salon = await salons.create(session.user.id, input, abn, userActor(c, session.user.id));
     return c.json(mySalonJson(c.env, salon, "owner"), 201);
   },
@@ -211,7 +251,7 @@ employerRoutes.openapi(
     },
   }),
   async (c) => {
-    const { salon, scope, actor, role } = await requireSalon(
+    const { salon, scope, actor, role, session } = await requireSalon(
       c,
       c.req.valid("param").salonId,
       "owner",
@@ -229,7 +269,21 @@ employerRoutes.openapi(
       }
       return c.json(mySalonJson(c.env, preview, role), 200);
     }
-    const abn = abnChanged ? await lookupAbn(c.env, changes.abn as string) : null;
+    // A new name is checked against the ABN again, like a new ABN: a verified salon can't
+    // rename itself into someone else's.
+    const renamed = changes.name !== undefined && changes.name !== salon.name;
+    const abnNow = (changes.abn as string | undefined) ?? salon.abn;
+    const abn =
+      abnNow && (abnChanged || (renamed && salon.abnStatus === "verified"))
+        ? await abnFor(
+            c,
+            abnNow,
+            (changes.name as string | undefined) ?? salon.name,
+            session.user.id,
+            salon.id,
+            abnChanged ? undefined : salon,
+          )
+        : null;
     const updated = await scope.update(changes, abn, actor);
     return c.json(mySalonJson(c.env, updated, role), 200);
   },
@@ -646,7 +700,7 @@ employerRoutes.openapi(
     path: "/v1/employer/salons/{salonId}/candidates/{userId}/phone",
     summary: "See a candidate's mobile",
     description:
-      "Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
+      "Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count. With `dry_run` the answer says a look is allowed but `phone` is empty.",
     tags: TAGS,
     request: { params: CandidateParams },
     responses: {
@@ -667,9 +721,16 @@ employerRoutes.openapi(
     const { scope, salon, session, actor } = await requireSalon(c, c.req.valid("param").salonId);
     const userId = idFrom("user", c.req.valid("param").userId, "candidate", candidateHint);
     if (c.get("dryRun")) {
+      // Says whether a look would be allowed. Never the number: a look is recorded and counted.
       const found = await scope.access(userId);
-      if (!found?.access.phone) throw noCandidate();
-      return c.json({ phone: found.contact.phoneNumber ?? "" }, 200);
+      if (!found?.access.view) throw noCandidate();
+      if (!found.access.phone) {
+        throw new ApiError("conflict", {
+          detail: "This person doesn't share their number",
+          hint: "Send them a message instead.",
+        });
+      }
+      return c.json({ phone: "" }, 200);
     }
     const { contact, added } = await scope.viewNumber(userId, session.user.id, actor);
     // Their open conversation shows the look straight away.

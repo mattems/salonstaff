@@ -133,14 +133,18 @@ function EditDetails({ d }: { d: SalonDetail }) {
           : "A new name, suburb or state gives it a new web address; the old one redirects. Leave an optional field blank to clear it."
       }
       confirm="Save"
-      run={async () =>
-        unwrap(
+      run={async () => {
+        const body = changed();
+        // Claim links go to the business email, so a new one is confirmed with a passkey.
+        const confirmation =
+          "email" in body ? await confirmWithPasskey("salon.change_email", d.salon.id) : undefined;
+        return unwrap(
           await api.PATCH("/admin/v1/salons/{id}", {
             params: { path: { id: d.salon.id } },
-            body: changed(),
+            body: { ...body, ...(confirmation ? { confirmation } : {}) },
           }),
-        )
-      }
+        );
+      }}
       done="Details saved"
     >
       <div className="grid gap-3 sm:grid-cols-2">
@@ -264,7 +268,15 @@ function Actions({ d }: { d: SalonDetail }) {
               label="Detach team"
               title="Detach the whole team"
               description="Takes its owners and managers off and cancels its invites: it becomes an unclaimed directory listing anyone can claim. Their accounts stay."
-              run={async () => unwrap(await api.POST("/admin/v1/salons/{id}/unclaim", path))}
+              run={async () => {
+                const confirmation = await confirmWithPasskey("salon.unclaim", salon.id);
+                return unwrap(
+                  await api.POST("/admin/v1/salons/{id}/unclaim", {
+                    ...path,
+                    body: { confirmation },
+                  }),
+                );
+              }}
               done="Team detached"
             />
           ) : null}

@@ -5,8 +5,8 @@
  * number of listings, including ones that already have owners (who are told). A listing's first
  * claim gets the same launch terms as a new salon.
  */
-import { ApiError, isValidAbn, randomToken, sha256Hex } from "@salonstaff/shared";
-import { and, desc, eq, gt, inArray, ne } from "drizzle-orm";
+import { ApiError, CONTACT_LIMITS, isValidAbn, randomToken, sha256Hex } from "@salonstaff/shared";
+import { and, count, desc, eq, gt, inArray, ne } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import type { Db } from "./index";
 import { type AbnCheck, type Contact, launchTerms, makeEmployer } from "./salon";
@@ -170,6 +170,22 @@ export function claims(db: Db) {
             detail: "That ABN isn't active on the Australian Business Register",
             hint: "Check it at abr.business.gov.au. A claim needs the business's current ABN.",
             errors: [{ path: "abn", message: "Not active" }],
+          });
+        }
+        // And one account can start only so many a day, across every listing.
+        const [today] = await tx
+          .select({ n: count() })
+          .from(salonClaims)
+          .where(
+            and(
+              eq(salonClaims.userId, input.userId),
+              gt(salonClaims.createdAt, new Date(Date.now() - 24 * 60 * 60_000)),
+            ),
+          );
+        if ((today?.n ?? 0) >= CONTACT_LIMITS.claimsPerDay) {
+          throw new ApiError("rate_limited", {
+            detail: `You can claim up to ${CONTACT_LIMITS.claimsPerDay} listings a day`,
+            hint: "Try again tomorrow. Running more salons than that? Contact support@salonstaff.com.au.",
           });
         }
         // Each claim by link emails the business: not more often than every few minutes.
@@ -347,7 +363,12 @@ export function claims(db: Db) {
                 abnEntityName: claim.abnEntityName,
                 contactName: claim.contactName,
                 phone: salon.phone ?? claim.phone,
-                ...(await launchTerms(tx, salon.founding)),
+                ...(await launchTerms(tx, {
+                  abn: claim.abn,
+                  abnVerified: Boolean(claim.abnEntityName),
+                  founding: salon.founding,
+                  freeUntil: salon.freeUntil,
+                })),
               })
               .where(eq(salons.id, salon.id))
               .returning()

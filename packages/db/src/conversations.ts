@@ -53,7 +53,7 @@ import type { Application, SeekerProfile } from "./seeker";
 import type { Job, Salon } from "./visibility";
 
 export type { ConversationMessage } from "./conversation-rows";
-export { roomOf } from "./conversation-rows";
+export { roomAudience, roomOf } from "./conversation-rows";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -515,11 +515,31 @@ export function salonConversations(db: Db, salonId: string) {
                   where a.seeker_id = ${conversations.seekerId} and j.salon_id = ${salonId})`,
               ),
             );
+          // The same person's cold messages from every salon they're on.
+          const [mine] = await tx
+            .select({
+              people: sql<number>`count(distinct ${conversationMessages.conversationId})::int`,
+            })
+            .from(conversationMessages)
+            .innerJoin(conversations, eq(conversations.id, conversationMessages.conversationId))
+            .where(
+              and(
+                eq(conversationMessages.senderId, input.senderId),
+                eq(conversationMessages.from, "salon"),
+                eq(conversationMessages.kind, "text"),
+                sql`${conversationMessages.createdAt} > ${dayAgo}`,
+                sql`not exists (select 1 from ${conversationMessages} r
+                  where r.conversation_id = ${conversations.id} and r."from" = 'seeker')`,
+                sql`not exists (select 1 from ${applications} a join ${jobs} j on j.id = a.job_id
+                  where a.seeker_id = ${conversations.seekerId} and j.salon_id = ${conversations.salonId})`,
+              ),
+            );
           const limit = contactLimitReached({
             kind: "message",
             cold,
             salonColdToday: today?.people ?? 0,
             personToday: today?.person ?? 0,
+            senderColdToday: mine?.people ?? 0,
           });
           if (limit) {
             throw new ApiError("rate_limited", {

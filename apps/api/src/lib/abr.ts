@@ -10,6 +10,9 @@ interface AbrAnswer {
 }
 
 /**
+ * `status` says only that the ABN is active. ABNs are public, so whether a salon is shown as
+ * verified is decided from `names` by `salonAbnStatus` (packages/shared).
+ *
  * Checks an ABN on the Australian Business Register (ABN Lookup's JSON service). Without
  * `ABR_GUID`, or when the register doesn't answer, a valid ABN stays `pending` for staff to check.
  */
@@ -33,6 +36,9 @@ export async function lookupAbn(env: Env, abn: string): Promise<AbnCheck> {
       return {
         status: "verified",
         entityName: answer.BusinessName?.[0] || answer.EntityName || null,
+        names: [answer.EntityName, ...(answer.BusinessName ?? [])].filter((name): name is string =>
+          Boolean(name),
+        ),
       };
     }
     // Cancelled, or not an ABN the register knows.

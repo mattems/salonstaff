@@ -44,6 +44,9 @@ That should print `302` and an address on the team domain.
 ## Day to day
 - **Let someone in or remove them:** edit the policy's email list. Then add or remove them as staff: [add-a-staff-member.md](add-a-staff-member.md).
 - **Sign someone out everywhere:** Zero Trust → the application → revoke their session.
+  That stops the portal, but a token they already hold keeps working if sent straight to the API
+  until it expires. To cut someone off at once, remove them on the portal's Staff screen (or
+  `bun db:staff`): the API checks the staff list on every request.
 - **Changed the application or team name?** The AUD tag or team domain changes with it. Update `wrangler.jsonc`.
 
 ## If the portal says…

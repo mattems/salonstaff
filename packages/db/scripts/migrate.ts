@@ -24,6 +24,14 @@ try {
 }
 
 const isLocal = ["localhost", "127.0.0.1", "::1"].includes(target.hostname);
+// A database that isn't on this machine is production: only on purpose. Without this, a
+// DATABASE_URL left in the shell would send `bun dev`'s migrations (or a staff change) there.
+if (!isLocal && process.env.ALLOW_REMOTE_DATABASE !== "1") {
+  console.error(
+    `✗ DATABASE_URL points at ${target.hostname}, not this machine. If you mean to change that database, run this again with ALLOW_REMOTE_DATABASE=1 (bun run deploy does).`,
+  );
+  process.exit(1);
+}
 console.log(
   `• Migrating ${target.pathname.slice(1) || "(no database name)"} on ${isLocal ? "local Postgres" : "a remote host"}, port ${target.port || "5432 (default)"}, ${isLocal ? "no TLS" : "TLS required"}`,
 );

@@ -8,6 +8,10 @@
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
   "dev": { "port": 8890 },
+  // These top-level settings are for local use: a deploy without `--env production` must not
+  // put them on a public workers.dev address.
+  "workers_dev": false,
+  "preview_urls": false,
   "observability": { "enabled": true },
   "minify": true,
   "upload_source_maps": true,
@@ -55,6 +59,7 @@
     "production": {
       "name": "salonstaff-api",
       "workers_dev": false,
+      "preview_urls": false,
       "routes": [{ "pattern": "api.salonstaff.com.au", "custom_domain": true }],
       // Next to the database. Set to the PlanetScale region you choose (docs/runbooks/first-deploy.md).
       "placement": { "region": "aws:ap-southeast-2" },

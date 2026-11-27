@@ -18,14 +18,42 @@ if (!url) {
   process.exit(1);
 }
 
-console.log("• Checks (lint, typecheck)…");
+// What's deployed is what's on main, committed and pushed: not a branch, and not work in progress
+// (its migrations would run on production). `--any-tree` deploys what's here anyway.
+if (!process.argv.includes("--any-tree")) {
+  const branch = (await $`git rev-parse --abbrev-ref HEAD`.text()).trim();
+  const dirty = (await $`git status --porcelain`.text()).trim();
+  await $`git fetch origin main`.quiet().nothrow();
+  const [head, main] = await Promise.all([
+    $`git rev-parse HEAD`.text(),
+    $`git rev-parse origin/main`.nothrow().text(),
+  ]);
+  const problem =
+    branch !== "main"
+      ? `You're on ${branch}, not main.`
+      : dirty
+        ? "There are uncommitted changes."
+        : head.trim() !== main.trim()
+          ? "main isn't the same as origin/main (push or pull first)."
+          : null;
+  if (problem) {
+    console.error(
+      `✗ ${problem} Deploy from a clean, pushed main, or pass --any-tree to deploy this anyway.`,
+    );
+    process.exit(1);
+  }
+}
+
+console.log("• Checks (lint, typecheck, tests)…");
 await $`bun run lint`;
 await $`bun run typecheck`;
+// Needs the local Postgres (docker compose up). `--skip-tests` when it can't run.
+if (!process.argv.includes("--skip-tests")) await $`bun run test`;
 
 console.log("• Migrating the production database…");
 await $`bun scripts/migrate.ts`
   .cwd(resolve(root, "packages/db"))
-  .env({ ...process.env, DATABASE_URL: url });
+  .env({ ...process.env, DATABASE_URL: url, ALLOW_REMOTE_DATABASE: "1" });
 
 console.log("• Deploying the API…");
 await $`bunx wrangler deploy --env production`.cwd(resolve(root, "apps/api"));

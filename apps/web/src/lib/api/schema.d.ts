@@ -87,7 +87,7 @@ export interface paths {
     post?: never;
     /**
      * Delete your account
-     * @description Permanently deletes your account, profile, pictures, applications and checks, and signs you out everywhere. A salon you created is deleted with its jobs; a directory listing you claimed goes back to being unclaimed. This can't be undone.
+     * @description Permanently deletes your account, profile, pictures, applications and checks, and signs you out everywhere. A salon you created is deleted with its jobs; a directory listing you claimed goes back to being unclaimed. Either way its Salon Plan is cancelled. This can't be undone.
      */
     delete: {
       parameters: {
@@ -1921,7 +1921,7 @@ export interface paths {
     put?: never;
     /**
      * Change your email: confirm with the code
-     * @description The code from the new address. Your account's email becomes that address: email codes go there from now on, and your old address is told about the change. Google and Apple stay connected. With `dry_run` only the form is checked (the code isn't used up).
+     * @description The code from the new address. Your account's email becomes that address: email codes go there from now on, and your old address is told about the change. Google and Apple stay connected; your other devices are signed out. With `dry_run` only the form is checked (the code isn't used up).
      */
     post: {
       parameters: {
@@ -2085,7 +2085,7 @@ export interface paths {
     put?: never;
     /**
      * Change your mobile: confirm with the code
-     * @description The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS. With `dry_run` only the form is checked.
+     * @description The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS, and your other devices are signed out. With `dry_run` only the form is checked.
      */
     post: {
       parameters: {
@@ -4198,7 +4198,7 @@ export interface paths {
     put?: never;
     /**
      * See a candidate's mobile
-     * @description Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.
+     * @description Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count. With `dry_run` the answer says a look is allowed but `phone` is empty.
      */
     post: {
       parameters: {

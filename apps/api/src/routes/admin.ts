@@ -373,7 +373,14 @@ admin.openapi(
     const ctx = await requireStaff(c, "staff:manage");
     const { data, staff } = ctx;
     const input = c.req.valid("json");
-    const actor = await requireConfirmation(c, ctx, "staff.add", input.email, input.confirmation);
+    const actor = await requireConfirmation(
+      c,
+      ctx,
+      "staff.add",
+      // The role is part of what's confirmed: "add X" can't be turned into "add X as an owner".
+      `${input.email}:${input.role}`,
+      input.confirmation,
+    );
     const already = () =>
       new ApiError("conflict", {
         detail: `${input.email} is already staff`,
@@ -437,7 +444,7 @@ admin.openapi(
       c,
       ctx,
       "staff.change_role",
-      encodeId("staff", member.id),
+      `${encodeId("staff", member.id)}:${role}`,
       confirmation,
     );
     if (member.id === staff.id) {

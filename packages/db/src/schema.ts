@@ -42,6 +42,32 @@ const id = () =>
     .$defaultFn(() => uuidv7());
 
 /**
+ * The launch terms an ABN was given (D-05), kept apart from the salon so they're given once: a
+ * salon made again with the same ABN, or another one with it, gets the same free period, not a
+ * new one.
+ */
+export const launchTermsGiven = pgTable("launch_terms", {
+  abn: text("abn").primaryKey(),
+  freeUntil: ts("free_until").notNull(),
+  createdAt: createdAt(),
+});
+
+/**
+ * One row each time a sign-in code is sent to an email or mobile, so one destination can only be
+ * sent so many an hour and a day, whoever asks and from wherever. Only a hash of the destination
+ * is kept. Rows older than two days are dropped by the cron.
+ */
+export const codeRequests = pgTable(
+  "code_requests",
+  {
+    id: id(),
+    destinationHash: text("destination_hash").notNull(),
+    createdAt: createdAt(),
+  },
+  (table) => [index("code_requests_destination_idx").on(table.destinationHash, table.createdAt)],
+);
+
+/**
  * Stored responses for requests sent with an `Idempotency-Key`, so a retry
  * returns the first result instead of repeating the action. Kept for 24 hours.
  */
@@ -765,6 +791,8 @@ export const conversationMessages = pgTable(
   },
   (table) => [
     index("conversation_messages_conversation_idx").on(table.conversationId, table.createdAt),
+    // For the hourly limit on what one person sends.
+    index("conversation_messages_sender_idx").on(table.senderId, table.createdAt),
   ],
 );
 

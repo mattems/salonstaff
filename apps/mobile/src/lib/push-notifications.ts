@@ -91,7 +91,10 @@ export function destinationOf(
     }
     const screen = SCREENS[pathname.replace(/\/+$/, '') || '/'];
     if (screen) return { screen };
-    return { web: new URL(pathname + search, SITE_URL).toString() };
+    // "//host/…" would resolve to another site: only ever a page on ours.
+    const web = new URL(pathname.replace(/^\/+/, '/') + search, SITE_URL);
+    const site = SITE_URL.replace(/\/+$/, '');
+    return web.toString().startsWith(`${site}/`) ? { web: web.toString() } : null;
   } catch {
     return null;
   }

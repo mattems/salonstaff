@@ -1,6 +1,6 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import { INVITE_DAYS, invites } from "@salonstaff/db";
-import { ApiError, BRAND } from "@salonstaff/shared";
+import { ApiError, BRAND, plainLine } from "@salonstaff/shared";
 import { userActor } from "../lib/actor";
 import { appUrl, sendEmail } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
@@ -126,7 +126,7 @@ teamRoutes.openapi(
     sendEmail(c, invite.email, {
       subject: `Join ${salon.name} on ${BRAND.name}`,
       title: `${from} invited you to ${salon.name}`,
-      body: `You're invited to help run ${salon.name} on ${BRAND.name} as ${roleLabel(invite.role)}: posting jobs and looking after applicants${invite.role === "owner" ? ", the salon's details, billing and team" : ""}. The link lasts ${INVITE_DAYS} days.`,
+      body: `You're invited to help run ${plainLine(salon.name)} on ${BRAND.name} as ${roleLabel(invite.role)}: posting jobs and looking after applicants${invite.role === "owner" ? ", the salon's details, billing and team" : ""}. The link lasts ${INVITE_DAYS} days.`,
       action: "Accept the invite",
       url: url.toString(),
       footer: "If you didn't expect this, ignore this email: nothing changes.",

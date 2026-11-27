@@ -60,6 +60,10 @@ docs.get("/docs", async (c) => {
     `src="${SCALAR_SCRIPT}"`,
     `src="${SCALAR_SCRIPT}" integrity="${SCALAR_INTEGRITY}" crossorigin="anonymous"`,
   );
+  // If an upgrade changes the markup, don't quietly serve the script unpinned.
+  if (!html.includes(`integrity="${SCALAR_INTEGRITY}"`)) {
+    throw new Error("The API reference's script tag couldn't be pinned (routes/docs.ts)");
+  }
   c.header("Content-Security-Policy", docsPolicy(nonce));
   return c.html(html);
 });

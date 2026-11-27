@@ -5,6 +5,7 @@ import { and, eq, lt } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env";
 import { actorKey } from "../lib/actor";
+import { loggedPath } from "./request-context";
 
 const { idempotencyKeys } = schema;
 const TTL_MS = 24 * 60 * 60 * 1000;
@@ -32,6 +33,9 @@ export function idempotency(): MiddlewareHandler<AppEnv> {
     const key = c.req.header("Idempotency-Key");
     if (c.req.method !== "POST" || key === undefined || c.get("dryRun")) return next();
     if (c.req.path.startsWith(`${AUTH_PATH}/`)) return next();
+    // The admin portal doesn't use keys, and a stored answer would be replayed before the staff
+    // gate runs: staff have no session to scope it to.
+    if (c.req.path.startsWith("/admin/")) return next();
 
     if (!KEY_RE.test(key)) {
       throw new ApiError("validation_failed", {
@@ -44,8 +48,10 @@ export function idempotency(): MiddlewareHandler<AppEnv> {
     // Scoped to whoever is calling, so two callers can't collide on the same key.
     const session = await c.get("session")();
     const caller = session ? `user:${session.user.id}` : actorKey(c);
-    const scope = `${caller} ${c.req.method} ${c.req.path}`;
-    const fingerprint = await sha256(await c.req.raw.clone().text());
+    // The path is stored with its secrets masked (a claim or invite token), and the whole path
+    // is part of the fingerprint instead, so one key still means one exact request.
+    const scope = `${caller} ${c.req.method} ${loggedPath(c.req.path)}`;
+    const fingerprint = await sha256(`${c.req.path}\n${await c.req.raw.clone().text()}`);
     const db = await c.get("db")();
     const row = and(eq(idempotencyKeys.scope, scope), eq(idempotencyKeys.key, key));
     const now = new Date();

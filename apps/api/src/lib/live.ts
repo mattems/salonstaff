@@ -3,6 +3,7 @@
  * per salon and job seeker, D-19: `roomOf` in @salonstaff/db), and telling the room about a new
  * message.
  */
+import { roomAudience } from "@salonstaff/db";
 import { ApiError } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
@@ -50,7 +51,8 @@ export async function connectLive(
 }
 
 /**
- * Sends a new message to the conversation's open views. Returns the people who have it open, who
+ * Sends a new message to the conversation's open views, closing any whose person may no longer
+ * see the conversation (taken off the salon's team, or banned, since opening it). Returns the people who have it open, who
  * needn't be told by push or email. Never fails the request: if the room can't be reached, the
  * message is still saved and everyone is told the usual way.
  */
@@ -60,7 +62,8 @@ export async function broadcast(
   event: LiveEvent,
 ): Promise<Set<string>> {
   try {
-    return new Set(await room(c, roomName).broadcast(event));
+    const allowed = await roomAudience(await c.get("db")(), roomName);
+    return new Set(await room(c, roomName).broadcast(event, allowed));
   } catch (error) {
     console.error("Live conversation unreachable", error);
     return new Set();
