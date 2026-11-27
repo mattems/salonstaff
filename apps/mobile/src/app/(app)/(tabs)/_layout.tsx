@@ -1,53 +1,44 @@
-import { Tabs } from 'expo-router/js-tabs';
-import type { ColorValue } from 'react-native';
+import { NativeTabs } from 'expo-router/native-tabs';
 
-import { Icon, type IconName } from '@/components/icon';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 
-function tabIcon(outline: IconName, filled: IconName) {
-  function TabIcon({ focused, color }: { focused: boolean; color: ColorValue }) {
-    return <Icon name={focused ? filled : outline} size={22} color={color} />;
-  }
-  return TabIcon;
-}
-
+/** The system tab bar (iOS's own, with its glass and badges). The Inbox shows unread messages. */
 export default function TabsLayout() {
   const theme = useTheme();
   const { user } = useAuth();
   const unread = user?.unreadMessages ?? 0;
   return (
-    <Tabs
-      screenOptions={{
-        tabBarActiveTintColor: theme.brand,
-        tabBarInactiveTintColor: theme.textMuted,
-        tabBarStyle: { backgroundColor: theme.surface, borderTopColor: theme.border },
-        headerStyle: { backgroundColor: theme.background },
-        headerShadowVisible: false,
-        headerTitleStyle: { color: theme.text, fontWeight: '700' },
-        sceneStyle: { backgroundColor: theme.background },
-      }}>
-      <Tabs.Screen
-        name="index"
-        options={{ title: 'Jobs', tabBarIcon: tabIcon('jobs', 'jobsFill') }}
-      />
-      <Tabs.Screen
-        name="saved"
-        options={{ title: 'Saved', tabBarIcon: tabIcon('saved', 'savedFill') }}
-      />
-      <Tabs.Screen
-        name="applications"
-        options={{ title: 'Applications', tabBarIcon: tabIcon('applications', 'applicationsFill') }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'Profile',
-          tabBarIcon: tabIcon('profile', 'profileFill'),
-          tabBarBadge: unread > 0 ? unread : undefined,
-          tabBarBadgeStyle: { backgroundColor: theme.brand },
-        }}
-      />
-    </Tabs>
+    <NativeTabs tintColor={theme.brand} badgeBackgroundColor={theme.brand}>
+      <NativeTabs.Trigger name="(jobs)">
+        <NativeTabs.Trigger.Icon sf={{ default: 'briefcase', selected: 'briefcase.fill' }} md="work" />
+        <NativeTabs.Trigger.Label>Jobs</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(saved)">
+        <NativeTabs.Trigger.Icon sf={{ default: 'bookmark', selected: 'bookmark.fill' }} md="bookmark" />
+        <NativeTabs.Trigger.Label>Saved</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(applications)">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'doc.text', selected: 'doc.text.fill' }}
+          md="description"
+        />
+        <NativeTabs.Trigger.Label>Applications</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(inbox)">
+        <NativeTabs.Trigger.Icon sf={{ default: 'tray', selected: 'tray.fill' }} md="inbox" />
+        <NativeTabs.Trigger.Label>Inbox</NativeTabs.Trigger.Label>
+        {unread > 0 ? (
+          <NativeTabs.Trigger.Badge>{unread > 99 ? '99+' : String(unread)}</NativeTabs.Trigger.Badge>
+        ) : null}
+      </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="(profile)">
+        <NativeTabs.Trigger.Icon
+          sf={{ default: 'person.crop.circle', selected: 'person.crop.circle.fill' }}
+          md="person"
+        />
+        <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
+      </NativeTabs.Trigger>
+    </NativeTabs>
   );
 }

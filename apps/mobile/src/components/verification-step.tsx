@@ -15,6 +15,7 @@ const STATUS_TONES: Record<VerificationStatus, Tone> = {
   requires_input: 'warning',
   verified: 'success',
   failed: 'danger',
+  expired: 'warning',
 };
 
 /** A check's status as a coloured pill. */

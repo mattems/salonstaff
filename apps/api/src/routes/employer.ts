@@ -1,5 +1,12 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { type Job, type Salon, type SalonJob, type SalonTeam, salonsFor } from "@salonstaff/db";
+import {
+  type Job,
+  type Salon,
+  type SalonJob,
+  type SalonTeam,
+  salonConversations,
+  salonsFor,
+} from "@salonstaff/db";
 import {
   APPLICATION_STATUSES,
   ApiError,
@@ -167,14 +174,22 @@ employerRoutes.openapi(
     tags: TAGS,
     request: { params: SalonParams },
     responses: {
-      200: json(MySalonSchema, "Your salon"),
+      200: json(
+        MySalonSchema.extend({
+          unreadMessages: z.number().int().openapi({
+            description: "Applications with replies your team hasn't read (D-17).",
+          }),
+        }).openapi("MySalonWithInbox"),
+        "Your salon",
+      ),
       401: errors[401],
       404: problemResponse("Not one of your salons"),
     },
   }),
   async (c) => {
     const { salon, role } = await requireSalon(c, c.req.valid("param").salonId);
-    return c.json(mySalonJson(c.env, salon, role), 200);
+    const unreadMessages = await salonConversations(await c.get("db")(), salon.id).unreadCount();
+    return c.json({ ...mySalonJson(c.env, salon, role), unreadMessages }, 200);
   },
 );
 
@@ -581,6 +596,7 @@ employerRoutes.openapi(
     const result = await scope.setApplicationStatus(id, status, actor);
     if (NOTIFY.includes(status) && result.before !== status) {
       notify(c, result.contact, {
+        topic: "applications",
         subject: `Update on your application: ${result.job.title}`,
         title: `${salon.name} updated your application`,
         body: `Your application for "${result.job.title}" is now: ${labelFor(APPLICATION_STATUSES, status)}.`,
@@ -666,22 +682,28 @@ employerRoutes.openapi(
       actor,
     );
     const sender = session.user.name || "Someone";
-    push(c, userId, {
-      title: `${sender} from ${salon.name}`,
-      body: message,
-      url: appUrl(c, "/inbox"),
-    });
+    push(
+      c,
+      userId,
+      { title: `${sender} from ${salon.name}`, body: message, url: appUrl(c, "/inbox") },
+      "messages",
+    );
     const to = realEmail(contact.email);
     if (to) {
-      sendEmail(c, to, {
-        subject: `${salon.name} sent you a message`,
-        title: `${sender} from ${salon.name} sent you a message`,
-        body: `${message}\n\nReply to this email to answer ${sender} directly. ${salon.name}: ${appUrl(c, salonPath(salon))}`,
-        action: "Open your inbox",
-        url: appUrl(c, "/inbox"),
-        replyTo,
-        footer: `${salon.name} found you on ${BRAND.name}. To stop them contacting you, hide your profile from them in your account.`,
-      });
+      sendEmail(
+        c,
+        { email: to, userId },
+        {
+          topic: "messages",
+          subject: `${salon.name} sent you a message`,
+          title: `${sender} from ${salon.name} sent you a message`,
+          body: `${message}\n\nReply to this email to answer ${sender} directly. ${salon.name}: ${appUrl(c, salonPath(salon))}`,
+          action: "Open your inbox",
+          url: appUrl(c, "/inbox"),
+          replyTo,
+          footer: `${salon.name} found you on ${BRAND.name}. To stop them contacting you, hide your profile from them in your account.`,
+        },
+      );
     }
     return c.json({ sent: true as const }, 201);
   },

@@ -99,15 +99,45 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   docs/runbooks/push-notifications.md. Not tried against Apple yet: needs Matt's APNs key.
 - The app on your own iPhone against the local API: `bun run ios:device` (a development build, as in the
   other apps, with `expo-dev-client`; signed with Studio 372 Pty Ltd's team, N2TR84P2TD, in app.json) or `bun run phone`
-  (Expo Go). Both open the API and site to the Wi-Fi on :8891/:5301 while they run and point the app at
+  (Expo Go). Both open the API and site to the Wi-Fi on :8891/:8892 while they run and point the app at
   them (apps/mobile/README.md). Running on Matt's iPhone (the App ID and its profile were made in Xcode
   once; see the README if a new phone hits the provisioning error).
+- The app's tab bar is iOS's own (`NativeTabs`): Jobs, Saved, Applications, Inbox (now a tab, with the unread
+  count as its badge, refreshed on return to the app and when a push arrives) and Profile. Each tab has its
+  own stack for its title bar. A new Settings screen (Profile → Settings): notification preferences per topic,
+  push and email (D-15, migration 0009), light/dark/system (kept on the phone), the version, and in
+  development builds the API, website, build kind and device, shareable.
+- A new name after the ID check expires it (D-16): verification status `expired`; the website and app warn
+  before saving and the verification pages explain it.
+- Conversations on applications (D-17, migration 0010): the salon's team writes to an applicant from the
+  application (with quick replies) and the applicant replies once the salon has written, on the website
+  (`/employer/{salon}/applications/{id}`, `/applications/{id}`) and in the app; push and email to the other
+  side under "Messages from salons"; unread counts in the salon's Applicants tab, the job seeker's inbox
+  badge and each application; no daily limit on messages. A new salon-wide Applicants page,
+  and the same on each job's page: status counts, job, unread replies, verified checks, open to work,
+  experience, name search, sort (`GET /v1/employer/salons/{salonId}/applicants`, up to 200).
+- Live conversations (D-18): while a conversation is open on the website or in the app, new messages and
+  "Jess is typing…" arrive at once over a WebSocket held by a Durable Object per application
+  (`ConversationRoom`, `/v1/.../applications/{id}/live`). Whoever has it open isn't also pushed or emailed.
+  `bun run phone` / `ios:device` forward the socket too (restart them to pick that up). On the website the
+  conversation is shadcn's chat parts (`message`, `bubble`, `message-scroller` in packages/ui): a fixed-height
+  window that keeps to the newest message, with a jump-down button when reading further up. The
+  website's router restores scroll positions only when you change page, not when a page reloads its
+  data (`src/router.tsx`), which used to pull the conversation back up after each new message. In the
+  app, reading further up keeps your place when a message arrives, and a button over the reply box says
+  "2 new messages" (or just points down) and takes you to the newest.
+- The app's Inbox badge stays current without a socket: a push re-checks it, as do coming back to the
+  app and switching tabs; when message pushes don't reach the phone (turned off, not allowed, or the API
+  can't send them, as locally without an APNs key: `PUT /v1/me/push-device` says `delivered`), it also
+  re-checks once a minute while the app is open (`hooks/use-fresh-inbox.ts`).
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
 ### Known issues
 - Not yet tried for real: SMS to the old number after a mobile change (Twilio), and the share
   page's preview card on Facebook, LinkedIn or WhatsApp (needs a deploy).
+- Not yet tried: a live conversation on a real iPhone through `bun run ios:device`'s forwarder, and a
+  deployed one through the website's service binding (both tried locally in the browser and simulator).
 - Not yet tried in a browser: the multi-salon employer pages, switcher, Team page, invite page and
   employer account page (API tests cover the flows).
 - Not yet tried for real: connecting Google/Apple from the account page (needs keys; the API side is

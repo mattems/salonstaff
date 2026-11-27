@@ -9,6 +9,7 @@ import {
   type EducationInput,
   type EndorsementRequestInput,
   type ExperienceInput,
+  nameChangeExpiresIdentity,
   PROFILE_LIMITS,
   type ProfileDetailsInput,
   type ProfileSettingsInput,
@@ -19,6 +20,7 @@ import { and, asc, count, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm
 import { alias } from "drizzle-orm/pg-core";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, type EducationCheck, educationChecks, summarise } from "./checks";
+import { seekerUnreadSql } from "./conversations";
 import type { Db } from "./index";
 import { type MySalon, salonsFor } from "./salon";
 import {
@@ -179,6 +181,8 @@ const sender = alias(users, "sender");
 
 export interface MyApplication extends JobWithSalon {
   application: Application;
+  /** The salon's messages they haven't read (D-17). */
+  unread: number;
 }
 
 export function seeker(db: Db, userId: string) {
@@ -203,13 +207,24 @@ export function seeker(db: Db, userId: string) {
     async account(): Promise<Account | null> {
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return null;
-      const [profile, checkRows, mySalons, unreadContacts] = await Promise.all([
+      const [profile, checkRows, mySalons, unreadContacts, [conversations]] = await Promise.all([
         profileRow(),
         db.select().from(seekerChecks).where(eq(seekerChecks.userId, userId)),
         salonsFor(db).ofUser(userId),
         unread(),
+        db
+          .select({ n: sql<number>`coalesce(sum(${seekerUnreadSql}), 0)::int` })
+          .from(applications)
+          .where(eq(applications.seekerId, userId)),
       ]);
-      return { user, profile, checks: summarise(checkRows), salons: mySalons, unreadContacts };
+      return {
+        user,
+        profile,
+        checks: summarise(checkRows),
+        salons: mySalons,
+        // The inbox: salons' contacts, and messages on their applications (D-17).
+        unreadContacts: unreadContacts + (conversations?.n ?? 0),
+      };
     },
 
     profile: () => profileRow(),
@@ -242,11 +257,35 @@ export function seeker(db: Db, userId: string) {
       });
     },
 
-    /** Creates or replaces the basics. The account's name follows the profile's. */
+    /**
+     * Creates or replaces the basics. The account's name follows the profile's. A new name after
+     * the ID check passed expires that check: they verify their ID again (D-16).
+     */
     async saveProfile(input: SeekerProfileInput, actor: Actor): Promise<SeekerProfile> {
       const values = profileValues(input);
       return db.transaction(async (tx) => {
         const before = await profileRow(tx);
+        if (before && nameChangeExpiresIdentity(before, input)) {
+          const expired = await tx
+            .update(seekerChecks)
+            .set({ status: "expired", updatedAt: new Date() })
+            .where(
+              and(
+                eq(seekerChecks.userId, userId),
+                eq(seekerChecks.kind, "identity"),
+                eq(seekerChecks.status, "verified"),
+              ),
+            )
+            .returning({ id: seekerChecks.id });
+          for (const check of expired) {
+            await recordAudit(tx, actor, {
+              action: "check.expired",
+              targetType: "check",
+              targetId: check.id,
+              reason: "name_changed",
+            });
+          }
+        }
         const [row] = await tx
           .insert(seekerProfiles)
           .values({ userId, ...values })
@@ -789,7 +828,7 @@ export function seeker(db: Db, userId: string) {
 
     async applications(): Promise<MyApplication[]> {
       const rows = await db
-        .select({ application: applications, job: jobs, salon: salons })
+        .select({ application: applications, job: jobs, salon: salons, unread: seekerUnreadSql })
         .from(applications)
         .innerJoin(jobs, eq(jobs.id, applications.jobId))
         .innerJoin(salons, eq(salons.id, jobs.salonId))

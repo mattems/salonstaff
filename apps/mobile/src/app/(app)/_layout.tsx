@@ -1,8 +1,9 @@
 import { useLastNotificationResponse } from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
+import { useFreshInbox } from '@/hooks/use-fresh-inbox';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
 import { destinationOf, registerForPush } from '@/lib/push-notifications';
@@ -11,7 +12,7 @@ export const unstable_settings = { anchor: '(tabs)' };
 
 export default function AppLayout() {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, refresh } = useAuth();
   const router = useRouter();
   const nudged = useRef(false);
   const needsProfile = !!user && !user.profile;
@@ -26,13 +27,20 @@ export default function AppLayout() {
   // Push notifications (D-15): once there's a profile (not in the middle of onboarding), ask
   // permission and send this phone's token; again on each launch, as tokens change.
   const hasProfile = !!user?.profile;
+  const [pushReachesPhone, setPushReachesPhone] = useState<boolean | null>(null);
   useEffect(() => {
     if (!hasProfile) return;
-    registerForPush().catch((error: unknown) => {
-      // Pushes are a bonus: every notice also goes by email.
-      if (__DEV__) console.warn('Push notifications not set up:', error);
-    });
+    registerForPush()
+      .then(setPushReachesPhone)
+      .catch((error: unknown) => {
+        setPushReachesPhone(false);
+        // Pushes are a bonus: every notice also goes by email.
+        if (__DEV__) console.warn('Push notifications not set up:', error);
+      });
   }, [hasProfile]);
+
+  // Keep the Inbox badge current, without a socket.
+  useFreshInbox(refresh, pushReachesPhone);
 
   // A tapped push opens its screen (also when it launched the app).
   const response = useLastNotificationResponse();
@@ -80,8 +88,9 @@ export default function AppLayout() {
       <Stack.Screen name="profile/sharing" options={{ title: 'Visibility and sharing' }} />
       <Stack.Screen name="profile/contact" options={{ title: 'How salons contact you' }} />
       <Stack.Screen name="profile/security" options={{ title: 'Sign-in and security' }} />
-      <Stack.Screen name="inbox/index" options={{ title: 'Inbox' }} />
       <Stack.Screen name="inbox/[id]" options={{ title: '' }} />
+      <Stack.Screen name="applications/[id]" options={{ title: '' }} />
+      <Stack.Screen name="settings" options={{ title: 'Settings' }} />
       <Stack.Screen name="verify-complete" options={{ headerShown: false }} />
     </Stack>
   );

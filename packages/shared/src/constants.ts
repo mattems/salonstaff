@@ -101,6 +101,8 @@ export const VERIFICATION_STATUSES = [
   "requires_input",
   "verified",
   "failed",
+  /** Passed once, but no longer counts (e.g. the name changed since, D-16): verify again. */
+  "expired",
 ] as const;
 export type VerificationStatus = (typeof VERIFICATION_STATUSES)[number];
 
@@ -261,6 +263,33 @@ export const CONTACT_BY = [
 export type ContactBy = (typeof CONTACT_BY)[number]["value"];
 export const CONTACT_BY_VALUES = CONTACT_BY.map((v) => v.value) as [ContactBy, ...ContactBy[]];
 
+/**
+ * What a person can choose to hear about, by push and by email (D-15). Sign-in and security
+ * notices, and salons' notices about their salon, always go.
+ */
+export const NOTIFICATION_TOPICS = [
+  {
+    value: "messages",
+    label: "Messages from salons",
+    description: "A salon writes to you.",
+  },
+  {
+    value: "applications",
+    label: "Your applications",
+    description: "A salon moves one of your applications along.",
+  },
+  {
+    value: "account",
+    label: "Verification and endorsements",
+    description: "A check is decided, or someone endorses you.",
+  },
+] as const;
+export type NotificationTopic = (typeof NOTIFICATION_TOPICS)[number]["value"];
+export const NOTIFICATION_TOPIC_VALUES = NOTIFICATION_TOPICS.map((t) => t.value) as [
+  NotificationTopic,
+  ...NotificationTopic[],
+];
+
 /** How a referee knows the job seeker. */
 export const ENDORSEMENT_RELATIONSHIPS = [
   { value: "managed", label: "Managed them" },
@@ -272,6 +301,47 @@ export type EndorsementRelationship = (typeof ENDORSEMENT_RELATIONSHIPS)[number]
 export const ENDORSEMENT_RELATIONSHIP_VALUES = ENDORSEMENT_RELATIONSHIPS.map((r) => r.value) as [
   EndorsementRelationship,
   ...EndorsementRelationship[],
+];
+
+/**
+ * A salon's quick replies to an applicant (D-17), to edit before sending. `{firstName}`, `{job}`
+ * and `{salon}` are filled in.
+ */
+export const QUICK_REPLIES = [
+  {
+    value: "interview",
+    label: "Invite to an interview",
+    text: "Hi {firstName}, thanks for applying for {job}. We'd love to meet you for an interview. When suits you this week?",
+  },
+  {
+    value: "trial",
+    label: "Invite to a trial",
+    text: "Hi {firstName}, thanks for applying for {job}. We'd like to invite you in for a paid trial. Which days could you do?",
+  },
+  {
+    value: "more",
+    label: "Ask for more",
+    text: "Hi {firstName}, thanks for applying for {job}. Could you tell us a bit more about your experience, and send a few photos of your recent work?",
+  },
+  {
+    value: "decline",
+    label: "Not this time",
+    text: "Hi {firstName}, thank you for applying for {job}. We've decided not to go ahead this time, but we wish you all the best. {salon}",
+  },
+] as const;
+export type QuickReply = (typeof QUICK_REPLIES)[number]["value"];
+
+/** How a salon can order its applicants (D-17). */
+export const APPLICANT_SORTS = [
+  { value: "newest", label: "Newest first" },
+  { value: "oldest", label: "Oldest first" },
+  { value: "experience", label: "Most experienced" },
+  { value: "message", label: "Latest message" },
+] as const;
+export type ApplicantSort = (typeof APPLICANT_SORTS)[number]["value"];
+export const APPLICANT_SORT_VALUES = APPLICANT_SORTS.map((s) => s.value) as [
+  ApplicantSort,
+  ...ApplicantSort[],
 ];
 
 /** Keeping salons' contact with job seekers useful and spam-free (D-13). Per salon, per day. */

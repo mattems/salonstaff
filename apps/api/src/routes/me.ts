@@ -45,6 +45,7 @@ import {
 } from "../lib/storage";
 import {
   jobSummaryJson,
+  myApplicationJson,
   myProfileJson,
   portfolioJson,
   profileJson,
@@ -176,7 +177,7 @@ meRoutes.openapi(
     path: "/v1/me/profile",
     summary: "Save your basic details",
     description:
-      "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here.",
+      "Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here. Changing your first or last name after your ID is verified expires that check (`identity` becomes `expired` in GET /v1/me/checks): verify your ID again (D-16).",
     tags: TAGS,
     request: jsonBody(seekerProfileSchema),
     responses: {
@@ -622,13 +623,7 @@ meRoutes.openapi(
     const rows = await seeker(await c.get("db")(), session.user.id).applications();
     return c.json(
       {
-        items: rows.map((row) => ({
-          id: encodeId("application", row.application.id),
-          status: row.application.status,
-          coverNote: row.application.coverNote,
-          createdAt: row.application.createdAt.toISOString(),
-          job: jobSummaryJson(c.env, row),
-        })),
+        items: rows.map((row) => myApplicationJson(c.env, row)),
       },
       200,
     );

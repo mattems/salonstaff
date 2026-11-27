@@ -20,6 +20,23 @@ const pushesTo = (app: ReturnType<typeof createTestApp>, userId: string) =>
   app.sent.filter((m) => m.to === `push+${userId}@local.test`);
 
 describe("push devices", () => {
+  it("says pushes reach the phone once Apple's push service is set up", async () => {
+    const app = createTestApp({
+      env: {
+        APNS_KEY_ID: "KEY123",
+        APNS_PRIVATE_KEY: "not-used-to-register",
+        APPLE_TEAM_ID: "TEAM123",
+        APPLE_BUNDLE_ID: "au.com.salonstaff.app",
+      },
+    });
+    const person = await app.person("Pushc");
+    const registered = await person.api("PUT", "/v1/me/push-device", {
+      platform: "ios",
+      token: token(),
+    });
+    expect(registered.body).toEqual({ registered: true, delivered: true });
+  });
+
   it("registers this session's phone, once, and moves a token to whoever signs in on it", async () => {
     const app = createTestApp();
     const a = await app.person("Pusha");
@@ -41,7 +58,8 @@ describe("push devices", () => {
       sandbox: true,
     });
     expect(first.status).toBe(200);
-    expect(first.body).toEqual({ registered: true });
+    // The tests have no APNs key, as locally: pushes wouldn't reach the phone.
+    expect(first.body).toEqual({ registered: true, delivered: false });
     await a.api("PUT", "/v1/me/push-device", { platform: "ios", token: phone, sandbox: true });
     const aId = await userIdOf(a);
     expect(await devicesOf(aId)).toEqual([{ token: phone, sandbox: true }]);
@@ -113,5 +131,78 @@ describe("pushes", () => {
     const pushes = pushesTo(app, ownerUserId);
     expect(pushes).toHaveLength(1);
     expect(pushes[0]?.subject).toContain("New applicant");
+  });
+});
+
+describe("notification preferences", () => {
+  const allOn = {
+    messages: { push: true, email: true },
+    applications: { push: true, email: true },
+    account: { push: true, email: true },
+  };
+
+  it("start all on, and save what's switched off", async () => {
+    const app = createTestApp();
+    const person = await app.person("Prefs");
+    expect((await app.call("/v1/me/notifications")).status).toBe(401);
+    expect((await person.api("GET", "/v1/me/notifications")).body).toEqual(allOn);
+
+    const choice = { ...allOn, messages: { push: false, email: true } };
+    const saved = await person.api("PUT", "/v1/me/notifications", choice);
+    expect(saved.status).toBe(200);
+    expect(saved.body).toEqual(choice);
+    expect((await person.api("GET", "/v1/me/notifications")).body).toEqual(choice);
+    expect(
+      (await person.api("PUT", "/v1/me/notifications", { messages: { push: false } })).status,
+    ).toBe(400);
+  });
+
+  it("hold back a salon's message by the channels switched off", async () => {
+    const app = createTestApp();
+    const seeker = await seekerWithProfile(app, "Quiet");
+    const seekerUserId = await userIdOf(seeker);
+    const me = await seeker.api<{ id: string }>("GET", "/v1/me");
+    await seeker.api("PUT", "/v1/me/push-device", { platform: "ios", token: token() });
+    await seeker.api("PUT", "/v1/me/notifications", {
+      ...allOn,
+      messages: { push: false, email: true },
+    });
+    const { owner } = await salonOwner(app);
+    const message = `A trial on Saturday? ${uid()}`;
+    const sent = await owner.api("POST", owner.at(`/candidates/${me.body.id}/messages`), {
+      message,
+    });
+    expect(sent.status).toBe(201);
+    expect(pushesTo(app, seekerUserId)).toEqual([]);
+    expect(app.sent.filter((m) => m.to === seeker.email).map((m) => m.text)).toEqual([
+      expect.stringContaining(message),
+    ]);
+  });
+
+  it("hold back an application update's email but still push it", async () => {
+    const app = createTestApp();
+    const { owner } = await salonOwner(app);
+    const job = await postJob(owner);
+    const seeker = await readySeeker(app, "Applicant");
+    const seekerUserId = await userIdOf(seeker);
+    await seeker.api("PUT", "/v1/me/push-device", { platform: "ios", token: token() });
+    await seeker.api("PUT", "/v1/me/notifications", {
+      ...allOn,
+      applications: { push: true, email: false },
+    });
+    expect((await seeker.api("POST", `/v1/jobs/${job.id}/apply`, {})).status).toBe(201);
+    const list = await owner.api<{ items: { id: string }[] }>(
+      "GET",
+      owner.at(`/jobs/${job.id}/applicants`),
+    );
+    const applicant = list.body.items[0]?.id as string;
+    const moved = await owner.api("PATCH", owner.at(`/applications/${applicant}`), {
+      status: "shortlisted",
+    });
+    expect(moved.status).toBe(200);
+    expect(pushesTo(app, seekerUserId).map((m) => m.subject)).toEqual([
+      expect.stringContaining("updated your application"),
+    ]);
+    expect(app.sent.filter((m) => m.to === seeker.email)).toEqual([]);
   });
 });

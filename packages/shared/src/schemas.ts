@@ -213,6 +213,15 @@ export const profileSettingsSchema = z.object({
 });
 export type ProfileSettingsInput = z.infer<typeof profileSettingsSchema>;
 
+/** Push and email, on or off, for each notification topic. Every topic is on until switched off. */
+const channels = z.object({ push: z.boolean(), email: z.boolean() });
+export const notificationPreferencesSchema = z.object({
+  messages: channels,
+  applications: channels,
+  account: channels,
+});
+export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
+
 /** Asking someone for an endorsement: they get an email with a one-time link. */
 export const endorsementRequestSchema = z.object({
   refereeName: trimmed(80).min(1, "Required"),
@@ -253,6 +262,12 @@ export const contactMessageSchema = z.object({
   message: trimmed(2000).min(20, "Write a little more (at least 20 characters)"),
 });
 export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
+
+/** A message in the conversation on an application (D-17). */
+export const applicationMessageSchema = z.object({
+  body: trimmed(2000).min(1, "Write a message"),
+});
+export type ApplicationMessageInput = z.infer<typeof applicationMessageSchema>;
 
 export const applySchema = z.object({
   coverNote: optionalText(1500),

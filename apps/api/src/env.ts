@@ -4,6 +4,7 @@ import type { EmailSender } from "@salonstaff/email";
 import type { TimingVariables } from "hono/timing";
 import type { JWTVerifyGetKey } from "jose";
 import type { SmsSender } from "./lib/sms";
+import type { ConversationRoom } from "./live/conversation-room";
 import type { RequestTimings } from "./middleware/request-context";
 
 /** Bindings, variables and secrets configured in wrangler.jsonc and the Cloudflare dashboard. */
@@ -21,6 +22,8 @@ export interface Env {
   MEDIA_URL: string;
   /** Never served publicly: certificates waiting for review. Deleted once decided. */
   PRIVATE: R2Bucket;
+  /** One room per application, for live conversations (D-18). */
+  CONVERSATIONS: DurableObjectNamespace<ConversationRoom>;
   /** From `.dev.vars` locally. Unset counts as production. Never set in wrangler.jsonc. */
   ENVIRONMENT?: "local" | "production";
   /** `off` switches the general rate limit off. Honoured only locally. */

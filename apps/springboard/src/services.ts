@@ -39,7 +39,9 @@ export const GROUPS: Group[] = [
         name: "Website",
         url: "http://localhost:5300",
         what: "salonstaff.com.au: jobs, the salon directory, job seeker and salon accounts.",
-        check: "http://localhost:5300",
+        // A plain server route: the home page would render, and ask the API who's signed in (a
+        // 401 in the API's log every few seconds).
+        check: "http://localhost:5300/robots.txt",
       },
       {
         name: "Admin portal",

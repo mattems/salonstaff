@@ -79,7 +79,7 @@
           },
           "unreadMessages": {
             "type": "integer",
-            "description": "Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts)."
+            "description": "What you haven't seen in your inbox: salons' messages on your applications (GET /v1/me/conversations), and their messages and number views (GET /v1/me/profile/contacts)."
           }
         },
         "required": [
@@ -248,15 +248,15 @@
         "properties": {
           "identity": {
             "type": "string",
-            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
           },
           "rightToWork": {
             "type": "string",
-            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
           },
           "qualification": {
             "type": "string",
-            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
           },
           "level": {
             "type": "integer",
@@ -473,7 +473,14 @@
             "properties": {
               "status": {
                 "type": "string",
-                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+                "enum": [
+                  "not_started",
+                  "pending",
+                  "requires_input",
+                  "verified",
+                  "failed",
+                  "expired"
+                ]
               },
               "reference": {
                 "type": ["string", "null"],
@@ -680,9 +687,13 @@
           },
           "job": {
             "$ref": "#/components/schemas/JobSummary"
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "The salon's messages on it you haven't read (D-17)."
           }
         },
-        "required": ["id", "status", "coverNote", "createdAt", "job"]
+        "required": ["id", "status", "coverNote", "createdAt", "job", "unreadMessages"]
       },
       "JobSummary": {
         "type": "object",
@@ -1220,9 +1231,13 @@
           "registered": {
             "type": "boolean",
             "enum": [true]
+          },
+          "delivered": {
+            "type": "boolean",
+            "description": "Whether pushes actually reach phones. `false` when the API can't send them (locally, without an APNs key): watch for news another way, such as checking `GET /v1/me` now and then."
           }
         },
-        "required": ["registered"]
+        "required": ["registered", "delivered"]
       },
       "PushDevice": {
         "type": "object",
@@ -1243,6 +1258,68 @@
           }
         },
         "required": ["platform", "token"]
+      },
+      "NotificationPreferences": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "object",
+            "properties": {
+              "push": {
+                "type": "boolean",
+                "description": "A push to your phones with the app"
+              },
+              "email": {
+                "type": "boolean",
+                "description": "An email, or a text if your account has no email"
+              }
+            },
+            "required": ["push", "email"]
+          },
+          "applications": {
+            "type": "object",
+            "properties": {
+              "push": {
+                "type": "boolean",
+                "description": "A push to your phones with the app"
+              },
+              "email": {
+                "type": "boolean",
+                "description": "An email, or a text if your account has no email"
+              }
+            },
+            "required": ["push", "email"]
+          },
+          "account": {
+            "type": "object",
+            "properties": {
+              "push": {
+                "type": "boolean",
+                "description": "A push to your phones with the app"
+              },
+              "email": {
+                "type": "boolean",
+                "description": "An email, or a text if your account has no email"
+              }
+            },
+            "required": ["push", "email"]
+          }
+        },
+        "required": ["messages", "applications", "account"],
+        "example": {
+          "messages": {
+            "push": true,
+            "email": true
+          },
+          "applications": {
+            "push": true,
+            "email": false
+          },
+          "account": {
+            "push": false,
+            "email": true
+          }
+        }
       },
       "Checks": {
         "type": "object",
@@ -1272,7 +1349,7 @@
           },
           "status": {
             "type": "string",
-            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
           },
           "reference": {
             "type": ["string", "null"],
@@ -1716,7 +1793,7 @@
           },
           "abnStatus": {
             "type": "string",
-            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
           },
           "abnEntityName": {
             "type": ["string", "null"]
@@ -1857,6 +1934,23 @@
           }
         },
         "required": ["items"]
+      },
+      "MySalonWithInbox": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MySalon"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "unreadMessages": {
+                "type": "integer",
+                "description": "Applications with replies your team hasn't read (D-17)."
+              }
+            },
+            "required": ["unreadMessages"]
+          }
+        ]
       },
       "SalonJobs": {
         "type": "object",
@@ -2372,6 +2466,203 @@
           }
         },
         "required": ["phone"]
+      },
+      "SalonApplicants": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalonApplicant"
+            }
+          },
+          "counts": {
+            "type": "object",
+            "properties": {
+              "submitted": {
+                "type": "integer"
+              },
+              "viewed": {
+                "type": "integer"
+              },
+              "shortlisted": {
+                "type": "integer"
+              },
+              "interview": {
+                "type": "integer"
+              },
+              "hired": {
+                "type": "integer"
+              },
+              "declined": {
+                "type": "integer"
+              }
+            },
+            "description": "How many of each status match the other filters."
+          },
+          "total": {
+            "type": "integer",
+            "description": "How many match, whatever their status."
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "More match than were returned: narrow the filters."
+          }
+        },
+        "required": ["items", "counts", "total", "truncated"]
+      },
+      "SalonApplicant": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/Applicant"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "job": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "path": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["draft", "published", "closed"]
+                  }
+                },
+                "required": ["id", "title", "path", "status"]
+              },
+              "unreadMessages": {
+                "type": "integer",
+                "description": "Their messages your team hasn't read (D-17)."
+              },
+              "lastMessageAt": {
+                "type": ["string", "null"],
+                "format": "date-time",
+                "example": "2026-11-25T03:00:00.000Z"
+              }
+            },
+            "required": ["job", "unreadMessages", "lastMessageAt"]
+          }
+        ]
+      },
+      "SalonConversation": {
+        "type": "object",
+        "properties": {
+          "applicant": {
+            "$ref": "#/components/schemas/SalonApplicant"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ApplicationMessage"
+            }
+          },
+          "canSend": {
+            "type": "boolean",
+            "description": "Whether you can write in it now."
+          },
+          "sendHint": {
+            "type": ["string", "null"],
+            "description": "Why not, when you can't (the salon hasn't written yet, today's limit)."
+          }
+        },
+        "required": ["applicant", "messages", "canSend", "sendHint"]
+      },
+      "ApplicationMessage": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "msg_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "from": {
+            "type": "string",
+            "enum": ["salon", "seeker"],
+            "description": "The salon's team, or the applicant."
+          },
+          "senderName": {
+            "type": ["string", "null"],
+            "description": "The writer's first name; null once their account is gone."
+          },
+          "body": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "from", "senderName", "body", "createdAt"]
+      },
+      "MyConversations": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MyConversation"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "MyConversation": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MyApplication"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "lastMessage": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ApplicationMessage"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": ["lastMessage"]
+          }
+        ]
+      },
+      "MyApplicationThread": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MyApplication"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ApplicationMessage"
+                }
+              },
+              "canSend": {
+                "type": "boolean",
+                "description": "Whether you can write in it now."
+              },
+              "sendHint": {
+                "type": ["string", "null"],
+                "description": "Why not, when you can't (the salon hasn't written yet, today's limit)."
+              }
+            },
+            "required": ["messages", "canSend", "sendHint"]
+          }
+        ]
       },
       "Team": {
         "type": "object",
@@ -2935,15 +3226,36 @@
             "properties": {
               "identity": {
                 "type": "string",
-                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+                "enum": [
+                  "not_started",
+                  "pending",
+                  "requires_input",
+                  "verified",
+                  "failed",
+                  "expired"
+                ]
               },
               "rightToWork": {
                 "type": "string",
-                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+                "enum": [
+                  "not_started",
+                  "pending",
+                  "requires_input",
+                  "verified",
+                  "failed",
+                  "expired"
+                ]
               },
               "qualification": {
                 "type": "string",
-                "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+                "enum": [
+                  "not_started",
+                  "pending",
+                  "requires_input",
+                  "verified",
+                  "failed",
+                  "expired"
+                ]
               },
               "level": {
                 "type": "integer",
@@ -3798,7 +4110,7 @@
           },
           "abn_status": {
             "type": "string",
-            "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+            "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
           },
           "status": {
             "type": "string",
@@ -6200,7 +6512,7 @@
           {
             "schema": {
               "type": "string",
-              "enum": ["not_started", "pending", "requires_input", "verified", "failed"]
+              "enum": ["not_started", "pending", "requires_input", "verified", "failed", "expired"]
             },
             "required": false,
             "name": "abn_status",

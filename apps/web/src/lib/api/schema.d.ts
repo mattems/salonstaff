@@ -237,7 +237,7 @@ export interface paths {
     };
     /**
      * Save your basic details
-     * @description Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here.
+     * @description Creates your job seeker profile, or replaces its basics. Your account's name becomes `firstName lastName`. Instagram and TikTok take a handle (`@jess`) or a link to the profile. Salons see your account's verified mobile (change it with POST /v1/me/mobile), not a number here. Changing your first or last name after your ID is verified expires that check (`identity` becomes `expired` in GET /v1/me/checks): verify your ID again (D-16).
      */
     put: {
       parameters: {
@@ -2640,6 +2640,112 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/v1/me/notifications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * What you're told about
+     * @description Push and email, on or off, for each topic: `messages` (messages from salons), `applications` (your applications), `account` (verification and endorsements). Everything is on until you switch it off. Sign-in and security notices, and notices about a salon you manage, always go.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Your choices */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["NotificationPreferences"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    /**
+     * Choose what you're told about
+     * @description Every topic, with `push` and `email`. Email also covers a text when your account has no email.
+     */
+    put: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            messages: {
+              push: boolean;
+              email: boolean;
+            };
+            applications: {
+              push: boolean;
+              email: boolean;
+            };
+            account: {
+              push: boolean;
+              email: boolean;
+            };
+          };
+        };
+      };
+      responses: {
+        /** @description Your choices now */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["NotificationPreferences"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/v1/me/checks": {
     parameters: {
       query?: never;
@@ -3475,7 +3581,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            "application/json": components["schemas"]["MySalon"];
+            "application/json": components["schemas"]["MySalonWithInbox"];
           };
         };
         /** @description Not signed in */
@@ -4035,7 +4141,51 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    get?: never;
+    /**
+     * One application, with its conversation
+     * @description The applicant, the job and every message, oldest first. Opening it marks their messages read (and a new application viewed).
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The application */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["SalonConversation"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
     put?: never;
     post?: never;
     delete?: never;
@@ -4338,6 +4488,540 @@ export interface paths {
         };
         /** @description Today's limit reached */
         429: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/applicants": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Everyone who applied
+     * @description Applicants for all your salon's jobs (or one, with `jobId`), filtered and sorted, with how many of each status match the other filters (`counts`). Up to 200; narrow the filters for more. New applications shown become viewed.
+     */
+    get: {
+      parameters: {
+        query?: {
+          /** @description Only this job's applicants. */
+          jobId?: string;
+          status?: "submitted" | "viewed" | "shortlisted" | "interview" | "hired" | "declined";
+          /** @description `true`: only those with replies your team hasn't read. */
+          unread?: "true" | "false";
+          /** @description Checks that must have passed, comma-separated: `identity`, `right_to_work`, `qualification`. */
+          verified?: string;
+          /** @description `true`: only those open to work. */
+          openToWork?: "true" | "false";
+          minYears?: number | null;
+          /** @description Part of their name. */
+          q?: string;
+          sort?: "newest" | "oldest" | "experience" | "message";
+        };
+        header?: never;
+        path: {
+          salonId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description The applicants */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["SalonApplicants"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/applications/{id}/live": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * The conversation, live
+     * @description Opens a WebSocket for this conversation while it's on screen (D-18). Each new message arrives as `{"type":"message","message":{...}}` (the same message as in the conversation; ignore one you already have) and the applicant typing as `{"type":"typing","from":"salon"|"seeker","name":"..."}`. Send `{"type":"typing"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Switching to the WebSocket */
+        101: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/employer/salons/{salonId}/applications/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Message an applicant
+     * @description Adds to the conversation on their application. They're told by push and email (as their notification settings allow) and reply in their inbox, on the website or in the app; neither of you sees the other's email.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          salonId: string;
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            body: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Sent */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["ApplicationMessage"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Your salon can't send messages now */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/conversations": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Your conversations with salons
+     * @description Your applications a salon has written about, latest message first, with how many of theirs you haven't read.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Your conversations */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MyConversations"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/applications/{id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * One of your applications, with its conversation
+     * @description Where it's up to, and every message with the salon, oldest first. Opening it marks the salon's messages read.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Your application */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["MyApplicationThread"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/applications/{id}/live": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Your conversation, live
+     * @description Opens a WebSocket for this conversation while it's on screen (D-18). Each new message arrives as `{"type":"message","message":{...}}` (the same message as in the conversation; ignore one you already have) and the salon's team typing as `{"type":"typing","from":"salon"|"seeker","name":"..."}`. Send `{"type":"typing"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.
+     */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Switching to the WebSocket */
+        101: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content?: never;
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/v1/me/applications/{id}/messages": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reply to the salon
+     * @description Once the salon has written about your application. The people the job notifies are told by push and email.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            body: string;
+          };
+        };
+      };
+      responses: {
+        /** @description Sent */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": components["schemas"]["ApplicationMessage"];
+          };
+        };
+        /** @description The request is not valid */
+        400: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not signed in */
+        401: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not allowed for this account */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Not found */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description The salon hasn't written yet */
+        409: {
           headers: {
             [name: string]: unknown;
           };
@@ -5876,7 +6560,7 @@ export interface components {
       verification: components["schemas"]["Verification"];
       /** @description The salons you're on the team of, in the order you joined them. */
       salons: components["schemas"]["OwnSalonSummary"][];
-      /** @description Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts). */
+      /** @description What you haven't seen in your inbox: salons' messages on your applications (GET /v1/me/conversations), and their messages and number views (GET /v1/me/profile/contacts). */
       unreadMessages: number;
     };
     SeekerProfile: {
@@ -5941,11 +6625,17 @@ export interface components {
     };
     Verification: {
       /** @enum {string} */
-      identity: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      identity: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @enum {string} */
-      rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @enum {string} */
-      qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      qualification:
+        | "not_started"
+        | "pending"
+        | "requires_input"
+        | "verified"
+        | "failed"
+        | "expired";
       /** @description 0 not verified, 1 ID verified, 2 work-ready (ID and right to work). */
       level: number;
       /** @description Verification IDs of passed checks (`SSV-7K3M-9QXA`). Only these are kept, never documents. */
@@ -6029,7 +6719,7 @@ export interface components {
       /** @description The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent. */
       verification: {
         /** @enum {string} */
-        status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        status: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
         /** @description The verification ID (`SSV-…`) once passed. Not on share pages. */
         reference: string | null;
       } | null;
@@ -6109,6 +6799,8 @@ export interface components {
        */
       createdAt: string;
       job: components["schemas"]["JobSummary"];
+      /** @description The salon's messages on it you haven't read (D-17). */
+      unreadMessages: number;
     };
     JobSummary: {
       /** @example job_01k6q2x8h4f7tbn3m9vz5cdr0e */
@@ -6349,6 +7041,8 @@ export interface components {
     PushDeviceRegistered: {
       /** @enum {boolean} */
       registered: true;
+      /** @description Whether pushes actually reach phones. `false` when the API can't send them (locally, without an APNs key): watch for news another way, such as checking `GET /v1/me` now and then. */
+      delivered: boolean;
     };
     PushDevice: {
       /** @enum {string} */
@@ -6361,6 +7055,42 @@ export interface components {
        */
       sandbox: boolean;
     };
+    /**
+     * @example {
+     *       "messages": {
+     *         "push": true,
+     *         "email": true
+     *       },
+     *       "applications": {
+     *         "push": true,
+     *         "email": false
+     *       },
+     *       "account": {
+     *         "push": false,
+     *         "email": true
+     *       }
+     *     }
+     */
+    NotificationPreferences: {
+      messages: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+      applications: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+      account: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+    };
     Checks: {
       verification: components["schemas"]["Verification"];
       checks: components["schemas"]["Check"][];
@@ -6371,7 +7101,7 @@ export interface components {
       /** @enum {string} */
       kind: "identity" | "right_to_work" | "qualification";
       /** @enum {string} */
-      status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      status: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @description The verification ID, once passed. */
       reference: string | null;
       /** @description A qualification's name. */
@@ -6554,7 +7284,7 @@ export interface components {
       path: string;
       abn: string | null;
       /** @enum {string} */
-      abnStatus: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      abnStatus: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       abnEntityName: string | null;
       contactName: string | null;
       phone: string | null;
@@ -6610,6 +7340,10 @@ export interface components {
     };
     MySalons: {
       items: components["schemas"]["MySalon"][];
+    };
+    MySalonWithInbox: components["schemas"]["MySalon"] & {
+      /** @description Applications with replies your team hasn't read (D-17). */
+      unreadMessages: number;
     };
     SalonJobs: {
       items: components["schemas"]["SalonJob"][];
@@ -6831,6 +7565,76 @@ export interface components {
       /** @example +61412345678 */
       phone: string;
     };
+    SalonApplicants: {
+      items: components["schemas"]["SalonApplicant"][];
+      /** @description How many of each status match the other filters. */
+      counts: {
+        submitted?: number;
+        viewed?: number;
+        shortlisted?: number;
+        interview?: number;
+        hired?: number;
+        declined?: number;
+      };
+      /** @description How many match, whatever their status. */
+      total: number;
+      /** @description More match than were returned: narrow the filters. */
+      truncated: boolean;
+    };
+    SalonApplicant: components["schemas"]["Applicant"] & {
+      job: {
+        id: string;
+        title: string;
+        path: string;
+        /** @enum {string} */
+        status: "draft" | "published" | "closed";
+      };
+      /** @description Their messages your team hasn't read (D-17). */
+      unreadMessages: number;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      lastMessageAt: string | null;
+    };
+    SalonConversation: {
+      applicant: components["schemas"]["SalonApplicant"];
+      messages: components["schemas"]["ApplicationMessage"][];
+      /** @description Whether you can write in it now. */
+      canSend: boolean;
+      /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
+      sendHint: string | null;
+    };
+    ApplicationMessage: {
+      /** @example msg_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /**
+       * @description The salon's team, or the applicant.
+       * @enum {string}
+       */
+      from: "salon" | "seeker";
+      /** @description The writer's first name; null once their account is gone. */
+      senderName: string | null;
+      body: string;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    MyConversations: {
+      items: components["schemas"]["MyConversation"][];
+    };
+    MyConversation: components["schemas"]["MyApplication"] & {
+      lastMessage: components["schemas"]["ApplicationMessage"] | null;
+    };
+    MyApplicationThread: components["schemas"]["MyApplication"] & {
+      messages: components["schemas"]["ApplicationMessage"][];
+      /** @description Whether you can write in it now. */
+      canSend: boolean;
+      /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
+      sendHint: string | null;
+    };
     Team: {
       /** @description Owners first. */
       members: components["schemas"]["TeamMember"][];
@@ -7042,11 +7846,23 @@ export interface components {
       endorsements: components["schemas"]["Endorsement"][];
       verification: {
         /** @enum {string} */
-        identity: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        identity: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
         /** @enum {string} */
-        rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        rightToWork:
+          | "not_started"
+          | "pending"
+          | "requires_input"
+          | "verified"
+          | "failed"
+          | "expired";
         /** @enum {string} */
-        qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        qualification:
+          | "not_started"
+          | "pending"
+          | "requires_input"
+          | "verified"
+          | "failed"
+          | "expired";
         /** @description 0 not verified, 1 ID verified, 2 work-ready (ID and right to work). */
         level: number;
         /**

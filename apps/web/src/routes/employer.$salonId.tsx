@@ -1,3 +1,4 @@
+import { Badge } from "@salonstaff/ui/components/badge";
 import { Button } from "@salonstaff/ui/components/button";
 import {
   DropdownMenu,
@@ -26,6 +27,7 @@ export const Route = createFileRoute("/employer/$salonId")({
 
 const TABS = [
   { to: "/employer/$salonId", label: "Dashboard", exact: true },
+  { to: "/employer/$salonId/applicants", label: "Applicants", inbox: true },
   { to: "/employer/$salonId/jobs/new", label: "Post a job" },
   { to: "/employer/$salonId/team", label: "Team" },
   { to: "/employer/$salonId/billing", label: "Billing", owners: true },
@@ -47,6 +49,11 @@ function SalonLayout() {
               activeProps={{ className: "bg-muted" }}
             >
               {tab.label}
+              {"inbox" in tab && salon.unreadMessages > 0 && (
+                <Badge className="ml-1" aria-label={`${salon.unreadMessages} with unread replies`}>
+                  {salon.unreadMessages}
+                </Badge>
+              )}
             </Link>
           </Button>
         ))}

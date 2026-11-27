@@ -172,7 +172,9 @@ function IdentityStep({
           ? 'Your ID has been verified. Salons see your “ID verified” badge.'
           : status === 'pending'
             ? 'We’re reviewing your ID. This usually takes a few minutes.'
-            : 'Scan your driver licence or passport and take a quick selfie. Takes about 2 minutes.'
+            : status === 'expired'
+              ? 'Your name changed after your ID was checked, so verify it again with the ID in your new name.'
+              : 'Scan your driver licence or passport and take a quick selfie. Takes about 2 minutes.'
       }>
       <ErrorBanner message={error} />
       {status === 'pending' ? (

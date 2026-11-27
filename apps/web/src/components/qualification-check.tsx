@@ -42,6 +42,7 @@ const STATUS: Record<Schemas["Verification"]["identity"], string> = {
   requires_input: "Needs another try",
   verified: "Verified",
   failed: "Not verified: try again",
+  expired: "Verify again",
 };
 
 /** One qualification with its status and, until it's verified, a way to send the certificate. */

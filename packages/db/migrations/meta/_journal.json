@@ -64,6 +64,20 @@
       "when": 1795752757767,
       "tag": "0008_push_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1795758846166,
+      "tag": "0009_notification_preferences",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1795760567693,
+      "tag": "0010_application_messages",
+      "breakpoints": true
     }
   ]
 }

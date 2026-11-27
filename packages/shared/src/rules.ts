@@ -101,6 +101,20 @@ export function nameMatches(
   return pl === idl && (idf.startsWith(pf) || pf.startsWith(idf));
 }
 
+/**
+ * Whether a profile name change means the ID check has to be done again (D-16): the first or last
+ * name is different, ignoring case, accents and punctuation ("jess o'brien" → "Jess OBrien" isn't).
+ */
+export function nameChangeExpiresIdentity(
+  before: { firstName: string; lastName: string },
+  after: { firstName: string; lastName: string },
+): boolean {
+  return (
+    nameKey(before.firstName) !== nameKey(after.firstName) ||
+    nameKey(before.lastName) !== nameKey(after.lastName)
+  );
+}
+
 // ---------- Applying ----------
 
 export type ApplyBlocker =
@@ -275,4 +289,33 @@ export const roughCoordinate = (degrees: number) => Math.round(degrees * 100) / 
 export function formatDistance(km: number): string {
   if (km < 1) return `${Math.max(100, Math.round((km * 1000) / 100) * 100)}m`;
   return `${Math.round(km)}km`;
+}
+
+// ---------- Conversations on applications (D-17) ----------
+
+export type MessageBlocker = "salon_suspended" | "wait_for_salon";
+
+/**
+ * Why one side can't write in an application's conversation right now, or null if they can. The
+ * applicant replies once the salon has written. There's no daily limit: it's a live conversation.
+ */
+export function messageBlockerOf(input: {
+  side: "salon" | "seeker";
+  salonActive: boolean;
+  salonHasWritten: boolean;
+}): MessageBlocker | null {
+  if (!input.salonActive) return "salon_suspended";
+  if (input.side === "seeker" && !input.salonHasWritten) return "wait_for_salon";
+  return null;
+}
+
+/** A quick reply with the applicant's first name, the job and the salon filled in. */
+export function fillQuickReply(
+  text: string,
+  values: { firstName: string; job: string; salon: string },
+): string {
+  return text
+    .replaceAll("{firstName}", values.firstName.trim() || "there")
+    .replaceAll("{job}", values.job.trim())
+    .replaceAll("{salon}", values.salon.trim());
 }

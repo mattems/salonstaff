@@ -1504,7 +1504,13 @@ export interface paths {
           /** @description The `next_cursor` from the previous page. Omit for the first page. */
           cursor?: string;
           q?: string;
-          abn_status?: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+          abn_status?:
+            | "not_started"
+            | "pending"
+            | "requires_input"
+            | "verified"
+            | "failed"
+            | "expired";
           claimed?: "claimed" | "unclaimed";
           status?: "active" | "suspended" | "removed";
         };
@@ -3012,7 +3018,7 @@ export interface components {
       verification: components["schemas"]["Verification"];
       /** @description The salons you're on the team of, in the order you joined them. */
       salons: components["schemas"]["OwnSalonSummary"][];
-      /** @description Salons' messages and number views you haven't seen in your inbox (GET /v1/me/profile/contacts). */
+      /** @description What you haven't seen in your inbox: salons' messages on your applications (GET /v1/me/conversations), and their messages and number views (GET /v1/me/profile/contacts). */
       unreadMessages: number;
     };
     SeekerProfile: {
@@ -3077,11 +3083,17 @@ export interface components {
     };
     Verification: {
       /** @enum {string} */
-      identity: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      identity: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @enum {string} */
-      rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @enum {string} */
-      qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      qualification:
+        | "not_started"
+        | "pending"
+        | "requires_input"
+        | "verified"
+        | "failed"
+        | "expired";
       /** @description 0 not verified, 1 ID verified, 2 work-ready (ID and right to work). */
       level: number;
       /** @description Verification IDs of passed checks (`SSV-7K3M-9QXA`). Only these are kept, never documents. */
@@ -3165,7 +3177,7 @@ export interface components {
       /** @description The qualification check for this entry (POST /v1/me/checks/qualification with its `id`). Null if none was sent. */
       verification: {
         /** @enum {string} */
-        status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        status: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
         /** @description The verification ID (`SSV-…`) once passed. Not on share pages. */
         reference: string | null;
       } | null;
@@ -3245,6 +3257,8 @@ export interface components {
        */
       createdAt: string;
       job: components["schemas"]["JobSummary"];
+      /** @description The salon's messages on it you haven't read (D-17). */
+      unreadMessages: number;
     };
     JobSummary: {
       /** @example job_01k6q2x8h4f7tbn3m9vz5cdr0e */
@@ -3485,6 +3499,8 @@ export interface components {
     PushDeviceRegistered: {
       /** @enum {boolean} */
       registered: true;
+      /** @description Whether pushes actually reach phones. `false` when the API can't send them (locally, without an APNs key): watch for news another way, such as checking `GET /v1/me` now and then. */
+      delivered: boolean;
     };
     PushDevice: {
       /** @enum {string} */
@@ -3497,6 +3513,42 @@ export interface components {
        */
       sandbox: boolean;
     };
+    /**
+     * @example {
+     *       "messages": {
+     *         "push": true,
+     *         "email": true
+     *       },
+     *       "applications": {
+     *         "push": true,
+     *         "email": false
+     *       },
+     *       "account": {
+     *         "push": false,
+     *         "email": true
+     *       }
+     *     }
+     */
+    NotificationPreferences: {
+      messages: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+      applications: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+      account: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+    };
     Checks: {
       verification: components["schemas"]["Verification"];
       checks: components["schemas"]["Check"][];
@@ -3507,7 +3559,7 @@ export interface components {
       /** @enum {string} */
       kind: "identity" | "right_to_work" | "qualification";
       /** @enum {string} */
-      status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      status: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @description The verification ID, once passed. */
       reference: string | null;
       /** @description A qualification's name. */
@@ -3690,7 +3742,7 @@ export interface components {
       path: string;
       abn: string | null;
       /** @enum {string} */
-      abnStatus: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      abnStatus: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       abnEntityName: string | null;
       contactName: string | null;
       phone: string | null;
@@ -3746,6 +3798,10 @@ export interface components {
     };
     MySalons: {
       items: components["schemas"]["MySalon"][];
+    };
+    MySalonWithInbox: components["schemas"]["MySalon"] & {
+      /** @description Applications with replies your team hasn't read (D-17). */
+      unreadMessages: number;
     };
     SalonJobs: {
       items: components["schemas"]["SalonJob"][];
@@ -3967,6 +4023,76 @@ export interface components {
       /** @example +61412345678 */
       phone: string;
     };
+    SalonApplicants: {
+      items: components["schemas"]["SalonApplicant"][];
+      /** @description How many of each status match the other filters. */
+      counts: {
+        submitted?: number;
+        viewed?: number;
+        shortlisted?: number;
+        interview?: number;
+        hired?: number;
+        declined?: number;
+      };
+      /** @description How many match, whatever their status. */
+      total: number;
+      /** @description More match than were returned: narrow the filters. */
+      truncated: boolean;
+    };
+    SalonApplicant: components["schemas"]["Applicant"] & {
+      job: {
+        id: string;
+        title: string;
+        path: string;
+        /** @enum {string} */
+        status: "draft" | "published" | "closed";
+      };
+      /** @description Their messages your team hasn't read (D-17). */
+      unreadMessages: number;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      lastMessageAt: string | null;
+    };
+    SalonConversation: {
+      applicant: components["schemas"]["SalonApplicant"];
+      messages: components["schemas"]["ApplicationMessage"][];
+      /** @description Whether you can write in it now. */
+      canSend: boolean;
+      /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
+      sendHint: string | null;
+    };
+    ApplicationMessage: {
+      /** @example msg_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      /**
+       * @description The salon's team, or the applicant.
+       * @enum {string}
+       */
+      from: "salon" | "seeker";
+      /** @description The writer's first name; null once their account is gone. */
+      senderName: string | null;
+      body: string;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    MyConversations: {
+      items: components["schemas"]["MyConversation"][];
+    };
+    MyConversation: components["schemas"]["MyApplication"] & {
+      lastMessage: components["schemas"]["ApplicationMessage"] | null;
+    };
+    MyApplicationThread: components["schemas"]["MyApplication"] & {
+      messages: components["schemas"]["ApplicationMessage"][];
+      /** @description Whether you can write in it now. */
+      canSend: boolean;
+      /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
+      sendHint: string | null;
+    };
     Team: {
       /** @description Owners first. */
       members: components["schemas"]["TeamMember"][];
@@ -4178,11 +4304,23 @@ export interface components {
       endorsements: components["schemas"]["Endorsement"][];
       verification: {
         /** @enum {string} */
-        identity: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        identity: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
         /** @enum {string} */
-        rightToWork: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        rightToWork:
+          | "not_started"
+          | "pending"
+          | "requires_input"
+          | "verified"
+          | "failed"
+          | "expired";
         /** @enum {string} */
-        qualification: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+        qualification:
+          | "not_started"
+          | "pending"
+          | "requires_input"
+          | "verified"
+          | "failed"
+          | "expired";
         /** @description 0 not verified, 1 ID verified, 2 work-ready (ID and right to work). */
         level: number;
         /**
@@ -4462,7 +4600,7 @@ export interface components {
       } | null;
       abn: string | null;
       /** @enum {string} */
-      abn_status: "not_started" | "pending" | "requires_input" | "verified" | "failed";
+      abn_status: "not_started" | "pending" | "requires_input" | "verified" | "failed" | "expired";
       /** @enum {string} */
       status: "active" | "suspended" | "removed";
       status_reason: string | null;

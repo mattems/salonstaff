@@ -44,6 +44,11 @@ const GONE = new Set(["BadDeviceToken", "Unregistered", "DeviceTokenNotForTopic"
  * Apple's push service (APNs) when the API has an APNs key; locally without one, Mailpit (as an
  * email to push+<userId>@local.test). Null when pushes can't be sent: notices still go by email.
  */
+/** Whether pushes reach phones: Apple's push service is set up (locally they go to Mailpit instead). */
+export function pushesReachPhones(env: Env): boolean {
+  return !!(env.APNS_KEY_ID && env.APNS_PRIVATE_KEY && env.APPLE_TEAM_ID && env.APPLE_BUNDLE_ID);
+}
+
 export function pushSenderFromEnv(env: Env, email: () => EmailSender): PushSender | null {
   const { APNS_KEY_ID, APNS_PRIVATE_KEY, APPLE_TEAM_ID, APPLE_BUNDLE_ID } = env;
   if (APNS_KEY_ID && APNS_PRIVATE_KEY && APPLE_TEAM_ID && APPLE_BUNDLE_ID) {

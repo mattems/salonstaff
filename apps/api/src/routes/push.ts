@@ -1,14 +1,16 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { myPushDevice } from "@salonstaff/db";
+import { myPushDevice, notificationSettings } from "@salonstaff/db";
+import { NOTIFICATION_TOPICS, notificationPreferencesSchema } from "@salonstaff/shared";
 import { userActor } from "../lib/actor";
+import { pushesReachPhones } from "../lib/push";
 import { createRouter } from "../lib/router";
 import { Deleted, errors, json, jsonBody } from "../lib/schemas";
 import { requireUser } from "../lib/session";
 
-/** Push notifications to the app (D-15): the phone you're signed in on. */
+/** Notifications (D-15): what you hear about, and push to the phone you're signed in on. */
 export const pushRoutes = createRouter();
 
-const TAGS = ["Push notifications"];
+const TAGS = ["Notifications"];
 
 const PushDeviceSchema = z
   .object({
@@ -25,7 +27,15 @@ const PushDeviceSchema = z
   })
   .openapi("PushDevice");
 
-const RegisteredSchema = z.object({ registered: z.literal(true) }).openapi("PushDeviceRegistered");
+const RegisteredSchema = z
+  .object({
+    registered: z.literal(true),
+    delivered: z.boolean().openapi({
+      description:
+        "Whether pushes actually reach phones. `false` when the API can't send them (locally, without an APNs key): watch for news another way, such as checking `GET /v1/me` now and then.",
+    }),
+  })
+  .openapi("PushDeviceRegistered");
 
 pushRoutes.openapi(
   createRoute({
@@ -51,7 +61,7 @@ pushRoutes.openapi(
         userActor(c, user.id),
       );
     }
-    return c.json({ registered: true as const }, 200);
+    return c.json({ registered: true as const, delivered: pushesReachPhones(c.env) }, 200);
   },
 );
 
@@ -70,5 +80,68 @@ pushRoutes.openapi(
       await myPushDevice(await c.get("db")(), user.id, session.id).remove(userActor(c, user.id));
     }
     return c.json({ deleted: true as const }, 200);
+  },
+);
+
+const topics = NOTIFICATION_TOPICS.map((t) => `\`${t.value}\` (${t.label.toLowerCase()})`).join(
+  ", ",
+);
+
+const Channels = z.object({
+  push: z.boolean().openapi({ description: "A push to your phones with the app" }),
+  email: z.boolean().openapi({ description: "An email, or a text if your account has no email" }),
+});
+const NotificationPreferencesSchema = z
+  .object({ messages: Channels, applications: Channels, account: Channels })
+  .openapi("NotificationPreferences", {
+    example: {
+      messages: { push: true, email: true },
+      applications: { push: true, email: false },
+      account: { push: false, email: true },
+    },
+  });
+
+pushRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/me/notifications",
+    summary: "What you're told about",
+    description: `Push and email, on or off, for each topic: ${topics}. Everything is on until you switch it off. Sign-in and security notices, and notices about a salon you manage, always go.`,
+    tags: TAGS,
+    responses: {
+      200: json(NotificationPreferencesSchema, "Your choices"),
+      401: errors[401],
+    },
+  }),
+  async (c) => {
+    const { user } = await requireUser(c);
+    return c.json(await notificationSettings(await c.get("db")(), user.id).get(), 200);
+  },
+);
+
+pushRoutes.openapi(
+  createRoute({
+    method: "put",
+    path: "/v1/me/notifications",
+    summary: "Choose what you're told about",
+    description:
+      "Every topic, with `push` and `email`. Email also covers a text when your account has no email.",
+    tags: TAGS,
+    request: jsonBody(notificationPreferencesSchema),
+    responses: {
+      200: json(NotificationPreferencesSchema, "Your choices now"),
+      400: errors[400],
+      401: errors[401],
+    },
+  }),
+  async (c) => {
+    const { user } = await requireUser(c);
+    const input = c.req.valid("json");
+    if (c.get("dryRun")) return c.json(input, 200);
+    const saved = await notificationSettings(await c.get("db")(), user.id).save(
+      input,
+      userActor(c, user.id),
+    );
+    return c.json(saved, 200);
   },
 );

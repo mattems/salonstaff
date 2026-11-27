@@ -38,7 +38,7 @@ bun run deploy  # production (docs/runbooks/first-deploy.md)
 
 | Path | What |
 |---|---|
-| `apps/api` | Hono on a Cloudflare Worker: `/v1/*` (website + mobile), `/v1/auth/*` (Better Auth), `/admin/v1/*` |
+| `apps/api` | Hono on a Cloudflare Worker: `/v1/*` (website + mobile), `/v1/auth/*` (Better Auth), `/admin/v1/*`; the `ConversationRoom` Durable Object for live conversations (D-18) |
 | `apps/web` | TanStack Start (SSR) on a Worker: salonstaff.com.au. Forwards `/api/*` to the API |
 | `apps/admin` | React + Vite admin portal from kaybee: admin.salonstaff.com.au, behind Cloudflare Access |
 | `apps/springboard` | Local launcher (:4100), never deployed |
@@ -52,7 +52,7 @@ bun run deploy  # production (docs/runbooks/first-deploy.md)
 ## Rules that apply everywhere
 
 - **Data access goes through scopes in `packages/db`** (`publicSite`, `seeker`, `signIns`, `salonScope`,
-  `claims`, `checks`, `myPushDevice`/`pushDevicesOf`, `backOffice` behind the staff gate, `housekeeping` in the cron). The API never
+  `claims`, `checks`, `myPushDevice`/`pushDevicesOf`, `notificationSettings`, `salonConversations`/`seekerConversations`, `backOffice` behind the staff gate, `housekeeping` in the cron). The API never
   imports tables; a test enforces it.
 - **Rules that decide things are pure functions with table tests** in `packages/shared`
   (`entitlementOf`, `eligibilityOf`, `verificationLevel`, `jobPath`/`parseJobsPath`…). Change a rule there only.

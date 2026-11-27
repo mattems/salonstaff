@@ -4,9 +4,17 @@ import { serverHooks } from "./lib/server-context";
 import { routeTree } from "./routeTree.gen";
 
 export function getRouter() {
+  let shownHref: string | undefined;
   return createRouter({
     routeTree,
-    scrollRestoration: true,
+    // Scroll positions are restored when you move between pages, not when the page you're on
+    // reloads its data (`router.invalidate()`): that would pull a live conversation back up
+    // from the message that just arrived.
+    scrollRestoration: ({ location }) => {
+      const moved = location.href !== shownHref;
+      shownHref = location.href;
+      return moved;
+    },
     defaultPreload: "intent",
     // Loaders re-run on every visit: pages show who is signed in, and what they've done.
     defaultPreloadStaleTime: 0,

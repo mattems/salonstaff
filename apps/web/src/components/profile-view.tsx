@@ -87,6 +87,7 @@ const NOT_VERIFIED: Record<Status, string> = {
   requires_input: "Not yet",
   failed: "Not verified",
   verified: "Verified",
+  expired: "Not verified",
 };
 
 /** The blue tick by the name: ID and right to work both verified by Salon Staff. */

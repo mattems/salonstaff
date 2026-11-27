@@ -3,6 +3,9 @@ import { createApp } from "./app";
 import type { Env } from "./env";
 import { housekeeping } from "./lib/housekeeping";
 
+/** Durable Objects the Worker hosts (wrangler.jsonc `durable_objects`). */
+export { ConversationRoom } from "./live/conversation-room";
+
 const app = createApp();
 
 export default {
