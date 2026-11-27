@@ -185,6 +185,12 @@ describe("salons contacting a job seeker", () => {
     // Cold (not applied, not replied): once a day to the same person.
     expect((await write("Just checking you got that?")).status).toBe(429);
 
+    // A dry run says a look is allowed, never the number: a look is recorded and counted.
+    const tried = await owner.api<{ phone: string }>(
+      "POST",
+      owner.at(`/candidates/${seekerId}/phone?dry_run=true`),
+    );
+    expect(tried).toMatchObject({ status: 200, body: { phone: "" } });
     const phone = await owner.api<{ phone: string }>(
       "POST",
       owner.at(`/candidates/${seekerId}/phone`),

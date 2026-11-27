@@ -7,6 +7,7 @@ import {
   ApiError,
   type ApplicationStatus,
   type AuState,
+  BRAND,
   type ContactLimit,
   contactLimitReached,
   type Entitlement,
@@ -14,6 +15,7 @@ import {
   isFoundingSlot,
   type JobInput,
   jobBaseSlug,
+  LIMITS,
   PRICING,
   type SalonAccess,
   type SalonInput,
@@ -22,7 +24,7 @@ import {
   slugify,
   type VerificationStatus,
 } from "@salonstaff/shared";
-import { and, count, desc, eq, gt, inArray, isNull, type SQL, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, inArray, isNull, ne, type SQL, sql } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, summariesFor } from "./checks";
 import { addMessage, type ConversationMessage, conversationFor } from "./conversation-rows";
@@ -30,6 +32,7 @@ import type { Db } from "./index";
 import {
   applications,
   jobs,
+  launchTermsGiven,
   payments,
   profileContacts,
   type SalonRole,
@@ -53,6 +56,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export interface AbnCheck {
   status: VerificationStatus;
   entityName: string | null;
+  /** Every name the register has for the ABN (the entity and its business names). */
+  names?: string[];
 }
 
 export interface Contact {
@@ -212,11 +217,43 @@ export async function makeEmployer(tx: Executor, userId: string, actor: Actor): 
   }
 }
 
-/** A new or claimed salon's launch terms (D-05): the free period, and a founding place if any are left. */
-export async function launchTerms(tx: Executor, alreadyFounding = false) {
+/**
+ * A new or claimed salon's launch terms (D-05): the free period, and a founding place if any are
+ * left. Given once per verified ABN and once per salon: the same ABN again (the salon deleted and made
+ * again, or another salon with it) keeps the first free period and takes no founding place, and a
+ * listing claimed a second time keeps the free period it had.
+ */
+export async function launchTerms(
+  tx: Executor,
+  salon: {
+    abn: string | null;
+    /** Whether the ABN is verified as this salon's (`salonAbnStatus`, or the claim's). */
+    abnVerified: boolean;
+    founding?: boolean;
+    freeUntil?: Date | null;
+  },
+) {
+  // One at a time, so two salons made at once can't both take the last founding place.
+  await tx.execute(sql`select pg_advisory_xact_lock(hashtext('launch_terms'))`);
+  const fresh = new Date(Date.now() + PRICING.freePeriodDays * DAY_MS);
+  if (salon.freeUntil) return { founding: salon.founding ?? false, freeUntil: salon.freeUntil };
+  // Only an ABN we know is the salon's stands for it: ABNs are public, so anyone could type a
+  // real business's and use up its free period before it arrives.
+  if (!salon.abn || !salon.abnVerified) {
+    return {
+      founding: salon.founding || isFoundingSlot(await foundingSoFar(tx)),
+      freeUntil: fresh,
+    };
+  }
+  const [given] = await tx
+    .select()
+    .from(launchTermsGiven)
+    .where(eq(launchTermsGiven.abn, salon.abn));
+  if (given) return { founding: salon.founding ?? false, freeUntil: given.freeUntil };
+  await tx.insert(launchTermsGiven).values({ abn: salon.abn, freeUntil: fresh });
   return {
-    founding: alreadyFounding || isFoundingSlot(await foundingSoFar(tx)),
-    freeUntil: new Date(Date.now() + PRICING.freePeriodDays * DAY_MS),
+    founding: salon.founding || isFoundingSlot(await foundingSoFar(tx)),
+    freeUntil: fresh,
   };
 }
 
@@ -268,9 +305,70 @@ export function salonsFor(db: Db) {
      * A new salon, owned by the person who makes it, with the free period and (if any are left)
      * founding pricing. An account can make any number (D-11).
      */
+    /**
+     * The Stripe subscriptions of salons this person is the only owner of: the ones that go (or
+     * are handed back) with their account, to cancel first.
+     */
+    async soleOwnerSubscriptions(userId: string): Promise<string[]> {
+      const rows = await db
+        .select({ id: salons.stripeSubscriptionId })
+        .from(salonMembers)
+        .innerJoin(salons, eq(salons.id, salonMembers.salonId))
+        .where(
+          and(
+            eq(salonMembers.userId, userId),
+            eq(salonMembers.role, "owner"),
+            sql`${salons.stripeSubscriptionId} is not null`,
+            // One that has already ended needs nothing done.
+            sql`coalesce(${salons.subscriptionStatus}, '') not in ('canceled', 'incomplete_expired')`,
+            sql`not exists (select 1 from salon_members m where m.salon_id = "salons"."id"
+              and m.role = 'owner' and m.user_id <> ${userId})`,
+          ),
+        );
+      return rows.map((row) => row.id).filter((id): id is string => Boolean(id));
+    },
+
+    /** Whether this person owns a salon with this ABN that's already verified (another location). */
+    async ownsVerifiedWithAbn(userId: string, abn: string, exceptSalonId?: string) {
+      const [row] = await db
+        .select({ id: salons.id })
+        .from(salonMembers)
+        .innerJoin(salons, eq(salons.id, salonMembers.salonId))
+        .where(
+          and(
+            eq(salonMembers.userId, userId),
+            eq(salonMembers.role, "owner"),
+            eq(salons.abn, abn),
+            eq(salons.abnStatus, "verified"),
+            exceptSalonId ? ne(salons.id, exceptSalonId) : undefined,
+          ),
+        )
+        .limit(1);
+      return Boolean(row);
+    },
+
     async create(ownerId: string, input: SalonInput, abn: AbnCheck, actor: Actor): Promise<Salon> {
       return retryOnSlugClash(() =>
         db.transaction(async (tx) => {
+          // One person's creates happen one at a time, so two at once can't both pass the cap.
+          await tx.select({ id: users.id }).from(users).where(eq(users.id, ownerId)).for("update");
+          const [made] = await tx
+            .select({ n: count() })
+            .from(salonMembers)
+            .innerJoin(salons, eq(salons.id, salonMembers.salonId))
+            .where(
+              and(
+                eq(salonMembers.userId, ownerId),
+                eq(salonMembers.role, "owner"),
+                eq(salons.source, "owner"),
+              ),
+            );
+          if ((made?.n ?? 0) >= LIMITS.salonsPerAccount) {
+            throw new ApiError("conflict", {
+              detail: `One account can create up to ${LIMITS.salonsPerAccount} salons`,
+              hint: `Running more locations than that? Contact ${BRAND.supportEmail} and we'll add them.`,
+            });
+          }
           const place = await placeSlug(tx, "salon", {
             state: input.state,
             suburb: input.suburb,
@@ -284,7 +382,10 @@ export function salonsFor(db: Db) {
               abnStatus: abn.status,
               abnEntityName: abn.entityName,
               source: "owner",
-              ...(await launchTerms(tx)),
+              ...(await launchTerms(tx, {
+                abn: input.abn,
+                abnVerified: abn.status === "verified",
+              })),
             })
             .returning();
           const salon = row as Salon;
@@ -833,9 +934,20 @@ export function salonScope(db: Db, salonId: string) {
               ),
             )
             .then(([row]) => row?.n ?? 0);
-        const [salonToday, personToday] = await Promise.all([
+        const [salonToday, personToday, [sender]] = await Promise.all([
           today(sql`true`),
           today(eq(profileContacts.seekerId, userId)),
+          // The same person's looks from every salon they're on.
+          tx
+            .select({ n: count() })
+            .from(profileContacts)
+            .where(
+              and(
+                eq(profileContacts.senderId, senderId),
+                eq(profileContacts.kind, "phone"),
+                gt(profileContacts.createdAt, dayAgo),
+              ),
+            ),
         ]);
         const [profile] = await tx
           .select({ firstName: seekerProfiles.firstName })
@@ -843,7 +955,11 @@ export function salonScope(db: Db, salonId: string) {
           .where(eq(seekerProfiles.userId, userId));
         const result = { contact: found.contact, firstName: profile?.firstName ?? "" };
         if (personToday > 0) return { ...result, added: null };
-        const limit = contactLimitReached({ kind: "phone", salonToday });
+        const limit = contactLimitReached({
+          kind: "phone",
+          salonToday,
+          senderToday: sender?.n ?? 0,
+        });
         if (limit) {
           throw new ApiError("rate_limited", {
             detail: CONTACT_LIMIT_DETAIL[limit],
@@ -935,6 +1051,44 @@ export function salonScope(db: Db, salonId: string) {
           after: { kind: input.kind, amountCents: input.amountCents, provider: input.provider },
         });
         return payment;
+      });
+    },
+
+    /** The salon's plan checkouts that were started and not finished. */
+    async openPlanCheckouts(): Promise<{ id: string; checkoutRef: string | null }[]> {
+      return db
+        .select({ id: payments.id, checkoutRef: payments.checkoutRef })
+        .from(payments)
+        .where(
+          and(
+            eq(payments.salonId, salonId),
+            eq(payments.status, "pending"),
+            inArray(payments.kind, ["salon_plan", "founding_plan"]),
+          ),
+        );
+    },
+
+    /** Marks an unfinished checkout failed, once it can no longer be paid: a new one replaces it. */
+    async endCheckout(paymentId: string, actor: Actor): Promise<void> {
+      await db.transaction(async (tx) => {
+        const [row] = await tx
+          .update(payments)
+          .set({ status: "failed" })
+          .where(
+            and(
+              eq(payments.id, paymentId),
+              eq(payments.salonId, salonId),
+              eq(payments.status, "pending"),
+            ),
+          )
+          .returning({ id: payments.id });
+        if (!row) return;
+        await recordAudit(tx, actor, {
+          action: "payment.failed",
+          targetType: "payment",
+          targetId: row.id,
+          reason: "Replaced by a new checkout",
+        });
       });
     },
 

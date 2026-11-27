@@ -11,6 +11,7 @@ import {
   PRICING,
   slugify,
   type VerificationStatus,
+  webAddress,
 } from "@salonstaff/shared";
 import {
   and,
@@ -69,6 +70,8 @@ export interface FilesToDelete {
   media: string[];
   /** Keys in the PRIVATE bucket. */
   private: string[];
+  /** Stripe subscriptions of salons that went with it, to cancel so nobody keeps being billed. */
+  subscriptions?: string[];
 }
 
 /** Statuses a job can be filtered on in the admin portal. */
@@ -162,7 +165,8 @@ export function cleanListing(raw: Record<string, string | undefined>): ListingIn
     address: v("address"),
     phone: v("phone"),
     email,
-    website: v("website"),
+    // Shown as a link: only a real web address is kept.
+    website: webAddress(v("website") ?? "") ?? undefined,
     instagram: v("instagram")?.replace(/^@/, ""),
     abn,
     about: v("about"),
@@ -692,6 +696,9 @@ export function backOffice(db: Db) {
               ...made.map((s) => s.logoKey),
             ].filter((key): key is string => Boolean(key)),
             private: evidence.map((e) => e.key).filter((key): key is string => Boolean(key)),
+            subscriptions: [...made, ...claimedListings]
+              .map((s) => s.stripeSubscriptionId)
+              .filter((id): id is string => Boolean(id)),
           };
         });
       },
@@ -834,7 +841,11 @@ export function backOffice(db: Db) {
             reason,
           });
         });
-        return { media: salon.logoKey ? [salon.logoKey] : [], private: [] };
+        return {
+          media: salon.logoKey ? [salon.logoKey] : [],
+          private: [],
+          subscriptions: salon.stripeSubscriptionId ? [salon.stripeSubscriptionId] : [],
+        };
       },
 
       async setAbnStatus(

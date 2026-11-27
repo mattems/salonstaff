@@ -28,7 +28,7 @@ import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import { errors, json, jsonBody, MeSchema, pathParam } from "../lib/schemas";
 import { idFrom, requireUser } from "../lib/session";
-import { withinCodeLimit } from "./auth";
+import { withinCodeLimit, withinDestinationLimit } from "./auth";
 import { meJson } from "./me";
 
 /**
@@ -44,7 +44,7 @@ const LABELS: Record<SocialProvider, string> = { google: "Google", apple: "Apple
 const tooFast = () =>
   new ApiError("rate_limited", {
     detail: "Too many codes asked for or tried",
-    hint: "Wait a minute and try again.",
+    hint: "Wait a while and try again: each email or mobile gets only a few codes an hour.",
   });
 
 async function requireCodeAllowance(c: Context<AppEnv>) {
@@ -111,6 +111,7 @@ securityRoutes.openapi(
     if (email === session.user.email) throw emailChangeError("same");
     if (c.get("dryRun")) return c.json({ sentTo: email }, 200);
     await requireCodeAllowance(c);
+    if (!(await withinDestinationLimit(c, email))) throw tooFast();
     const result = await requestEmailChange(await c.get("auth")(), c.req.raw.headers, email);
     if (!result.ok) throw emailChangeError(result.problem);
     return c.json({ sentTo: email }, 200);
@@ -122,7 +123,7 @@ securityRoutes.openapi(
     method: "post",
     path: "/v1/me/email/confirm",
     summary: "Change your email: confirm with the code",
-    description: `The code from the new address. Your account's email becomes that address: email codes go there from now on, and your old address is told about the change. Google and Apple stay connected. With \`dry_run\` only the form is checked (the code isn't used up).`,
+    description: `The code from the new address. Your account's email becomes that address: email codes go there from now on, and your old address is told about the change. Google and Apple stay connected; your other devices are signed out. With \`dry_run\` only the form is checked (the code isn't used up).`,
     tags: TAGS,
     request: jsonBody(emailChangeConfirmSchema),
     responses: {
@@ -155,6 +156,11 @@ securityRoutes.openapi(
     await signIns(db, session.user.id).recordEmailChange(
       before,
       email,
+      userActor(c, session.user.id),
+    );
+    // Whoever else was signed in (someone with a stolen session, say) isn't any more.
+    await signIns(db, session.user.id).endOtherSessions(
+      session.session.id,
       userActor(c, session.user.id),
     );
     if (before) {
@@ -236,6 +242,7 @@ securityRoutes.openapi(
     if (await signIns(db, session.user.id).mobileTakenByOther(phoneNumber)) {
       return c.json({ sentTo: phoneNumber }, 200);
     }
+    if (!(await withinDestinationLimit(c, phoneNumber))) throw tooFast();
     const result = await requestMobileChange(await c.get("auth")(), phoneNumber);
     if (!result.ok) throw mobileChangeError(result.problem);
     return c.json({ sentTo: phoneNumber }, 200);
@@ -248,7 +255,7 @@ securityRoutes.openapi(
     path: "/v1/me/mobile/confirm",
     summary: "Change your mobile: confirm with the code",
     description:
-      "The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS. With `dry_run` only the form is checked.",
+      "The code from the new number. Your account's mobile becomes that number, verified: SMS codes go there and salons see it. Your old number is told by SMS, and your other devices are signed out. With `dry_run` only the form is checked.",
     tags: TAGS,
     request: jsonBody(mobileChangeConfirmSchema),
     responses: {
@@ -282,6 +289,10 @@ securityRoutes.openapi(
     await signIns(db, session.user.id).recordMobileChange(
       before,
       phoneNumber,
+      userActor(c, session.user.id),
+    );
+    await signIns(db, session.user.id).endOtherSessions(
+      session.session.id,
       userActor(c, session.user.id),
     );
     if (before) {

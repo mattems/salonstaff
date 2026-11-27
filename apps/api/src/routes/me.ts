@@ -4,6 +4,7 @@ import {
   type Db,
   profileValues,
   type SeekerProfile,
+  salonsFor,
   seeker,
   summarise,
 } from "@salonstaff/db";
@@ -43,6 +44,7 @@ import {
   requireUploadAllowance,
   storeUpload,
 } from "../lib/storage";
+import { cancelSubscription } from "../lib/stripe";
 import {
   jobSummaryJson,
   myApplicationJson,
@@ -294,11 +296,12 @@ meRoutes.openapi(
     const { file } = c.req.valid("form");
     const scope = seeker(await c.get("db")(), session.user.id);
     await scope.requireProfile();
+    // Before the dry run too: it reads the whole file like the real thing.
+    await requireUploadAllowance(c.env, session.user.id);
     if (c.get("dryRun")) {
       await inspectUpload(file, ["image"]);
       return c.json({ photoUrl: null }, 200);
     }
-    await requireUploadAllowance(c.env, session.user.id);
     const { key } = await storeUpload(c.env, file, { bucket: "public", allow: ["image"] });
     try {
       const { previousKey } = await scope.setPhoto(key, userActor(c, session.user.id));
@@ -404,6 +407,8 @@ meRoutes.openapi(
     const { file, caption } = c.req.valid("form");
     const scope = seeker(await c.get("db")(), session.user.id);
     await scope.requireProfile();
+    // Before the dry run too: it reads the whole file like the real thing.
+    await requireUploadAllowance(c.env, session.user.id);
     if (c.get("dryRun")) {
       await inspectUpload(file, ["image"]);
       return c.json(
@@ -415,7 +420,6 @@ meRoutes.openapi(
         201,
       );
     }
-    await requireUploadAllowance(c.env, session.user.id);
     const { key } = await storeUpload(c.env, file, { bucket: "public", allow: ["image"] });
     try {
       const item = await scope.addPortfolioItem(
@@ -660,7 +664,7 @@ meRoutes.openapi(
     path: "/v1/me",
     summary: "Delete your account",
     description:
-      "Permanently deletes your account, profile, pictures, applications and checks, and signs you out everywhere. A salon you created is deleted with its jobs; a directory listing you claimed goes back to being unclaimed. This can't be undone.",
+      "Permanently deletes your account, profile, pictures, applications and checks, and signs you out everywhere. A salon you created is deleted with its jobs; a directory listing you claimed goes back to being unclaimed. Either way its Salon Plan is cancelled. This can't be undone.",
     tags: TAGS,
     responses: { 200: json(Deleted, "Deleted"), 401: errors[401] },
   }),
@@ -668,6 +672,20 @@ meRoutes.openapi(
     const session = await requireUser(c);
     const db = await c.get("db")();
     if (c.get("dryRun")) return c.json({ deleted: true as const }, 200);
+    // Their salons' plans are cancelled before anything is deleted: if Stripe can't be reached
+    // the account stays, rather than a plan billing for a salon that's gone.
+    if (c.env.STRIPE_SECRET_KEY) {
+      try {
+        for (const id of await salonsFor(db).soleOwnerSubscriptions(session.user.id)) {
+          await cancelSubscription(c.env, id);
+        }
+      } catch {
+        throw new ApiError("billing_unavailable", {
+          detail: "Your salon's plan couldn't be cancelled just now, so nothing was deleted",
+          hint: "Try again in a few minutes, or cancel the plan from the salon's Billing page first.",
+        });
+      }
+    }
     const { mediaKeys, privateKeys } = await seeker(db, session.user.id).deleteAccount(
       userActor(c, session.user.id),
     );

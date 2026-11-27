@@ -1,4 +1,5 @@
-import { BRAND } from "@salonstaff/shared";
+import { ApiError, BRAND } from "@salonstaff/shared";
+import { bodyLimit } from "hono/body-limit";
 import { secureHeaders } from "hono/secure-headers";
 import { timing } from "hono/timing";
 import type { JWTVerifyGetKey } from "jose";
@@ -47,6 +48,8 @@ type App = ReturnType<typeof createRouter>;
 type OpenApiDocument = ReturnType<App["getOpenAPI31Document"]>;
 
 const ADMIN_PATH = "/admin/";
+/** An 8MB file (`MAX_UPLOAD_BYTES`) and the form around it. */
+const MAX_BODY_BYTES = 9 * 1024 * 1024;
 const ADMIN_SCHEMA = "Admin";
 
 /**
@@ -113,6 +116,19 @@ export function createApp(options: AppOptions = {}) {
   app.use("*", authContext(options));
   for (const prefix of ["/v1/*", "/admin/v1/*"]) {
     app.use(prefix, rateLimit());
+    // Before anything reads the body: the biggest thing sent is an 8MB upload.
+    app.use(
+      prefix,
+      bodyLimit({
+        maxSize: MAX_BODY_BYTES,
+        onError: () => {
+          throw new ApiError("file_too_large", {
+            detail: "The request is too large",
+            hint: "Uploads can be up to 8MB.",
+          });
+        },
+      }),
+    );
     app.use(prefix, dryRun());
     app.use(prefix, idempotency());
   }

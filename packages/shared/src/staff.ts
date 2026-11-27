@@ -62,6 +62,11 @@ export const STAFF_CONFIRMED_ACTIONS = [
   "salon.suspend",
   "salon.remove",
   "salon.delete",
+  // Who runs a salon: approving a claim, taking its team off, and changing the address claim
+  // links are sent to.
+  "claim.approve",
+  "salon.unclaim",
+  "salon.change_email",
 ] as const;
 export type StaffConfirmedAction = (typeof STAFF_CONFIRMED_ACTIONS)[number];
 

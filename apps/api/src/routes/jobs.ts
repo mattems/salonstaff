@@ -270,7 +270,10 @@ jobsRoutes.openapi(
     const query = c.req.valid("query");
     const url = new URL(query.path, "https://x.invalid");
     const pathname = url.pathname.replace(/\/+$/, "") || "/";
-    const page = Number(url.searchParams.get("page")) || query.page;
+    // A page number inside `path` is checked like the `page` parameter: a whole number from 1.
+    const inPath = Number(url.searchParams.get("page"));
+    const page =
+      Number.isSafeInteger(inPath) && inPath >= 1 && inPath <= 10_000 ? inPath : query.page;
     const nothing = new ApiError("not_found", {
       detail: `Nothing at ${pathname}`,
       hint: "Job addresses look like /jobs/{state}/{suburb}/{job} or /jobs/{role}/{state}/{suburb}.",

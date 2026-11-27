@@ -4,7 +4,16 @@ import { encodeId } from "@salonstaff/shared";
 import { eq } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createTestApp, withDb } from "./helpers";
-import { admin, auditFor, seedCheck, seedClaim, seedSalon, staffMember, userIdOf } from "./staff";
+import {
+  admin,
+  auditFor,
+  SKIP,
+  seedCheck,
+  seedClaim,
+  seedSalon,
+  staffMember,
+  userIdOf,
+} from "./staff";
 
 type Body = Record<string, unknown>;
 type Check = {
@@ -133,7 +142,7 @@ describe("claims", () => {
       support,
       "POST",
       `/claims/${encodeId("claim", claim.id)}/approve`,
-      { note: "Called the salon" },
+      { note: "Called the salon", confirmation: SKIP },
     );
     expect(approved.status).toBe(200);
     expect(approved.body.status).toBe("approved");
@@ -143,7 +152,11 @@ describe("claims", () => {
     expect(team).toMatchObject([{ userId: claimant.uuid, role: "owner" }]);
     expect(await auditFor(claim.id, "claim.approved")).toHaveLength(1);
     expect(
-      (await admin(support, "POST", `/claims/${encodeId("claim", claim.id)}/approve`, {})).status,
+      (
+        await admin(support, "POST", `/claims/${encodeId("claim", claim.id)}/approve`, {
+          confirmation: SKIP,
+        })
+      ).status,
     ).toBe(409);
     expect(admin.sent.some((m) => m.to === claimant.email)).toBe(true);
   });

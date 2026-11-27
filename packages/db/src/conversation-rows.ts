@@ -2,9 +2,17 @@
  * The rows behind conversations (D-19): one per salon and job seeker. Shared by the salon's and the
  * job seeker's scopes (`conversations.ts`) and the salon's number looks (`salon.ts`).
  */
-import { and, asc, eq, sql } from "drizzle-orm";
+import { ApiError, CONTACT_LIMITS } from "@salonstaff/shared";
+import { and, asc, count, eq, gt, isNull, sql } from "drizzle-orm";
 import type { Executor } from "./audit";
-import { applications, conversationMessages, conversations, jobs, users } from "./schema";
+import {
+  applications,
+  conversationMessages,
+  conversations,
+  jobs,
+  salonMembers,
+  users,
+} from "./schema";
 
 export type Side = "salon" | "seeker";
 
@@ -130,6 +138,25 @@ export async function addMessage(
   },
 ): Promise<ConversationMessage> {
   const now = new Date();
+  if ((input.kind ?? "text") === "text") {
+    // Each message notifies someone (an email, a push, sometimes a text): only so many an hour.
+    const [recent] = await tx
+      .select({ n: count() })
+      .from(conversationMessages)
+      .where(
+        and(
+          eq(conversationMessages.senderId, input.senderId),
+          eq(conversationMessages.kind, "text"),
+          gt(conversationMessages.createdAt, new Date(now.getTime() - 60 * 60_000)),
+        ),
+      );
+    if ((recent?.n ?? 0) >= CONTACT_LIMITS.messagesPerHour) {
+      throw new ApiError("rate_limited", {
+        detail: `You can send up to ${CONTACT_LIMITS.messagesPerHour} messages an hour`,
+        hint: "Wait a while and try again.",
+      });
+    }
+  }
   const [inserted] = await tx
     .insert(conversationMessages)
     .values({
@@ -156,3 +183,24 @@ export async function addMessage(
 
 /** The live room for a salon and job seeker (D-18): one per pair, made or not. */
 export const roomOf = (salonId: string, seekerId: string) => `${salonId}:${seekerId}`;
+
+/**
+ * Who may have a room open right now: the salon's team and the job seeker, none of them banned.
+ * Checked each time something is sent to the room, so someone taken off the team (or banned)
+ * since they opened the conversation stops hearing it.
+ */
+export async function roomAudience(db: Executor, room: string): Promise<string[]> {
+  const [salonId = "", seekerId = ""] = room.split(":");
+  const [team, seeker] = await Promise.all([
+    db
+      .select({ id: salonMembers.userId })
+      .from(salonMembers)
+      .innerJoin(users, eq(users.id, salonMembers.userId))
+      .where(and(eq(salonMembers.salonId, salonId), isNull(users.suspendedAt))),
+    db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.id, seekerId), isNull(users.suspendedAt))),
+  ]);
+  return [...team, ...seeker].map((row) => row.id);
+}

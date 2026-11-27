@@ -105,7 +105,7 @@ function AddStaffDialog(props: { onClose: () => void }) {
   const add = useMutation({
     mutationFn: async () => {
       const address = email.trim().toLowerCase();
-      const confirmation = await confirmWithPasskey("staff.add", address);
+      const confirmation = await confirmWithPasskey("staff.add", `${address}:${role}`);
       return unwrap(
         await api.POST("/admin/v1/staff", {
           body: { name: name.trim(), email: address, role, reason: reason.trim(), confirmation },
@@ -202,7 +202,7 @@ function ManageStaffDialog({ member, onClose }: { member: StaffMember; onClose: 
 
   const save = useMutation({
     mutationFn: async () => {
-      const confirmation = await confirmWithPasskey("staff.change_role", member.id);
+      const confirmation = await confirmWithPasskey("staff.change_role", `${member.id}:${role}`);
       return unwrap(
         await api.PATCH("/admin/v1/staff/{id}", {
           params: { path: { id: member.id } },

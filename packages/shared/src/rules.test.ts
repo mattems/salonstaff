@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { CONTACT_LIMITS } from "./constants";
 import { SHARE_CODE_RE, shareCode } from "./crypto";
 import {
+  abnNameMatches,
   boundingBox,
   claimMethods,
   contactLimitReached,
@@ -15,12 +16,15 @@ import {
   messageBlockerOf,
   nameChangeExpiresIdentity,
   nameMatches,
+  plainLine,
   publicName,
   roughCoordinate,
+  salonAbnStatus,
   salonAccessTo,
   shareLinkWorks,
   verificationLevel,
 } from "./rules";
+import { webAddress } from "./schemas";
 
 const now = new Date("2026-12-01T00:00:00Z");
 const day = 86_400_000;
@@ -246,6 +250,18 @@ describe("contactLimitReached", () => {
     [{ kind: "message", cold: false, salonColdToday: messagesPerDay, personToday: 9 }, null],
     [{ kind: "phone", salonToday: phoneRevealsPerDay - 1 }, null],
     [{ kind: "phone", salonToday: phoneRevealsPerDay }, "salon_reveals"],
+    // The person's own count, across every salon they're on, runs out too.
+    [{ kind: "phone", salonToday: 0, senderToday: phoneRevealsPerDay }, "salon_reveals"],
+    [
+      {
+        kind: "message",
+        cold: true,
+        salonColdToday: 0,
+        personToday: 0,
+        senderColdToday: messagesPerDay,
+      },
+      "salon_messages",
+    ],
   ] as const)("%o → %s", (input, expected) => {
     expect(contactLimitReached(input)).toBe(expected);
   });
@@ -276,4 +292,72 @@ it("fillQuickReply", () => {
     }),
   ).toBe("Hi Jess, about Senior Colourist. Willow & Ash");
   expect(fillQuickReply("Hi {firstName}", { firstName: " ", job: "", salon: "" })).toBe("Hi there");
+});
+
+describe("abnNameMatches", () => {
+  it.each([
+    ["The Fade Room", ["FADE ROOM PTY LTD"], true],
+    ["Fade Room", ["SMITH, JANE", "The Fade Room Fitzroy"], true],
+    // Words added to the registered name aren't vouched for by it.
+    ["Fade Room Fitzroy", ["SMITH, JANE", "The Fade Room"], false],
+    ["Toni & Guy Hair Studio Bondi", ["HAIR STUDIO"], false],
+    ["Jane Smith", ["SMITH, JANE"], true],
+    ["Jane Smith Hair", ["SMITH, JANE"], false],
+    ["Toni & Guy Bondi", ["FADE ROOM PTY LTD", "The Fade Room"], false],
+    ["Toni and Guy", ["TONI & GUY"], true],
+    // Too little to go on.
+    ["Co", ["CO PTY LTD"], false],
+    ["Fade Room", [], false],
+  ] as const)("%s against %o → %s", (name, registered, expected) => {
+    expect(abnNameMatches(name, registered)).toBe(expected);
+  });
+});
+
+describe("salonAbnStatus", () => {
+  const base = { salonName: "Fade Room", registeredNames: ["Fade Room Pty Ltd"] };
+  it.each([
+    [{ ...base, register: "verified", ownsVerifiedSalonWithAbn: false }, "verified"],
+    // An active ABN under another name waits for staff: ABNs are public.
+    [
+      { ...base, salonName: "Toni & Guy", register: "verified", ownsVerifiedSalonWithAbn: false },
+      "pending",
+    ],
+    // Another location of a salon they already own, verified.
+    [
+      { ...base, salonName: "Other Name", register: "verified", ownsVerifiedSalonWithAbn: true },
+      "verified",
+    ],
+    [{ ...base, register: "failed", ownsVerifiedSalonWithAbn: true }, "failed"],
+    [{ ...base, register: "pending", ownsVerifiedSalonWithAbn: false }, "pending"],
+  ] as const)("%o → %s", (input, expected) => {
+    expect(salonAbnStatus(input)).toBe(expected);
+  });
+});
+
+describe("plainLine", () => {
+  it.each([
+    ["The Fade Room", "The Fade Room"],
+    ["Security alert\r\nBcc: x@y.z", "Security alert Bcc: x@y.z"],
+    ["Confirm at https://evil.example/login now", "Confirm at now"],
+    ["Verify: www.evil.example", "Verify:"],
+    ["Go to evil-site.com/reset today", "Go to today"],
+    ["Hair & Co.", "Hair & Co."],
+  ])("%j → %j", (input, expected) => {
+    expect(plainLine(input)).toBe(expected);
+  });
+});
+
+describe("webAddress", () => {
+  it.each([
+    ["fade.com.au", "https://fade.com.au"],
+    ["https://fade.com.au/book?x=1", "https://fade.com.au/book?x=1"],
+    ["http://fade.com.au", "http://fade.com.au"],
+    ["javascript:alert(1)", null],
+    ["data:text/html,<script>", null],
+    ["https://user:pass@fade.com.au", null],
+    ["localhost", null],
+    ["", null],
+  ])("%j → %j", (input, expected) => {
+    expect(webAddress(input)).toBe(expected);
+  });
 });

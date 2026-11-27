@@ -217,16 +217,85 @@ export type ContactLimit = "salon_messages" | "salon_reveals" | "same_person";
  */
 export function contactLimitReached(
   input:
-    | { kind: "phone"; salonToday: number }
-    | { kind: "message"; cold: boolean; salonColdToday: number; personToday: number },
+    | { kind: "phone"; salonToday: number; senderToday?: number }
+    | {
+        kind: "message";
+        cold: boolean;
+        salonColdToday: number;
+        personToday: number;
+        senderColdToday?: number;
+      },
 ): ContactLimit | null {
+  // `sender…` counts the same thing for the person doing it, across every salon they're on:
+  // making more salons doesn't make more allowance.
   if (input.kind === "phone") {
-    return input.salonToday >= CONTACT_LIMITS.phoneRevealsPerDay ? "salon_reveals" : null;
+    const most = Math.max(input.salonToday, input.senderToday ?? 0);
+    return most >= CONTACT_LIMITS.phoneRevealsPerDay ? "salon_reveals" : null;
   }
   if (!input.cold) return null;
   if (input.personToday >= CONTACT_LIMITS.messagesPerPersonPerDay) return "same_person";
-  if (input.salonColdToday >= CONTACT_LIMITS.messagesPerDay) return "salon_messages";
+  if (Math.max(input.salonColdToday, input.senderColdToday ?? 0) >= CONTACT_LIMITS.messagesPerDay)
+    return "salon_messages";
   return null;
+}
+
+// ---------- A salon's ABN ----------
+
+const ABN_NAME_NOISE = new Set([
+  "the",
+  "and",
+  "pty",
+  "ltd",
+  "limited",
+  "trustee",
+  "for",
+  "trust",
+  "as",
+  "atf",
+  "co",
+]);
+
+const abnNameWords = (name: string) =>
+  name
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .filter((word) => word && !ABN_NAME_NOISE.has(word));
+
+/**
+ * Whether a salon's name is one the Australian Business Register has for its ABN (the entity
+ * or one of its business names). ABNs are public, so an active ABN alone says nothing about who
+ * typed it: a salon is shown as verified only when its name is the ABN's, or staff say so.
+ * The salon's name may be shorter than the registered one ("Fade Room" for "The Fade Room Fitzroy
+ * Pty Ltd") but not add to it; a name of one short word doesn't count.
+ */
+export function abnNameMatches(salonName: string, registeredNames: readonly string[]): boolean {
+  const mine = abnNameWords(salonName);
+  if (mine.join("").length < 4) return false;
+  return registeredNames.some((registered) => {
+    const theirs = abnNameWords(registered);
+    if (theirs.join("").length < 4) return false;
+    // One way only: every word of the salon's name is in the registered one. The other way
+    // round would let a registered "Hair Studio" vouch for "Someone Famous Hair Studio".
+    return mine.every((word) => theirs.includes(word));
+  });
+}
+
+/**
+ * The ABN status a salon gets from a register lookup (`register`). An active ABN counts as
+ * verified only when the salon's name is one of the ABN's, or the person already owns a verified
+ * salon with that ABN (another location). Otherwise it waits for staff.
+ */
+export function salonAbnStatus(input: {
+  register: VerificationStatus;
+  salonName: string;
+  registeredNames: readonly string[];
+  ownsVerifiedSalonWithAbn: boolean;
+}): VerificationStatus {
+  if (input.register !== "verified") return input.register;
+  if (input.ownsVerifiedSalonWithAbn) return "verified";
+  return abnNameMatches(input.salonName, input.registeredNames) ? "verified" : "pending";
 }
 
 // ---------- Claims ----------
@@ -326,4 +395,22 @@ export function fillQuickReply(
     .replaceAll("{firstName}", values.firstName.trim() || "there")
     .replaceAll("{job}", values.job.trim())
     .replaceAll("{salon}", values.salon.trim());
+}
+
+// ---------- Text people typed, in emails we send ----------
+
+const LINK =
+  /\b(?:https?:\/\/|www\.)\S+|\b[\w-]+(?:\.[\w-]+)*\.(?:com|net|org|info|biz|io|co|au|nz|uk|me|ly|xyz|app|link|site|online|shop|top)\b(?:\/\S*)?/gi;
+
+/**
+ * A name someone typed (a salon, a person, a job title), made safe to put in the subject or
+ * heading of an email to somebody else: one line, no control characters, and no web addresses,
+ * so our emails can't be made to carry a link of the sender's choosing.
+ */
+export function plainLine(text: string): string {
+  return text
+    .replace(/[\p{Cc}\u2028\u2029]+/gu, " ")
+    .replace(LINK, "")
+    .replace(/\s+/g, " ")
+    .trim();
 }

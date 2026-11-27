@@ -18,8 +18,12 @@ let warm = false;
 
 /** A secret that travels in the path is not written to the log. */
 export function loggedPath(path: string): string {
-  // Claim links carry a one-time token: never log it.
-  return path.replace(/^(\/v1\/claims\/verify\/)[^/]+/, "$1:token");
+  // Claim, invite and endorsement links carry a one-time token, and a share link is a profile's
+  // only key: never log them.
+  return path.replace(
+    /^((?:\/api)?\/v1\/(?:claims\/verify|invites|endorsements|profiles)\/)[^/]+/,
+    "$1:token",
+  );
 }
 
 const round = (ms: number | null) => (ms === null ? null : Math.round(ms));

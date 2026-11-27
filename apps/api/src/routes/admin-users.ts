@@ -11,6 +11,7 @@ import { decodeCursor, PaginationQuery } from "../lib/pagination";
 import { Confirmation, requireConfirmation } from "../lib/staff-confirmation";
 import { requireStaff } from "../lib/staff-context";
 import { deleteUpload, mediaUrl } from "../lib/storage";
+import { cancelSubscriptions } from "../lib/stripe";
 import {
   admin,
   body,
@@ -177,7 +178,10 @@ async function userRow(data: BackOffice, user: AdminUser) {
   });
 }
 
-/** Deletes files from R2 after the database change. A failure is logged, never fatal. */
+/**
+ * Deletes files from R2 and cancels the Stripe plans of salons that went, after the database
+ * change. A failure is logged, never fatal.
+ */
 export async function deleteFiles(c: Context<AppEnv>, files: FilesToDelete) {
   const results = await Promise.allSettled([
     ...files.media.map((key) => deleteUpload(c.env, "public", key)),
@@ -187,6 +191,7 @@ export async function deleteFiles(c: Context<AppEnv>, files: FilesToDelete) {
     if (result.status === "rejected")
       console.error("Couldn't delete a file from R2", result.reason);
   }
+  await cancelSubscriptions(c.env, files.subscriptions ?? []);
 }
 
 admin.openapi(

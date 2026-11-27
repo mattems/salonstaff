@@ -161,6 +161,17 @@ describe("changing your email", () => {
       "/v1/auth/list-sessions",
       "/v1/auth/revoke-other-sessions",
       "/v1/auth/unlink-account",
+      // There are no passwords: the library's routes that would make or use one stay shut.
+      "/v1/auth/email-otp/request-password-reset",
+      "/v1/auth/forget-password/email-otp",
+      "/v1/auth/email-otp/reset-password",
+      "/v1/auth/email-otp/verify-email",
+      "/v1/auth/email-otp/check-verification-otp",
+      "/v1/auth/sign-in/phone-number",
+      "/v1/auth/phone-number/reset-password",
+      "/v1/auth/list-accounts",
+      "/v1/auth/get-access-token",
+      "/v1/auth/delete-user",
     ]) {
       const response = await me.api("POST", path, { newEmail: "x@example.test", role: "employer" });
       expect(response.status, path).toBe(404);

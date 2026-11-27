@@ -551,7 +551,10 @@ export interface paths {
               | "user.delete"
               | "salon.suspend"
               | "salon.remove"
-              | "salon.delete";
+              | "salon.delete"
+              | "claim.approve"
+              | "salon.unclaim"
+              | "salon.change_email";
             /** @description The ID or code of what is being changed, or `new` when adding something. */
             target: string;
           };
@@ -1668,7 +1671,7 @@ export interface paths {
     head?: never;
     /**
      * Change a salon's details
-     * @description Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing.
+     * @description Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing, so changing it is confirmed with a passkey (action `salon.change_email`, target the salon's ID).
      */
     patch: {
       parameters: {
@@ -2084,7 +2087,7 @@ export interface paths {
     put?: never;
     /**
      * Detach a salon's team
-     * @description Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay.
+     * @description Takes everyone (owners and managers) off the salon and cancels its invites: it becomes an unclaimed directory listing, which anyone can claim. Their accounts stay. Confirmed with a passkey (action `salon.unclaim`, target the salon's ID).
      */
     post: {
       parameters: {
@@ -2095,7 +2098,20 @@ export interface paths {
         };
         cookie?: never;
       };
-      requestBody?: never;
+      requestBody: {
+        content: {
+          "application/json": {
+            /** @description `id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development. */
+            confirmation?: {
+              id?: string;
+              response?: {
+                [key: string]: unknown;
+              };
+              skip?: boolean;
+            };
+          };
+        };
+      };
       responses: {
         /** @description The salon, unclaimed */
         200: {
@@ -2849,7 +2865,7 @@ export interface paths {
     put?: never;
     /**
      * Approve a claim
-     * @description The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.
+     * @description The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how. Confirmed with a passkey (action `claim.approve`, target the claim's ID).
      */
     post: {
       parameters: {
@@ -2864,6 +2880,14 @@ export interface paths {
         content: {
           "application/json": {
             note?: string;
+            /** @description `id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development. */
+            confirmation?: {
+              id?: string;
+              response?: {
+                [key: string]: unknown;
+              };
+              skip?: boolean;
+            };
           };
         };
       };
@@ -4728,6 +4752,14 @@ export interface components {
       website?: string | null;
       instagram?: string | null;
       about?: string | null;
+      /** @description `id` and `response`: from `POST /admin/v1/confirmations` for this action and target, answered by your passkey. Not needed for a dry run. `skip: true` is accepted only in local development. */
+      confirmation?: {
+        id?: string;
+        response?: {
+          [key: string]: unknown;
+        };
+        skip?: boolean;
+      };
     };
     AdminListingInput: {
       name: string;

@@ -38,6 +38,9 @@ interface Pipe {
   queue: (string | Buffer)[];
 }
 
+/** Paths never forwarded: the admin API and the local stand-ins for Stripe (`/api/…` on the site too). */
+const CLOSED = /^(?:\/api)?\/(?:admin|v1\/dev)(?:\/|$)/;
+
 /** A close code that can be sent on (1005 and 1006 only describe a close). */
 const sendable = (code: number) => (code === 1000 || (code >= 3000 && code < 5000) ? code : 1000);
 
@@ -51,6 +54,10 @@ function forward(port: number, target: number) {
     port,
     async fetch(request, server) {
       const url = new URL(request.url);
+      // The phone needs the app's API and the site, not the staff API or the local stand-ins for
+      // Stripe: those stay on this Mac, whoever else is on the Wi-Fi.
+      if (CLOSED.test(url.pathname))
+        return new Response("Not available over the network", { status: 404 });
       if (request.headers.get("upgrade")?.toLowerCase() === "websocket") {
         const headers: Record<string, string> = {};
         for (const name of SOCKET_HEADERS) {

@@ -16,7 +16,7 @@ import {
   verificationLevel,
   verificationReference,
 } from "@salonstaff/shared";
-import { and, asc, desc, eq, inArray, lt, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, gt, inArray, lt, sql } from "drizzle-orm";
 import { type Actor, recordAudit } from "./audit";
 import type { Db } from "./index";
 import { type CheckKind, seekerChecks, seekerEducation, seekerProfiles, users } from "./schema";
@@ -182,6 +182,21 @@ export function checks(db: Db) {
         .from(seekerChecks)
         .where(eq(seekerChecks.reference, reference.trim().toUpperCase()));
       return row ?? null;
+    },
+
+    /** How many identity checks this person started in the last 24 hours. */
+    async identityStartedToday(userId: string): Promise<number> {
+      const [row] = await db
+        .select({ n: count() })
+        .from(seekerChecks)
+        .where(
+          and(
+            eq(seekerChecks.userId, userId),
+            eq(seekerChecks.kind, "identity"),
+            gt(seekerChecks.createdAt, new Date(Date.now() - 24 * 60 * 60_000)),
+          ),
+        );
+      return row?.n ?? 0;
     },
 
     /** Records a new identity check, started with the provider (`stripe`, or `mock` locally). */

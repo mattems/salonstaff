@@ -134,6 +134,23 @@ describe("confirming with a passkey", () => {
     expect(await list(matt)).toHaveLength(1);
   });
 
+  it("won't start or finish registering a passkey as a dry run", async () => {
+    const matt = await staffMember("owner");
+    await register(matt);
+
+    // A dry run skips the confirmation, so it must not hand out a real registration.
+    const options = await admin(matt, "POST", "/passkeys/options?dry_run=true", {});
+    expect(options.status).toBe(400);
+    expect(options.body).not.toHaveProperty("options");
+    const finish = await admin(matt, "POST", "/passkeys?dry_run=true", {
+      id: "x",
+      name: "Sneaky",
+      response: {},
+    });
+    expect(finish.status).toBe(400);
+    expect(await list(matt)).toHaveLength(1);
+  });
+
   it("refuses a confirmation made for another action or another target", async () => {
     const matt = await staffMember("owner");
     const first = await register(matt);

@@ -4,13 +4,14 @@
  * keep the rules (D-03, D-04); these routes add the staff gate, the files and the notices.
  */
 import { createRoute, z } from "@hono/zod-openapi";
-import { type BackOffice, checks, claims } from "@salonstaff/db";
+import { type BackOffice, checks, claims, recordAudit } from "@salonstaff/db";
 import { ApiError, encodeId, salonPath } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { appUrl, notify, tellOwnersAboutClaim } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { decodeCursor, PaginationQuery } from "../lib/pagination";
+import { Confirmation, requireConfirmation } from "../lib/staff-confirmation";
 import { requireStaff } from "../lib/staff-context";
 import {
   admin,
@@ -134,19 +135,28 @@ admin.openapi(
     },
   }),
   async (c) => {
-    const { data } = await requireStaff(c, "checks:review");
+    const { data, actor } = await requireStaff(c, "checks:review");
     const check = await data.checks.find(pathId(c, "check", CHECKS));
     const object = check?.documentKey ? await c.env.PRIVATE.get(check.documentKey) : null;
-    if (!object) {
+    if (!object || !check) {
       throw new ApiError("not_found", {
         detail: "This check has no document",
         hint: "Documents are deleted once a check is decided. Check `document_url` on the check first.",
       });
     }
+    // Who looked at someone's certificate is on the record, like who decided it.
+    await recordAudit(await c.get("db")(), actor, {
+      action: "check.document_viewed",
+      targetType: "check",
+      targetId: check.id,
+    });
     return new Response(object.body, {
       headers: {
         "Content-Type": object.httpMetadata?.contentType ?? "application/octet-stream",
         "Content-Disposition": "inline",
+        // Whatever the file is, it can't run script or load anything on the portal's origin.
+        "Content-Security-Policy":
+          "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
         "Cache-Control": "private, no-store",
         "X-Content-Type-Options": "nosniff",
       },
@@ -357,9 +367,12 @@ admin.openapi(
     path: `${CLAIMS}/{id}/approve`,
     summary: "Approve a claim",
     description:
-      "The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how.",
+      "The claimant becomes an owner of the listing. On an unclaimed listing it gets the launch free period (and founding pricing while places last) and other open claims on it are rejected; on a listing that already has owners, they're emailed (D-11). An ABN is public, so confirm the person first: call the salon on its listed number, or check the ABR, its website or Instagram. `note` says how. Confirmed with a passkey (action `claim.approve`, target the claim's ID).",
     tags: ["Admin"],
-    request: { params: IdParams, body: body(z.object({ note: Note.optional() })) },
+    request: {
+      params: IdParams,
+      body: body(z.object({ note: Note.optional(), confirmation: Confirmation })),
+    },
     responses: {
       200: ok(Claim, "The claim, approved"),
       ...errors,
@@ -368,11 +381,27 @@ admin.openapi(
     },
   }),
   async (c) => {
-    const { data, staff, actor } = await requireStaff(c, "claims:review");
+    const ctx = await requireStaff(c, "claims:review");
+    const { data, staff } = ctx;
     const row = await findClaim(c, data);
-    const { note } = c.req.valid("json");
+    const { note, confirmation } = c.req.valid("json");
+    // Nobody approves their own claim: another staff member decides it.
+    if (row.claimant?.email && row.claimant.email.toLowerCase() === staff.email.toLowerCase()) {
+      throw new ApiError("forbidden", {
+        detail: "This claim is from your own account",
+        hint: "Ask another staff member to review it.",
+      });
+    }
     if (c.get("dryRun"))
       return c.json(claimJson({ ...row, claim: { ...row.claim, status: "approved" } }), 200);
+    // It makes someone an owner of a business: confirmed with a passkey.
+    const actor = await requireConfirmation(
+      c,
+      ctx,
+      "claim.approve",
+      encodeId("claim", row.claim.id),
+      confirmation,
+    );
     const decided = await claims(await c.get("db")()).approve(row.claim.id, staff.id, note, actor);
     notify(c, decided.contact, {
       subject: `You now manage ${decided.salon.name} on Salon Staff`,

@@ -29,7 +29,9 @@ export function forgetMe() {
 
 /** A path on this site that's safe to send someone back to after signing in. */
 export function safeNext(next: unknown): string | undefined {
-  if (typeof next !== "string" || !next.startsWith("/") || next.startsWith("//")) return undefined;
+  if (typeof next !== "string" || !next.startsWith("/")) return undefined;
+  // Browsers read "/\\host" and "/<tab>/host" as another site, as they do "//host".
+  if (/[\\\p{Cc}]/u.test(next) || next.startsWith("//")) return undefined;
   if (next.startsWith("/api/") || next.startsWith("/sign-in")) return undefined;
   return next;
 }

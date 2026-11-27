@@ -125,7 +125,19 @@ export const PRICING = {
 /** Anti-bot / anti-spam limits for job seekers. */
 export const LIMITS = {
   applicationsPerDay: 20,
+  /** Identity checks one person can start a day: each is a paid check at the provider. */
+  identityChecksPerDay: 3,
+  /** Salons one account may create itself. A bigger group asks support. */
+  salonsPerAccount: 5,
+  /** Sign-in codes one caller (IP address) may have sent to one email or mobile. */
   otpRequestsPerHour: 5,
+  otpRequestsPerDay: 15,
+  /**
+   * And to one email or mobile from everyone together. Higher, so a stranger asking for codes to
+   * someone's address can't use up that person's own allowance and lock them out.
+   */
+  otpDestinationPerHour: 20,
+  otpDestinationPerDay: 60,
   otpMaxAttempts: 5,
   otpTtlMinutes: 10,
   sessionDays: 60,
@@ -352,6 +364,15 @@ export const CONTACT_LIMITS = {
   phoneRevealsPerDay: 50,
   /** Messages from one salon to the same person a day, while it's cold. */
   messagesPerPersonPerDay: 1,
+  /** Messages one person can send an hour, across their conversations: each one notifies someone. */
+  messagesPerHour: 60,
+  /** Team invites a salon can email a day. */
+  invitesPerDay: 20,
+  /** Listings one account can start a claim on a day: each emails a business. */
+  claimsPerDay: 5,
+  /** Notices by text to one mobile (accounts with no email), an hour and a day. */
+  smsNoticesPerHour: 5,
+  smsNoticesPerDay: 15,
   /** Endorsement requests a job seeker can send. */
   endorsementRequestsPerDay: 5,
   endorsementLinkDays: 30,

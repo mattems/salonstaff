@@ -8,6 +8,7 @@ import {
   encodeId,
   labelFor,
   parseSalonsPath,
+  plainLine,
   salonPath,
   salonsLandingPath,
 } from "@salonstaff/shared";
@@ -167,7 +168,10 @@ directoryRoutes.openapi(
     const query = c.req.valid("query");
     const url = new URL(query.path, "https://x.invalid");
     const pathname = url.pathname.replace(/\/+$/, "") || "/";
-    const page = Number(url.searchParams.get("page")) || query.page;
+    // A page number inside `path` is checked like the `page` parameter: a whole number from 1.
+    const inPath = Number(url.searchParams.get("page"));
+    const page =
+      Number.isSafeInteger(inPath) && inPath >= 1 && inPath <= 10_000 ? inPath : query.page;
     const nothing = new ApiError("not_found", {
       detail: `Nothing at ${pathname}`,
       hint: "Salon addresses look like /salons/{state}/{suburb}/{salon}.",
@@ -311,7 +315,7 @@ directoryRoutes.openapi(
       sendEmail(c, started.salon.email, {
         subject: `Confirm you manage ${started.salon.name} on ${BRAND.name}`,
         title: `Is this your business?`,
-        body: `${input.contactName} asked to manage the ${BRAND.name} listing for ${started.salon.name}. If that's you, or someone you've authorised, confirm with the button. The link lasts ${LINK_HOURS} hours and works only for the account that asked.`,
+        body: `${plainLine(input.contactName)} asked to manage the ${BRAND.name} listing for ${plainLine(started.salon.name)}. If that's you, or someone you've authorised, confirm with the button. The link lasts ${LINK_HOURS} hours and works only for the account that asked.`,
         action: "Confirm and manage the listing",
         url: url.toString(),
         footer: "If you didn't expect this, ignore this email: nothing changes.",

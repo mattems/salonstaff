@@ -1,3 +1,4 @@
+import { LIMITS } from "@salonstaff/shared";
 import { describe, expect, it } from "vitest";
 import { APP_ORIGIN, codeFor, createTestApp } from "./helpers";
 
@@ -121,5 +122,32 @@ describe("the mobile app (bearer token)", () => {
     const { token } = (await login.json()) as { token: string };
     const me = await call("/v1/me", { headers: { Authorization: `Bearer ${token}` } });
     expect(me.status).toBe(200);
+  });
+});
+
+describe("sign-in codes are limited per destination", () => {
+  it("sends one address only so many an hour, whoever asks", async () => {
+    const { call, sent } = createTestApp();
+    const email = `flood-${crypto.randomUUID().slice(0, 8)}@example.test`;
+    const ask = () =>
+      call("/v1/auth/email-otp/send-verification-otp", json({ email, type: "sign-in" }));
+    for (let i = 0; i < LIMITS.otpRequestsPerHour; i++) expect((await ask()).status).toBe(200);
+    expect((await ask()).status).toBe(429);
+    expect(sent.filter((m) => m.to === email)).toHaveLength(LIMITS.otpRequestsPerHour);
+  });
+
+  it("sends only sign-in codes, and texts only mobiles", async () => {
+    const { call, sent } = createTestApp();
+    const email = `kind-${crypto.randomUUID().slice(0, 8)}@example.test`;
+    for (const type of ["forget-password", "email-verification"]) {
+      const asked = await call("/v1/auth/email-otp/send-verification-otp", json({ email, type }));
+      expect(asked.status, type).toBe(404);
+    }
+    expect(sent.filter((m) => m.to === email)).toHaveLength(0);
+    const landline = await call(
+      "/v1/auth/phone-number/send-otp",
+      json({ phoneNumber: "+61298765432" }),
+    );
+    expect(landline.status).toBe(400);
   });
 });

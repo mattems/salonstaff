@@ -121,6 +121,72 @@ export async function billingPortalUrl(env: Env, customerId: string, returnUrl: 
   return portal.url;
 }
 
+/** Ends a subscription now, e.g. when its salon is deleted or handed back. Fine if it's already gone. */
+export async function cancelSubscription(env: Env, subscriptionId: string): Promise<void> {
+  try {
+    await client(env).subscriptions.cancel(subscriptionId);
+  } catch (error) {
+    if ((error as { code?: string }).code === "resource_missing") return;
+    // Cancelling one that has already ended is refused too: that's done, not a failure.
+    const now = await currentSubscription(env, subscriptionId).catch(() => null);
+    if (now?.status === "canceled" || now?.status === "incomplete_expired") return;
+    throw error;
+  }
+}
+
+/**
+ * A subscription as Stripe has it now. Webhooks can arrive out of order (an old "updated" after
+ * "deleted"), so what an event carries is never taken as the current state. One Stripe no longer
+ * has counts as cancelled.
+ */
+export async function currentSubscription(
+  env: Env,
+  subscriptionId: string,
+): Promise<{ status: string; periodEnd: Date | null }> {
+  try {
+    const subscription = await client(env).subscriptions.retrieve(subscriptionId);
+    return { status: subscription.status, periodEnd: periodEndOf(subscription) };
+  } catch (error) {
+    if ((error as { code?: string }).code === "resource_missing") {
+      return { status: "canceled", periodEnd: null };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Closes a checkout nobody finished, so it can't be paid later. False when Stripe won't close it:
+ * it has been paid (the webhook may not have arrived yet), or Stripe can't be reached.
+ */
+export async function expireCheckout(env: Env, sessionId: string): Promise<boolean> {
+  try {
+    await client(env).checkout.sessions.expire(sessionId);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Cancels the plans of salons that were just deleted or handed back, after the database change.
+ * A failure is logged with the subscription to cancel by hand, never fatal: the salon is gone.
+ */
+export async function cancelSubscriptions(env: Env, subscriptionIds: string[]): Promise<void> {
+  if (!env.STRIPE_SECRET_KEY) return;
+  for (const id of subscriptionIds) {
+    await cancelSubscription(env, id).catch((error: unknown) => {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          event: "subscription_cancel_failed",
+          subscription: id,
+          message: error instanceof Error ? error.message : String(error),
+        }),
+      );
+    });
+  }
+}
+
 /** When the subscription's current period ends (it's on the subscription's item). */
 export async function subscriptionPeriodEnd(env: Env, subscriptionId: string) {
   const subscription = await client(env).subscriptions.retrieve(subscriptionId);

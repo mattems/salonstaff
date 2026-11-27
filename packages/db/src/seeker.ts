@@ -842,18 +842,20 @@ export function seeker(db: Db, userId: string) {
      * Permanently deletes the person and everything attached to them. They leave every salon's team;
      * where they were the last owner, a directory listing they claimed goes back to being unclaimed
      * and a salon they created is deleted with its jobs.
-     * Returns the stored files the caller must delete.
+     * Returns the stored files the caller must delete and the Stripe subscriptions to cancel.
      */
-    async deleteAccount(actor: Actor): Promise<{ mediaKeys: string[]; privateKeys: string[] }> {
+    async deleteAccount(
+      actor: Actor,
+    ): Promise<{ mediaKeys: string[]; privateKeys: string[]; subscriptionIds: string[] }> {
       return db.transaction(async (tx) => {
         const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
-        if (!user) return { mediaKeys: [], privateKeys: [] };
+        if (!user) return { mediaKeys: [], privateKeys: [], subscriptionIds: [] };
         const [profile, portfolio, checkRows] = await Promise.all([
           profileRow(tx),
           tx.select().from(portfolioItems).where(eq(portfolioItems.userId, userId)),
           tx.select().from(seekerChecks).where(eq(seekerChecks.userId, userId)),
         ]);
-        const { deleted: created } = await releaseSalonsOf(
+        const { deleted: created, unclaimed } = await releaseSalonsOf(
           tx,
           userId,
           actor,
@@ -874,7 +876,10 @@ export function seeker(db: Db, userId: string) {
         const privateKeys = checkRows
           .map((c) => c.documentKey)
           .filter((key): key is string => Boolean(key));
-        return { mediaKeys, privateKeys };
+        const subscriptionIds = [...created, ...unclaimed]
+          .map((s) => s.stripeSubscriptionId)
+          .filter((id): id is string => Boolean(id));
+        return { mediaKeys, privateKeys, subscriptionIds };
       });
     },
   };

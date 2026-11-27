@@ -17,6 +17,22 @@ interface Fetcher {
 /** Headers that describe one hop, not the request, and never go further. */
 const HOP_HEADERS = ["connection", "keep-alive", "transfer-encoding", "upgrade", "host"];
 
+/**
+ * Headers only the admin portal's own path or a proxy in front may set: nothing a browser sends
+ * through the website gets to say who staff are, or where the request came from.
+ */
+const NEVER_FORWARDED = [
+  "cf-access-jwt-assertion",
+  "x-local-staff",
+  "x-forwarded-for",
+  "x-forwarded-host",
+  "x-forwarded-proto",
+  "x-real-ip",
+];
+
+/** The website and app use the API's /v1 routes only: the admin API has its own way in. */
+export const forwards = (pathname: string) => pathname.startsWith("/api/v1/");
+
 /** What a local binding answers when its Worker isn't running. Never seen deployed. */
 const NOT_RUNNING = /^Worker ".+" not found/;
 
@@ -36,6 +52,7 @@ function forwardable(request: Request, target: URL): Request {
   const headers = new Headers(request.headers);
   const keep = isWebSocket(request) ? ["upgrade", "connection"] : [];
   for (const name of HOP_HEADERS) if (!keep.includes(name)) headers.delete(name);
+  for (const name of NEVER_FORWARDED) headers.delete(name);
   const hasBody = request.method !== "GET" && request.method !== "HEAD";
   return new Request(target, {
     method: request.method,
@@ -48,6 +65,19 @@ function forwardable(request: Request, target: URL): Request {
 /** Forwards `request` to the API unchanged: method, path, query, headers and body. */
 export async function fetchApi(request: Request): Promise<Response> {
   const url = new URL(request.url);
+  if (!forwards(url.pathname)) {
+    return Response.json(
+      {
+        type: "about:blank",
+        title: "Not found",
+        status: 404,
+        code: "not_found",
+        detail: `No route for ${request.method} ${url.pathname}`,
+        hint: "The website forwards /api/v1/* to the API.",
+      },
+      { status: 404, headers: { "Content-Type": "application/problem+json" } },
+    );
+  }
   const local = new URL(`${url.pathname}${url.search}`, LOCAL_API_ORIGIN);
   const api = binding();
   let response: Response | undefined;
