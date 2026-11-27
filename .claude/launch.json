@@ -6,6 +6,12 @@
       "runtimeExecutable": "bun",
       "runtimeArgs": ["run", "dev"],
       "port": 4100
+    },
+    {
+      "name": "mobile",
+      "runtimeExecutable": "sh",
+      "runtimeArgs": ["-c", "cd apps/mobile && npx expo start --port 8081"],
+      "port": 8081
     }
   ]
 }

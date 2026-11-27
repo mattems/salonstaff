@@ -1,43 +1,105 @@
-import type {
-  ApiError,
-  ApplyInput,
-  AuthResponse,
-  EducationInput,
-  ExperienceInput,
-  FullProfile,
-  PortfolioItem,
-  ProfileDetailsInput,
-  JobDetail,
-  JobFilters,
-  JobSummary,
-  Me,
-  MyApplication,
-  Paginated,
-  SeekerProfileInput,
-  StartVerificationResponse,
-  VerificationSummary,
-} from '@salonstaff/shared';
+/**
+ * The typed API client, from the API's OpenAPI description (`bun run api:types` at the repo root
+ * writes `./api/schema.d.ts`). The app signs in with Better Auth (`/v1/auth/*`, not in the
+ * description) and sends the session token as `Authorization: Bearer`.
+ */
+import createClient from 'openapi-fetch';
 
-import { API_BASE } from '@/lib/config';
+import { API_URL } from '@/lib/config';
 
-export class ApiClientError extends Error {
-  /** HTTP status, or 0 when the server could not be reached. */
+import type { components, paths } from './api/schema';
+
+// ---------- The API's shapes ----------
+
+export type Schemas = components['schemas'];
+export type Me = Schemas['Me'];
+export type SeekerProfile = Schemas['SeekerProfile'];
+export type Verification = Schemas['Verification'];
+export type VerificationStatus = Verification['identity'];
+export type JobSummary = Schemas['JobSummary'];
+export type JobDetail = Schemas['JobDetail'];
+export type JobViewer = Schemas['JobViewer'];
+export type JobAd = Schemas['JobAd'];
+export type MyApplication = Schemas['MyApplication'];
+export type MyProfile = Schemas['MyProfile'];
+export type Education = Schemas['Education'];
+export type Experience = Schemas['Experience'];
+export type PortfolioItem = Schemas['PortfolioItem'];
+export type Checks = Schemas['Checks'];
+export type JobFilters = NonNullable<paths['/v1/jobs']['get']['parameters']['query']>;
+export type ProfileInput = NonNullable<
+  paths['/v1/me/profile']['put']['requestBody']
+>['content']['application/json'];
+export type EducationInput = NonNullable<
+  paths['/v1/me/education']['post']['requestBody']
+>['content']['application/json'];
+export type RightToWorkInput = NonNullable<
+  paths['/v1/me/checks/right-to-work']['post']['requestBody']
+>['content']['application/json'];
+export type DetailsInput = NonNullable<
+  paths['/v1/me/profile/details']['put']['requestBody']
+>['content']['application/json'];
+export type ExperienceInput = NonNullable<
+  paths['/v1/me/experience']['post']['requestBody']
+>['content']['application/json'];
+export type EndorsementRequest = NonNullable<
+  paths['/v1/me/endorsements']['post']['requestBody']
+>['content']['application/json'];
+export type SettingsInput = NonNullable<
+  paths['/v1/me/profile/settings']['patch']['requestBody']
+>['content']['application/json'];
+export type ProfileSettings = Schemas['ProfileSettings'];
+export type MyEndorsement = Schemas['MyEndorsement'];
+export type ProfileContact = Schemas['ProfileContact'];
+export type HiddenSalon = Schemas['HiddenSalon'];
+export type SignInSession = Schemas['SignInSession'];
+export type SignInMethods = Schemas['SignInMethods'];
+/** A picked file, ready for a multipart upload. */
+export type UploadFile = { blob: Blob; name: string };
+
+// ---------- Errors ----------
+
+/** An error answer from the API (RFC 9457 with `code` and `hint`), or from Better Auth. */
+export class ApiProblem extends Error {
+  /** HTTP status, or 0 when the server couldn't be reached. */
   readonly status: number;
-  /** Human-readable message from the server (`ApiError.error`). */
-  readonly error: string;
-  readonly fieldErrors?: Record<string, string[]>;
+  readonly code: string;
+  readonly hint: string | undefined;
+  readonly errors: { path: string; message: string }[];
 
-  constructor(status: number, body: ApiError) {
-    super(body.error);
-    this.name = 'ApiClientError';
+  constructor(status: number, body: unknown) {
+    const problem = (body ?? {}) as {
+      title?: string;
+      detail?: string;
+      message?: string;
+      code?: string;
+      hint?: string;
+      errors?: { path: string; message: string }[];
+    };
+    super(
+      problem.detail ??
+        problem.message ??
+        problem.title ??
+        (status >= 500 ? 'Server error. Please try again shortly.' : `Request failed (${status})`),
+    );
+    this.name = 'ApiProblem';
     this.status = status;
-    this.error = body.error;
-    this.fieldErrors = body.fieldErrors;
+    this.code = problem.code ?? 'unknown';
+    this.hint = problem.hint;
+    this.errors = problem.errors ?? [];
+  }
+
+  /** The message for one form field, if the API named it. */
+  field(path: string): string | undefined {
+    return this.errors.find((error) => error.path === path)?.message;
   }
 }
 
+const UNREACHABLE = "Can't reach Salon Staff right now. Check your connection and try again.";
+
+/** A sentence to show a person when something fails. */
 export function errorMessage(err: unknown, fallback = 'Something went wrong. Please try again.') {
-  if (err instanceof ApiClientError) return err.error || fallback;
+  if (err instanceof ApiProblem) return err.errors[0]?.message ?? err.message ?? fallback;
   if (err instanceof Error && err.message) return err.message;
   return fallback;
 }
@@ -55,167 +117,267 @@ export function setUnauthorizedHandler(handler: (() => void) | null) {
   unauthorizedHandler = handler;
 }
 
-// ---------- Core request ----------
-
-type Query = Record<string, string | number | undefined | null>;
-
-type RequestOptions = {
-  query?: Query;
-  json?: unknown;
-  form?: FormData;
-  /** Override the stored token (used straight after sign-in). */
-  token?: string | null;
-  signal?: AbortSignal;
-};
-
-function buildUrl(path: string, query?: Query) {
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query ?? {})) {
-    if (value !== undefined && value !== null && value !== '') params.append(key, String(value));
-  }
-  const qs = params.toString();
-  return `${API_BASE}${path}${qs ? `?${qs}` : ''}`;
+function headersFor(token: string | null | undefined): Record<string, string> {
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
-async function request<T>(method: string, path: string, opts: RequestOptions = {}): Promise<T> {
-  const token = opts.token !== undefined ? opts.token : authToken;
-  const headers: Record<string, string> = { Accept: 'application/json' };
-  if (token) headers.Authorization = `Bearer ${token}`;
-
-  let body: string | FormData | undefined;
-  if (opts.form) {
-    // Let fetch set the multipart boundary.
-    body = opts.form;
-  } else if (opts.json !== undefined) {
-    headers['Content-Type'] = 'application/json';
-    body = JSON.stringify(opts.json);
-  }
-
-  let res: Response;
+/**
+ * Every call goes through here. Cookies are never sent (`credentials: 'omit'`): the bearer token is
+ * the only session, so signing out really signs out. A 401 on a signed-in call ends the session.
+ */
+async function send(url: string, init: RequestInit): Promise<Response> {
+  let response: Response;
   try {
-    res = await fetch(buildUrl(path, opts.query), { method, headers, body, signal: opts.signal });
+    response = await fetch(url, { ...init, credentials: 'omit' });
   } catch (err) {
     if (err instanceof Error && err.name === 'AbortError') throw err;
-    throw new ApiClientError(0, {
-      error: "Can't reach Salon Staff right now. Check your connection and try again.",
-    });
+    throw new ApiProblem(0, { detail: UNREACHABLE });
   }
+  const hadToken = new Headers(init.headers).has('Authorization');
+  if (response.status === 401 && hadToken) unauthorizedHandler?.();
+  return response;
+}
 
-  const text = await res.text();
-  let data: unknown = undefined;
-  if (text) {
-    try {
-      data = JSON.parse(text);
-    } catch {
-      data = undefined;
+const client = createClient<paths>({
+  baseUrl: API_URL,
+  // React Native's fetch is happier with a URL and init than with a Request object.
+  fetch: async (request: Request) =>
+    send(request.url, {
+      method: request.method,
+      headers: request.headers,
+      body: request.method === 'GET' || request.method === 'HEAD' ? undefined : await request.text(),
+      signal: request.signal,
+    }),
+});
+
+client.use({
+  onRequest({ request }) {
+    if (authToken && !request.headers.has('Authorization')) {
+      request.headers.set('Authorization', `Bearer ${authToken}`);
     }
-  }
+    request.headers.set('Accept', 'application/json');
+    return request;
+  },
+});
 
-  if (!res.ok) {
-    if (res.status === 401 && token) unauthorizedHandler?.();
-    const apiError: ApiError =
-      data && typeof data === 'object' && 'error' in data && typeof data.error === 'string'
-        ? (data as ApiError)
-        : { error: res.status >= 500 ? 'Server error. Please try again shortly.' : `Request failed (${res.status})` };
-    throw new ApiClientError(res.status, apiError);
-  }
+/** The data from a typed call, or an `ApiProblem` thrown. */
+function unwrap<T>(result: { data?: T; error?: unknown; response: Response }): T {
+  if (!result.response.ok) throw new ApiProblem(result.response.status, result.error);
+  return result.data as T;
+}
 
+async function readJson(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+/** A multipart upload (photos, certificates): sent directly, so the File blob isn't re-read. */
+async function upload<T>(method: 'POST', path: string, form: FormData): Promise<T> {
+  const response = await send(`${API_URL}${path}`, {
+    method,
+    headers: { Accept: 'application/json', ...headersFor(authToken) },
+    body: form,
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new ApiProblem(response.status, data);
   return data as T;
 }
 
-// ---------- Endpoints (docs/api.md) ----------
+// ---------- Sign-in (Better Auth, /v1/auth/*) ----------
 
-export type RightToWorkInput = import('@salonstaff/shared').RightToWorkInput;
-
-export type UploadFile = {
-  /** A Blob-compatible file, e.g. `new File(uri)` from expo-file-system. */
-  blob: Blob;
-  name: string;
-};
-
-/** Where a one-time sign-in code is sent. */
+/** Where a one-time sign-in code is sent. `phone` is E.164 (+614…). */
 export type CodeTarget = { email: string } | { phone: string };
 
 export type OAuthProvider = 'google' | 'apple';
 
-const id = (value: string) => encodeURIComponent(value);
+async function authCall(path: string, body: unknown, token?: string | null): Promise<Response> {
+  const response = await send(`${API_URL}/v1/auth/${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...headersFor(token) },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new ApiProblem(response.status, await readJson(response));
+  return response;
+}
+
+/** The session token from a sign-in: Better Auth's bearer plugin puts it in `set-auth-token`. */
+async function sessionToken(response: Response): Promise<string> {
+  const fromHeader = response.headers.get('set-auth-token');
+  const body = (await readJson(response)) as { token?: string } | undefined;
+  const token = fromHeader || body?.token;
+  if (!token) throw new ApiProblem(500, { detail: 'Signed in, but no session came back.' });
+  return token;
+}
+
+// ---------- Endpoints ----------
+
+const path = (value: string) => ({ path: { id: value } });
 
 export const api = {
-  // Auth
-  requestCode: (target: CodeTarget) =>
-    request<{ ok: true }>('POST', '/auth/request-code', {
-      json: { ...target, role: 'seeker' },
-      token: null,
-    }),
-  verifyCode: (target: CodeTarget, code: string) =>
-    request<AuthResponse>('POST', '/auth/verify-code', {
-      json: { ...target, code, client: 'mobile' },
-      token: null,
-    }),
-  oauth: (provider: OAuthProvider, idToken: string, name?: string) =>
-    request<AuthResponse>('POST', '/auth/oauth', {
-      json: { provider, idToken, name: name || undefined, role: 'seeker' },
-      token: null,
-    }),
-  logout: () => request<{ ok: true }>('POST', '/auth/logout'),
+  // Sign-in
+  sendCode: async (target: CodeTarget) => {
+    if ('email' in target)
+      await authCall('email-otp/send-verification-otp', { email: target.email, type: 'sign-in' });
+    else await authCall('phone-number/send-otp', { phoneNumber: target.phone });
+  },
+  /** Returns the session token. Signs up on first use (as a job seeker). */
+  verifyCode: async (target: CodeTarget, code: string) =>
+    sessionToken(
+      'email' in target
+        ? await authCall('sign-in/email-otp', { email: target.email, otp: code })
+        : await authCall('phone-number/verify', { phoneNumber: target.phone, code }),
+    ),
+  /** Native Google / Apple: the provider's ID token. Apple sends the name on the first sign-in only. */
+  signInWithIdToken: async (provider: OAuthProvider, idToken: string, name?: string) => {
+    const [firstName, ...rest] = (name ?? '').trim().split(/\s+/);
+    const user = firstName ? { name: { firstName, lastName: rest.join(' ') } } : undefined;
+    return sessionToken(
+      await authCall('sign-in/social', { provider, idToken: { token: idToken, user } }),
+    );
+  },
+  /** Local development only (404 anywhere else): the demo job seeker, without a code. */
+  devLogin: async () => {
+    const response = await authCall('dev-login', { role: 'seeker' });
+    return sessionToken(response);
+  },
+  signOut: async () => {
+    await authCall('sign-out', {}, authToken);
+  },
 
   // Me
-  me: (token?: string) => request<Me>('GET', '/me', token ? { token } : {}),
-  updateProfile: (input: SeekerProfileInput) => request<Me>('PUT', '/me/profile', { json: input }),
-  deleteAccount: () => request<{ ok: true }>('DELETE', '/me'),
-  myApplications: () => request<{ items: MyApplication[] }>('GET', '/me/applications'),
-  mySaved: () => request<{ items: JobSummary[] }>('GET', '/me/saved'),
+  me: async (token?: string) =>
+    unwrap(await client.GET('/v1/me', token ? { headers: headersFor(token) } : {})),
+  deleteAccount: async () => unwrap(await client.DELETE('/v1/me')),
+  myApplications: async () => unwrap(await client.GET('/v1/me/applications')),
+  mySaved: async () => unwrap(await client.GET('/v1/me/saved')),
 
-  // Rich profile
-  fullProfile: () => request<FullProfile>('GET', '/me/profile/full'),
-  updateDetails: (input: ProfileDetailsInput) =>
-    request<FullProfile>('PUT', '/me/profile/details', { json: input }),
+  // Profile
+  profile: async () => unwrap(await client.GET('/v1/me/profile')),
+  saveProfile: async (body: ProfileInput) => unwrap(await client.PUT('/v1/me/profile', { body })),
+  /** Skills, availability and pay are saved together: send the others' current values. */
+  saveDetails: async (body: DetailsInput) =>
+    unwrap(await client.PUT('/v1/me/profile/details', { body })),
   uploadPhoto: (file: UploadFile) => {
     const form = new FormData();
     form.append('file', file.blob, file.name);
-    return request<{ photoUrl: string }>('POST', '/me/photo', { form });
+    return upload<Schemas['ProfilePhoto']>('POST', '/v1/me/photo', form);
   },
-  deletePhoto: () => request<{ photoUrl: null }>('DELETE', '/me/photo'),
-  addPortfolioItem: (file: UploadFile, caption?: string) => {
+  removePhoto: async () => unwrap(await client.DELETE('/v1/me/photo')),
+  addPortfolioPhoto: (file: UploadFile, caption?: string) => {
     const form = new FormData();
     form.append('file', file.blob, file.name);
-    if (caption) form.append('caption', caption);
-    return request<PortfolioItem>('POST', '/me/portfolio', { form });
+    if (caption?.trim()) form.append('caption', caption.trim());
+    return upload<PortfolioItem>('POST', '/v1/me/portfolio', form);
   },
-  deletePortfolioItem: (itemId: string) =>
-    request<{ ok: true }>('DELETE', `/me/portfolio/${id(itemId)}`),
-  addExperience: (input: ExperienceInput) =>
-    request<FullProfile>('POST', '/me/experience', { json: input }),
-  deleteExperience: (itemId: string) =>
-    request<FullProfile>('DELETE', `/me/experience/${id(itemId)}`),
-  addEducation: (input: EducationInput) =>
-    request<FullProfile>('POST', '/me/education', { json: input }),
-  deleteEducation: (itemId: string) =>
-    request<FullProfile>('DELETE', `/me/education/${id(itemId)}`),
+  removePortfolioPhoto: async (id: string) =>
+    unwrap(await client.DELETE('/v1/me/portfolio/{id}', { params: path(id) })),
+  addExperience: async (body: ExperienceInput) =>
+    unwrap(await client.POST('/v1/me/experience', { body })),
+  removeExperience: async (id: string) =>
+    unwrap(await client.DELETE('/v1/me/experience/{id}', { params: path(id) })),
+  addEducation: async (body: EducationInput) =>
+    unwrap(await client.POST('/v1/me/education', { body })),
+  removeEducation: async (id: string) =>
+    unwrap(await client.DELETE('/v1/me/education/{id}', { params: path(id) })),
+
+  // Endorsements
+  endorsements: async () => unwrap(await client.GET('/v1/me/endorsements')),
+  askForEndorsement: async (body: EndorsementRequest) =>
+    unwrap(await client.POST('/v1/me/endorsements', { body })),
+  showEndorsement: async (id: string, shown: boolean) =>
+    unwrap(await client.PATCH('/v1/me/endorsements/{id}', { params: path(id), body: { shown } })),
+  removeEndorsement: async (id: string) =>
+    unwrap(await client.DELETE('/v1/me/endorsements/{id}', { params: path(id) })),
+
+  // Who sees it
+  saveSettings: async (body: SettingsInput) =>
+    unwrap(await client.PATCH('/v1/me/profile/settings', { body })),
+  newShareCode: async () => unwrap(await client.POST('/v1/me/profile/share-code')),
+  hiddenSalons: async () => unwrap(await client.GET('/v1/me/hidden-salons')),
+  hideFromSalon: async (salonId: string) =>
+    unwrap(await client.PUT('/v1/me/hidden-salons/{salonId}', { params: { path: { salonId } } })),
+  unhideFromSalon: async (salonId: string) =>
+    unwrap(
+      await client.DELETE('/v1/me/hidden-salons/{salonId}', { params: { path: { salonId } } }),
+    ),
+  searchSalons: async (q: string) =>
+    unwrap(await client.GET('/v1/salons', { params: { query: { q } } })),
+
+  // Inbox
+  contacts: async () => unwrap(await client.GET('/v1/me/profile/contacts')),
+  /** No ids: all of them. */
+  markRead: async (ids?: string[]) =>
+    unwrap(await client.POST('/v1/me/profile/contacts/read', { body: ids ? { ids } : {} })),
+
+  // Sign-in and security
+  changeEmail: async (email: string) =>
+    unwrap(await client.POST('/v1/me/email', { body: { email } })),
+  confirmEmail: async (email: string, code: string) =>
+    unwrap(await client.POST('/v1/me/email/confirm', { body: { email, code } })),
+  changeMobile: async (phoneNumber: string) =>
+    unwrap(await client.POST('/v1/me/mobile', { body: { phoneNumber } })),
+  confirmMobile: async (phoneNumber: string, code: string) =>
+    unwrap(await client.POST('/v1/me/mobile/confirm', { body: { phoneNumber, code } })),
+  signInMethods: async () => unwrap(await client.GET('/v1/me/sign-in-methods')),
+  /** Connect Google or Apple to this account with the provider's ID token (Better Auth). */
+  connectProvider: async (provider: OAuthProvider, idToken: string) => {
+    await authCall('link-social', { provider, idToken: { token: idToken } }, authToken);
+  },
+  disconnectProvider: async (provider: OAuthProvider) =>
+    unwrap(
+      await client.DELETE('/v1/me/sign-in-methods/{provider}', { params: { path: { provider } } }),
+    ),
+  sessions: async () => unwrap(await client.GET('/v1/me/sessions')),
+  signOutSession: async (id: string) =>
+    unwrap(await client.DELETE('/v1/me/sessions/{id}', { params: path(id) })),
+  signOutOthers: async () => unwrap(await client.DELETE('/v1/me/sessions')),
 
   // Jobs
-  jobs: (filters: Partial<JobFilters>, signal?: AbortSignal) =>
-    request<Paginated<JobSummary>>('GET', '/jobs', { query: filters, signal }),
-  job: (idOrSlug: string) => request<JobDetail>('GET', `/jobs/${encodeURIComponent(idOrSlug)}`),
-  apply: (jobId: string, input: ApplyInput) =>
-    request<{ ok: true; applicationId: string }>('POST', `/jobs/${encodeURIComponent(jobId)}/apply`, {
-      json: input,
-    }),
-  saveJob: (jobId: string) =>
-    request<{ saved: boolean }>('POST', `/jobs/${encodeURIComponent(jobId)}/save`),
-  unsaveJob: (jobId: string) =>
-    request<{ saved: boolean }>('DELETE', `/jobs/${encodeURIComponent(jobId)}/save`),
+  jobs: async (query: JobFilters) => unwrap(await client.GET('/v1/jobs', { params: { query } })),
+  /**
+   * A job ad by its public path (`/jobs/nsw/surry-hills/…`), with what you can do (`viewer`).
+   * A renamed ad answers with its new path, which is followed.
+   */
+  jobAd: async (jobPath: string): Promise<JobAd> => {
+    let current = jobPath;
+    for (let hop = 0; hop < 3; hop++) {
+      const found = unwrap(
+        await client.GET('/v1/jobs/by-path', { params: { query: { path: current } } }),
+      );
+      if (found.kind === 'job') return found;
+      if (found.kind !== 'redirect') break;
+      current = found.redirect;
+    }
+    throw new ApiProblem(404, {
+      detail: 'This job is no longer on Salon Staff.',
+      code: 'not_found',
+    });
+  },
+  apply: async (jobId: string, coverNote?: string) =>
+    unwrap(
+      await client.POST('/v1/jobs/{id}/apply', { params: path(jobId), body: { coverNote } }),
+    ),
+  saveJob: async (jobId: string) =>
+    unwrap(await client.POST('/v1/jobs/{id}/save', { params: path(jobId) })),
+  unsaveJob: async (jobId: string) =>
+    unwrap(await client.DELETE('/v1/jobs/{id}/save', { params: path(jobId) })),
 
-  // Verification
-  verification: () => request<VerificationSummary>('GET', '/verification'),
-  startIdentity: (returnUrl: string) =>
-    request<StartVerificationResponse>('POST', '/verification/identity', { json: { returnUrl } }),
-  rightToWork: (input: RightToWorkInput) =>
-    request<VerificationSummary>('POST', '/verification/right-to-work', { json: input }),
-  uploadQualification: (file: UploadFile, title: string) => {
+  // Verification checks
+  checks: async () => unwrap(await client.GET('/v1/me/checks')),
+  startIdentity: async (returnUrl: string) =>
+    unwrap(await client.POST('/v1/me/checks/identity', { body: { returnUrl } })),
+  rightToWork: async (body: RightToWorkInput) =>
+    unwrap(await client.POST('/v1/me/checks/right-to-work', { body })),
+  /** A certificate for one of your qualifications (an education entry). */
+  uploadQualification: (file: { blob: Blob; name: string }, educationId: string) => {
     const form = new FormData();
-    form.append('title', title);
+    form.append('educationId', educationId);
     form.append('file', file.blob, file.name);
-    return request<VerificationSummary>('POST', '/verification/qualification', { form });
+    return upload<Checks>('POST', '/v1/me/checks/qualification', form);
   },
 };

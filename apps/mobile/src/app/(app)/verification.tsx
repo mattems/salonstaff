@@ -1,7 +1,7 @@
-import type { VerificationStatus, VerificationSummary } from '@salonstaff/shared';
 import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import * as WebBrowser from 'expo-web-browser';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -20,13 +20,22 @@ import { ErrorBanner, ErrorView, LoadingView } from '@/components/state-views';
 import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
 import { VerificationBadge } from '@/components/verification-badge';
-import { VerificationStep } from '@/components/verification-step';
+import { StatusPill, VerificationStep } from '@/components/verification-step';
 import { Radius, Spacing } from '@/constants/theme';
 import { useRequest } from '@/hooks/use-request';
 import { useTheme } from '@/hooks/use-theme';
-import { ApiClientError, api, errorMessage, type RightToWorkInput } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
+import {
+  ApiProblem,
+  api,
+  errorMessage,
+  type Checks,
+  type Education,
+  type RightToWorkInput,
+  type VerificationStatus,
+} from '@/lib/api';
+import { useAuth, useUser } from '@/lib/auth';
 import { VERIFY_RETURN_URL } from '@/lib/config';
+import { VERIFICATION_STATUS_LABELS } from '@/lib/format';
 
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const UPLOAD_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
@@ -36,13 +45,22 @@ const canSubmit = (s: VerificationStatus) => s !== 'verified' && s !== 'pending'
 export default function VerificationScreen() {
   const theme = useTheme();
   const { refresh: refreshMe } = useAuth();
+  const user = useUser();
+  const hasProfile = !!user.profile;
+  // Qualifications are the profile's education entries, each checked on its own.
   const { data, error, loading, refreshing, reload, refresh, setData } = useRequest(
-    api.verification,
+    async () => {
+      const [checks, profile] = await Promise.all([
+        api.checks(),
+        hasProfile ? api.profile() : Promise.resolve(null),
+      ]);
+      return { verification: checks.verification, education: profile?.education ?? [] };
+    },
     { refetchOnFocus: true },
   );
 
-  function update(summary: VerificationSummary) {
-    setData(() => summary);
+  function update(checks: Checks) {
+    setData((prev) => (prev ? { ...prev, verification: checks.verification } : prev));
     void refreshMe();
   }
 
@@ -81,14 +99,26 @@ export default function VerificationScreen() {
           </View>
         </View>
 
-        <VerificationBadge level={data.level} />
+        <VerificationBadge level={data.verification.level} />
 
-        <IdentityStep status={data.identity} onDone={async () => {
-          await reload();
-          await refreshMe();
-        }} />
-        <RightToWorkStep status={data.rightToWork} onUpdated={update} />
-        <QualificationStep status={data.qualification} onUpdated={update} />
+        <IdentityStep
+          status={data.verification.identity}
+          hasProfile={hasProfile}
+          onDone={async () => {
+            await reload();
+            await refreshMe();
+          }}
+        />
+        <RightToWorkStep status={data.verification.rightToWork} onUpdated={update} />
+        <QualificationStep
+          status={data.verification.qualification}
+          hasProfile={hasProfile}
+          education={data.education}
+          onUpdated={async () => {
+            await reload();
+            await refreshMe();
+          }}
+        />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -96,7 +126,16 @@ export default function VerificationScreen() {
 
 // ---------- (a) Identity ----------
 
-function IdentityStep({ status, onDone }: { status: VerificationStatus; onDone: () => Promise<void> }) {
+function IdentityStep({
+  status,
+  hasProfile,
+  onDone,
+}: {
+  status: VerificationStatus;
+  hasProfile: boolean;
+  onDone: () => Promise<void>;
+}) {
+  const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -138,6 +177,17 @@ function IdentityStep({ status, onDone }: { status: VerificationStatus; onDone: 
       <ErrorBanner message={error} />
       {status === 'pending' ? (
         <Button title="Check status" variant="outline" onPress={onDone} />
+      ) : status !== 'verified' && !hasProfile ? (
+        <>
+          <Text variant="small" color="textSecondary">
+            Set up your profile first: we check the name on your ID against it.
+          </Text>
+          <Button
+            title="Set up profile"
+            variant="secondary"
+            onPress={() => router.push('/edit-profile')}
+          />
+        </>
       ) : status !== 'verified' ? (
         <Button title={label} icon="shield" loading={busy} onPress={start} />
       ) : null}
@@ -158,7 +208,7 @@ function RightToWorkStep({
   onUpdated,
 }: {
   status: VerificationStatus;
-  onUpdated: (s: VerificationSummary) => void;
+  onUpdated: (checks: Checks) => void;
 }) {
   const [basis, setBasis] = useState<RightToWorkInput['basis'] | undefined>();
   const [visaGrantNumber, setVisaGrantNumber] = useState('');
@@ -187,8 +237,8 @@ function RightToWorkStep({
     try {
       onUpdated(await api.rightToWork(input));
     } catch (err) {
-      if (err instanceof ApiClientError && err.fieldErrors) {
-        setErrors(Object.fromEntries(Object.entries(err.fieldErrors).map(([k, v]) => [k, v[0]])));
+      if (err instanceof ApiProblem && err.errors.length) {
+        setErrors(Object.fromEntries(err.errors.map((e) => [e.path, e.message])));
       }
       setError(errorMessage(err));
     } finally {
@@ -257,20 +307,167 @@ function RightToWorkStep({
   );
 }
 
-// ---------- (c) Qualification ----------
+// ---------- (c) Qualifications ----------
 
 type PickedFile = { uri: string; name: string; size?: number };
 
+/** A certificate can be sent for an entry that has none, or whose check needs another go. */
+const canSendCertificate = (entry: Education) =>
+  !entry.verification || canSubmit(entry.verification.status);
+
+async function pickCertificate(): Promise<PickedFile | { tooBig: true } | null> {
+  const result = await DocumentPicker.getDocumentAsync({
+    type: UPLOAD_TYPES,
+    copyToCacheDirectory: true,
+    multiple: false,
+  });
+  if (result.canceled) return null;
+  const asset = result.assets[0];
+  if (!asset) return null;
+  if (asset.size && asset.size > MAX_UPLOAD_BYTES) return { tooBig: true };
+  return { uri: asset.uri, name: asset.name, size: asset.size };
+}
+
+const TOO_BIG = 'That file is over 8MB. Try a smaller scan or photo.';
+
 function QualificationStep({
   status,
+  hasProfile,
+  education,
   onUpdated,
 }: {
   status: VerificationStatus;
-  onUpdated: (s: VerificationSummary) => void;
+  hasProfile: boolean;
+  education: Education[];
+  onUpdated: () => Promise<void>;
+}) {
+  const router = useRouter();
+  const [adding, setAdding] = useState(false);
+
+  return (
+    <VerificationStep
+      step={3}
+      icon="qualification"
+      title="Qualifications"
+      status={status}
+      description={
+        status === 'verified'
+          ? 'A qualification is verified. Some salons require this to apply.'
+          : status === 'pending'
+            ? 'We’re reviewing your certificate.'
+            : 'Send the certificate for a qualification (PDF, JPG or PNG, up to 8MB). Some jobs require a verified qualification.'
+      }>
+      {!hasProfile ? (
+        <>
+          <Text variant="small" color="textSecondary">
+            Set up your profile first, then add your qualifications.
+          </Text>
+          <Button
+            title="Set up profile"
+            variant="secondary"
+            onPress={() => router.push('/edit-profile')}
+          />
+        </>
+      ) : (
+        <View style={styles.form}>
+          {education.map((entry) => (
+            <QualificationRow key={entry.id} entry={entry} onUpdated={onUpdated} />
+          ))}
+          {adding || education.length === 0 ? (
+            <AddQualification
+              existing={education}
+              onCancel={education.length ? () => setAdding(false) : undefined}
+              onUpdated={async () => {
+                setAdding(false);
+                await onUpdated();
+              }}
+            />
+          ) : (
+            <Button
+              title="Add a qualification"
+              variant="ghost"
+              size="sm"
+              onPress={() => setAdding(true)}
+            />
+          )}
+        </View>
+      )}
+    </VerificationStep>
+  );
+}
+
+/** One qualification on the profile, with its check and a way to send its certificate. */
+function QualificationRow({ entry, onUpdated }: { entry: Education; onUpdated: () => Promise<void> }) {
+  const theme = useTheme();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const check = entry.verification;
+
+  async function send() {
+    setError(null);
+    const picked = await pickCertificate();
+    if (!picked) return;
+    if ('tooBig' in picked) {
+      setError(TOO_BIG);
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.uploadQualification({ blob: new File(picked.uri), name: picked.name }, entry.id);
+      await onUpdated();
+      Alert.alert('Sent', 'Thanks! We’ll review your certificate shortly.');
+    } catch (err) {
+      setError(errorMessage(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <View style={[styles.entry, { borderColor: theme.border }]}>
+      <View style={styles.entryRow}>
+        <View style={styles.flex}>
+          <Text variant="smallStrong">{entry.qualification}</Text>
+          <Text variant="caption" color="textMuted">
+            {[entry.institution, entry.year].filter(Boolean).join(' · ') ||
+              (check ? VERIFICATION_STATUS_LABELS[check.status] : 'No certificate sent')}
+          </Text>
+        </View>
+        {check ? <StatusPill status={check.status} /> : null}
+      </View>
+      {check?.reference ? (
+        <Text variant="caption" color="textMuted">
+          Verification ID {check.reference}
+        </Text>
+      ) : null}
+      <ErrorBanner message={error} />
+      {canSendCertificate(entry) ? (
+        <Button
+          title={check ? 'Send a new certificate' : 'Send certificate'}
+          icon="upload"
+          size="sm"
+          variant="outline"
+          loading={busy}
+          onPress={send}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+/** A new qualification (an education entry) and its certificate, sent together. */
+function AddQualification({
+  existing,
+  onCancel,
+  onUpdated,
+}: {
+  existing: Education[];
+  onCancel?: () => void;
+  onUpdated: () => Promise<void>;
 }) {
   const theme = useTheme();
-  const [showForm, setShowForm] = useState(false);
   const [title, setTitle] = useState('');
+  const [institution, setInstitution] = useState('');
   const [file, setFile] = useState<PickedFile | null>(null);
   const [errors, setErrors] = useState<{ title?: string; file?: string }>({});
   const [error, setError] = useState<string | null>(null);
@@ -278,41 +475,36 @@ function QualificationStep({
 
   async function pick() {
     setErrors((e) => ({ ...e, file: undefined }));
-    const result = await DocumentPicker.getDocumentAsync({
-      type: UPLOAD_TYPES,
-      copyToCacheDirectory: true,
-      multiple: false,
-    });
-    if (result.canceled) return;
-    const asset = result.assets[0];
-    if (!asset) return;
-    if (asset.size && asset.size > MAX_UPLOAD_BYTES) {
-      setErrors((e) => ({ ...e, file: 'That file is over 8MB. Try a smaller scan or photo.' }));
-      return;
-    }
-    setFile({ uri: asset.uri, name: asset.name, size: asset.size });
+    const picked = await pickCertificate();
+    if (!picked) return;
+    if ('tooBig' in picked) setErrors((e) => ({ ...e, file: TOO_BIG }));
+    else setFile(picked);
   }
 
-  async function upload() {
+  async function save() {
     setError(null);
     const next: typeof errors = {};
-    if (!title.trim()) next.title = 'Add a title, e.g. Cert III in Hairdressing';
+    if (!title.trim()) next.title = 'Add its name, e.g. Cert III in Hairdressing';
     if (!file) next.file = 'Choose a PDF, JPG or PNG';
     setErrors(next);
     if (next.title || next.file || !file) return;
 
     setBusy(true);
     try {
-      const blob = new File(file.uri);
-      const summary = await api.uploadQualification({ blob, name: file.name }, title.trim());
-      setTitle('');
-      setFile(null);
-      setShowForm(false);
-      onUpdated(summary);
-      Alert.alert('Uploaded', 'Thanks! We’ll review your qualification shortly.');
+      const before = new Set(existing.map((e) => e.id));
+      const profile = await api.addEducation({
+        qualification: title.trim(),
+        institution: institution.trim() || undefined,
+      });
+      const added = profile.education.find((e) => !before.has(e.id));
+      if (added) {
+        await api.uploadQualification({ blob: new File(file.uri), name: file.name }, added.id);
+      }
+      await onUpdated();
+      Alert.alert('Sent', 'Thanks! We’ll review your qualification shortly.');
     } catch (err) {
-      if (err instanceof ApiClientError && err.fieldErrors) {
-        setErrors({ title: err.fieldErrors.title?.[0], file: err.fieldErrors.file?.[0] });
+      if (err instanceof ApiProblem && err.errors.length) {
+        setErrors({ title: err.field('qualification'), file: err.field('file') });
       }
       setError(errorMessage(err));
     } finally {
@@ -320,58 +512,47 @@ function QualificationStep({
     }
   }
 
-  const formVisible = canSubmit(status) || showForm;
-
   return (
-    <VerificationStep
-      step={3}
-      icon="qualification"
-      title="Qualification"
-      status={status}
-      description={
-        status === 'verified'
-          ? 'Your qualification is verified. Some salons require this to apply.'
-          : status === 'pending'
-            ? 'We’re reviewing your certificate.'
-            : 'Upload your certificate (PDF, JPG or PNG, up to 8MB). Some jobs require a verified qualification.'
-      }>
-      {formVisible ? (
-        <View style={styles.form}>
-          <TextField
-            label="Qualification"
-            value={title}
-            onChangeText={(t) => {
-              setTitle(t);
-              setErrors((e) => ({ ...e, title: undefined }));
-            }}
-            placeholder="e.g. Cert III in Hairdressing"
-            maxLength={120}
-            error={errors.title}
-          />
-          <View
-            style={[
-              styles.file,
-              { borderColor: errors.file ? theme.danger : theme.border, backgroundColor: theme.surfaceMuted },
-            ]}>
-            <Icon name="upload" size={20} color={theme.textSecondary} />
-            <View style={styles.flex}>
-              <Text variant="smallStrong" numberOfLines={1}>
-                {file ? file.name : 'No file chosen'}
-              </Text>
-              <Text variant="caption" color={errors.file ? 'danger' : 'textMuted'}>
-                {errors.file ??
-                  (file?.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : 'PDF, JPG or PNG')}
-              </Text>
-            </View>
-            <Button title={file ? 'Change' : 'Choose'} size="sm" variant="outline" onPress={pick} />
-          </View>
-          <ErrorBanner message={error} />
-          <Button title="Upload" onPress={upload} loading={busy} variant="secondary" />
+    <View style={styles.form}>
+      <TextField
+        label="Qualification"
+        value={title}
+        onChangeText={(t) => {
+          setTitle(t);
+          setErrors((e) => ({ ...e, title: undefined }));
+        }}
+        placeholder="e.g. Cert III in Hairdressing"
+        maxLength={120}
+        error={errors.title}
+      />
+      <TextField
+        label="Where you studied (optional)"
+        value={institution}
+        onChangeText={setInstitution}
+        placeholder="e.g. TAFE NSW"
+        maxLength={120}
+      />
+      <View
+        style={[
+          styles.file,
+          { borderColor: errors.file ? theme.danger : theme.border, backgroundColor: theme.surfaceMuted },
+        ]}>
+        <Icon name="upload" size={20} color={theme.textSecondary} />
+        <View style={styles.flex}>
+          <Text variant="smallStrong" numberOfLines={1}>
+            {file ? file.name : 'No certificate chosen'}
+          </Text>
+          <Text variant="caption" color={errors.file ? 'danger' : 'textMuted'}>
+            {errors.file ??
+              (file?.size ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : 'PDF, JPG or PNG')}
+          </Text>
         </View>
-      ) : status === 'verified' ? (
-        <Button title="Upload another" variant="ghost" size="sm" onPress={() => setShowForm(true)} />
-      ) : null}
-    </VerificationStep>
+        <Button title={file ? 'Change' : 'Choose'} size="sm" variant="outline" onPress={pick} />
+      </View>
+      <ErrorBanner message={error} />
+      <Button title="Add and send" onPress={save} loading={busy} variant="secondary" />
+      {onCancel ? <Button title="Cancel" variant="ghost" size="sm" onPress={onCancel} /> : null}
+    </View>
   );
 }
 
@@ -385,6 +566,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
   },
   form: { gap: Spacing.three },
+  entry: { gap: Spacing.two, padding: Spacing.three, borderRadius: Radius.md, borderWidth: 1 },
+  entryRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },
   file: {
     flexDirection: 'row',

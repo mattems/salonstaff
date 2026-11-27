@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-26_
+_Last updated: 2026-11-27_
 
 ## Where things stand
 
@@ -75,6 +75,17 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
     in a lightbox.
   - An inbox of salons' messages and number views, with an unread count on a bell in the header.
   - Migrations 0005, 0006 and 0007.
+- Mobile app (`apps/mobile`, still not a workspace) moved onto the current API: types generated from the
+  OpenAPI description (`bun run api:types` writes `apps/mobile/src/lib/api/schema.d.ts`), Better Auth
+  sign-in by email or SMS code with the session as a bearer token, Google/Apple only when the build is
+  configured, and a local "Demo job seeker" button (`/v1/auth/dev-login` now also returns the token).
+  Jobs, job ads by path with the API's `blocker`, apply, saved, applications and checks, where each
+  qualification is an education entry with its own certificate. The Profile tab has the website's
+  account sections: basics (TikTok added; the old mobile and free-text qualifications fields gone),
+  photo, skills, availability and pay, portfolio, experience and qualifications, endorsements,
+  visibility and sharing (the share link through the phone's share sheet; no post image), how salons
+  contact you, verification, and sign-in and security (email and mobile by code, Google/Apple, devices).
+  An inbox of salons' messages and number views, with the unread count on the Profile tab.
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
@@ -110,4 +121,5 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   the built CSVs in production (tools/directory/README.md).
 - No Cloudflare account, PlanetScale database or deploy yet (docs/runbooks/first-deploy.md).
 - Google, Apple, Twilio, Stripe and Resend keys (Matt sets them).
-- Mobile app (`apps/mobile`) parked; it needs updating to the new API and bearer auth.
+- Mobile app: not tried on Android or a physical device; Google/Apple sign-in and connecting them not tried
+  (needs keys and a development build). No post image for Instagram/TikTok (the website draws it).

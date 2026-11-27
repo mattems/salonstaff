@@ -6,7 +6,6 @@ import {
   type AuState,
   type EmploymentType,
   type JobRole,
-  type JobSummary,
 } from '@salonstaff/shared';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -20,7 +19,7 @@ import { Text } from '@/components/text';
 import { Spacing } from '@/constants/theme';
 import { useDebounced } from '@/hooks/use-debounced';
 import { useTheme } from '@/hooks/use-theme';
-import { api, errorMessage } from '@/lib/api';
+import { api, errorMessage, type JobSummary } from '@/lib/api';
 
 type Filters = { q?: string; role?: JobRole; state?: AuState; type?: EmploymentType };
 type LoadMode = 'initial' | 'refresh' | 'more';

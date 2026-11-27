@@ -8,10 +8,13 @@ export function SearchField({
   value,
   onChangeText,
   placeholder,
+  onSubmitEditing,
 }: {
   value: string;
   onChangeText: (text: string) => void;
   placeholder: string;
+  /** Searching on return, when results aren't fetched as you type. */
+  onSubmitEditing?: () => void;
 }) {
   const theme = useTheme();
   return (
@@ -24,6 +27,7 @@ export function SearchField({
         placeholderTextColor={theme.textMuted}
         selectionColor={theme.brand}
         returnKeyType="search"
+        onSubmitEditing={onSubmitEditing}
         autoCorrect={false}
         clearButtonMode="never"
         accessibilityLabel={placeholder}

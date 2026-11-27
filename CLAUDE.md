@@ -42,7 +42,7 @@ bun run deploy  # production (docs/runbooks/first-deploy.md)
 | `apps/web` | TanStack Start (SSR) on a Worker: salonstaff.com.au. Forwards `/api/*` to the API |
 | `apps/admin` | React + Vite admin portal from kaybee: admin.salonstaff.com.au, behind Cloudflare Access |
 | `apps/springboard` | Local launcher (:4100), never deployed |
-| `apps/mobile` | Expo job seeker app. **Parked** until the website is done; not in the workspaces |
+| `apps/mobile` | Expo job seeker app on the current API (bearer token). Its own npm project, not in the workspaces: check it with `npx tsc --noEmit` there |
 | `packages/db` | Drizzle schema, migrations, all data access (scopes) |
 | `packages/shared` | Constants, zod schemas, IDs, errors, staff roles, and the pure rules (`rules.ts`, `urls.ts`) |
 | `packages/auth` | Better Auth: Google, Apple, email code, SMS code, bearer (mobile) |

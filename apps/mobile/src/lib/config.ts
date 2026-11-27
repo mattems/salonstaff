@@ -1,19 +1,32 @@
 import { Platform } from 'react-native';
 
 /**
- * Base URL of the Salon Staff server (without `/api/v1`).
- * Android emulators reach the host machine on 10.0.2.2 rather than localhost.
+ * The API's origin (it serves `/v1/*` and sign-in at `/v1/auth/*`).
+ * Locally it's `wrangler dev` on :8890; Android emulators reach the host machine on 10.0.2.2.
  */
 function resolveApiUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL?.trim();
   if (fromEnv) return fromEnv.replace(/\/+$/, '');
-  return Platform.OS === 'android' ? 'http://10.0.2.2:3000' : 'http://localhost:3000';
+  if (!__DEV__) return 'https://api.salonstaff.com.au';
+  return Platform.OS === 'android' ? 'http://10.0.2.2:8890' : 'http://localhost:8890';
 }
 
 export const API_URL = resolveApiUrl();
-export const API_BASE = `${API_URL}/api/v1`;
 
-/** Deep link the identity provider redirects back to when verification finishes. */
+/** The website, for links people open or share (a share page, a salon's page). */
+function resolveSiteUrl(): string {
+  const fromEnv = process.env.EXPO_PUBLIC_SITE_URL?.trim();
+  if (fromEnv) return fromEnv.replace(/\/+$/, '');
+  if (!__DEV__) return 'https://salonstaff.com.au';
+  return Platform.OS === 'android' ? 'http://10.0.2.2:5300' : 'http://localhost:5300';
+}
+
+export const SITE_URL = resolveSiteUrl();
+
+/** A page on the website by its path (`/p/k7x2m9qd4h`). */
+export const siteUrl = (path: string) => `${SITE_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+
+/** Deep link the identity check sends people back to when it finishes. */
 export const VERIFY_RETURN_URL = 'salonstaff://verify-complete';
 
 /** Google OAuth client IDs (Google Cloud Console → Credentials). */
@@ -24,11 +37,17 @@ export const GOOGLE_CLIENT_IDS = {
   web: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID?.trim() || undefined,
 };
 
-/** Media paths from the API are server-relative (`/media/<key>`). */
-export function mediaUrl(path: string): string;
-export function mediaUrl(path: string | null | undefined): string | null;
-export function mediaUrl(path: string | null | undefined): string | null {
-  if (!path) return null;
-  if (/^(https?:|data:|blob:|file:)/.test(path)) return path;
-  return `${API_URL}${path.startsWith('/') ? '' : '/'}${path}`;
+/**
+ * Picture URLs from the API are absolute. Locally they point at `localhost`, which an Android
+ * emulator or a phone can't reach, so they're moved onto the API address the app uses.
+ */
+export function mediaUrl(url: string): string;
+export function mediaUrl(url: string | null | undefined): string | null;
+export function mediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (__DEV__) {
+    const local = url.match(/^https?:\/\/(?:localhost|127\.0\.0\.1)(?::\d+)?(\/.*)$/);
+    if (local) return `${API_URL}${local[1]}`;
+  }
+  return url;
 }

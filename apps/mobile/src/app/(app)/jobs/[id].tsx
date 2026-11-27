@@ -1,11 +1,4 @@
-import {
-  EMPLOYMENT_TYPES,
-  JOB_ROLES,
-  formatPay,
-  labelFor,
-  type JobDetail,
-  type Me,
-} from '@salonstaff/shared';
+import { EMPLOYMENT_TYPES, JOB_ROLES, labelFor } from '@salonstaff/shared';
 import { Stack, useLocalSearchParams, useRouter, type Href } from 'expo-router';
 import { useState } from 'react';
 import { Alert, ScrollView, StyleSheet, View } from 'react-native';
@@ -22,76 +15,62 @@ import { VerifiedTick } from '@/components/verified-tick';
 import { Spacing } from '@/constants/theme';
 import { useRequest } from '@/hooks/use-request';
 import { useTheme } from '@/hooks/use-theme';
-import { api, errorMessage } from '@/lib/api';
-import { useUser } from '@/lib/auth';
+import { api, errorMessage, type JobAd, type JobViewer } from '@/lib/api';
 import { formatDate, timeAgo } from '@/lib/format';
 
 export default function JobDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { path } = useLocalSearchParams<{ id: string; path: string }>();
   // Refetch on focus so `viewer` is fresh after applying or verifying.
-  const { data: job, error, loading, reload, setData } = useRequest(() => api.job(id), {
+  const { data: ad, error, loading, reload, setData } = useRequest(() => api.jobAd(path), {
     refetchOnFocus: true,
   });
 
-  if (loading && !job) return <LoadingView />;
-  if (error && !job) return <ErrorView message={error} onRetry={reload} />;
-  if (!job) return null;
+  if (loading && !ad) return <LoadingView />;
+  if (error && !ad) return <ErrorView message={error} onRetry={reload} />;
+  if (!ad) return null;
 
   return (
     <JobDetailView
-      job={job}
+      ad={ad}
       onSavedChange={(saved) =>
-        setData((prev) => (prev ? { ...prev, viewer: { ...defaultViewer(prev), saved } } : prev))
+        setData((prev) => (prev ? { ...prev, viewer: { ...viewerOf(prev), saved } } : prev))
       }
     />
   );
 }
 
-function defaultViewer(job: JobDetail): NonNullable<JobDetail['viewer']> {
-  return job.viewer ?? { applied: false, saved: false, canApply: true };
+/** Signed in, so the API always sends `viewer`; this only guards the type. */
+function viewerOf(ad: JobAd): JobViewer {
+  return (
+    ad.viewer ?? { applied: false, saved: false, canApply: false, blocker: 'login', reason: null }
+  );
 }
 
 type Cta = { label: string; href: Href; icon: IconName };
 
-/** Work out what the seeker needs to do before they can apply. */
-function blockerCta(user: Me, job: JobDetail, viewer: NonNullable<JobDetail['viewer']>): Cta | null {
-  const r = (viewer.reason ?? '').toLowerCase();
-  const profile: Cta = { label: 'Complete profile', href: '/edit-profile', icon: 'edit' };
-  const verify: Cta = { label: 'Verify identity', href: '/verification', icon: 'shield' };
-  const qualification: Cta = { label: 'Add qualification', href: '/verification', icon: 'qualification' };
-
-  switch (viewer.reasonCode) {
+/** What the seeker needs to do before they can apply, from the API's `blocker`. */
+function blockerCta(viewer: JobViewer): Cta | null {
+  switch (viewer.blocker) {
     case 'profile':
-      return profile;
+      return { label: 'Complete profile', href: '/edit-profile', icon: 'edit' };
     case 'verify':
-      return verify;
+      return { label: 'Verify identity', href: '/verification', icon: 'shield' };
     case 'qualification':
-      return qualification;
-    case 'applied':
-    case 'employer':
-    case 'login':
+      return { label: 'Verify a qualification', href: '/verification', icon: 'qualification' };
+    default:
       return null;
   }
-  // Fallback for older servers without reasonCode.
-  if (r.includes('profile')) return profile;
-  if (r.includes('identity') || r.includes('verify')) return verify;
-  if (r.includes('qualif')) return qualification;
-  if (r.includes('right to work')) return { ...verify, label: 'Add right to work' };
-  if (!user.profile) return profile;
-  if (user.verification.identity !== 'verified') return verify;
-  if (job.requireQualification && user.verification.qualification !== 'verified') return qualification;
-  return null;
 }
 
-function JobDetailView({ job, onSavedChange }: { job: JobDetail; onSavedChange: (saved: boolean) => void }) {
+function JobDetailView({ ad, onSavedChange }: { ad: JobAd; onSavedChange: (saved: boolean) => void }) {
   const theme = useTheme();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const user = useUser();
-  const viewer = defaultViewer(job);
+  const job = ad.job;
+  const viewer = viewerOf(ad);
   const [saving, setSaving] = useState(false);
-  const pay = formatPay(job.payMin, job.payMax, job.payPeriod);
-  const cta = !viewer.applied && !viewer.canApply ? blockerCta(user, job, viewer) : null;
+  const pay = job.pay;
+  const cta = !viewer.applied && !viewer.canApply ? blockerCta(viewer) : null;
 
   async function toggleSave() {
     const next = !viewer.saved;
@@ -141,7 +120,16 @@ function JobDetailView({ job, onSavedChange }: { job: JobDetail; onSavedChange: 
           <Fact
             icon="time"
             label="Posted"
-            value={`${timeAgo(job.publishedAt)} · closes ${formatDate(job.expiresAt)}`}
+            value={
+              ad.closed
+                ? 'This job has closed'
+                : [
+                    job.publishedAt ? timeAgo(job.publishedAt) : null,
+                    job.expiresAt ? `closes ${formatDate(job.expiresAt)}` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+            }
           />
           {job.requireQualification ? (
             <Fact icon="qualification" label="Qualification" value="Verified qualification required" />

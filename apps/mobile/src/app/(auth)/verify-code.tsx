@@ -27,7 +27,7 @@ export default function VerifyCodeScreen() {
   const { email, phone } = useLocalSearchParams<{ email?: string; phone?: string }>();
   const target: CodeTarget = phone ? { phone } : { email: email ?? '' };
   const destination = phone ? formatAuMobile(phone) : (email ?? '');
-  const { verifyCode, requestCode } = useAuth();
+  const { verifyCode, sendCode } = useAuth();
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +63,7 @@ export default function VerifyCodeScreen() {
     setError(null);
     setNotice(null);
     try {
-      await requestCode(target);
+      await sendCode(target);
       setCooldown(RESEND_SECONDS);
       setNotice('New code sent.');
     } catch (err) {
