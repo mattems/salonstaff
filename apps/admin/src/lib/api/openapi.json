@@ -918,99 +918,6 @@
         },
         "required": ["hidden"]
       },
-      "ProfileContacts": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProfileContact"
-            }
-          }
-        },
-        "required": ["items"]
-      },
-      "ProfileContact": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
-          },
-          "kind": {
-            "type": "string",
-            "enum": ["message", "phone"],
-            "description": "`message`: they sent you a message (emailed to you). `phone`: they looked at your number."
-          },
-          "message": {
-            "type": ["string", "null"]
-          },
-          "read": {
-            "type": "boolean",
-            "description": "You've seen it in your inbox."
-          },
-          "sender": {
-            "type": ["object", "null"],
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              }
-            },
-            "required": ["name", "email"],
-            "description": "Who sent a message, and where your reply goes (it's the message's reply-to)."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-11-25T03:00:00.000Z"
-          },
-          "salon": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "path": {
-                "type": "string"
-              }
-            },
-            "required": ["id", "name", "path"]
-          },
-          "hidden": {
-            "type": "boolean",
-            "description": "You've hidden your profile from this salon."
-          }
-        },
-        "required": ["id", "kind", "message", "read", "sender", "createdAt", "salon", "hidden"]
-      },
-      "Unread": {
-        "type": "object",
-        "properties": {
-          "unread": {
-            "type": "integer"
-          }
-        },
-        "required": ["unread"]
-      },
-      "ContactsRead": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
-            },
-            "maxItems": 200
-          }
-        }
-      },
       "MyEndorsements": {
         "type": "object",
         "properties": {
@@ -2438,7 +2345,7 @@
         "properties": {
           "message": {
             "type": "boolean",
-            "description": "You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you."
+            "description": "You can write to them in your conversation (POST …/candidates/{userId}/messages, D-19)."
           },
           "phone": {
             "type": "boolean",
@@ -2446,16 +2353,6 @@
           }
         },
         "required": ["message", "phone"]
-      },
-      "MessageSent": {
-        "type": "object",
-        "properties": {
-          "sent": {
-            "type": "boolean",
-            "enum": [true]
-          }
-        },
-        "required": ["sent"]
       },
       "CandidatePhone": {
         "type": "object",
@@ -2552,30 +2449,51 @@
           }
         ]
       },
-      "SalonConversation": {
+      "SalonConversations": {
         "type": "object",
         "properties": {
-          "applicant": {
-            "$ref": "#/components/schemas/SalonApplicant"
-          },
-          "messages": {
+          "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ApplicationMessage"
+              "$ref": "#/components/schemas/SalonConversationSummary"
             }
-          },
-          "canSend": {
-            "type": "boolean",
-            "description": "Whether you can write in it now."
-          },
-          "sendHint": {
-            "type": ["string", "null"],
-            "description": "Why not, when you can't (the salon hasn't written yet, today's limit)."
           }
         },
-        "required": ["applicant", "messages", "canSend", "sendHint"]
+        "required": ["items"]
       },
-      "ApplicationMessage": {
+      "SalonConversationSummary": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lastMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "Their messages your team hasn't read."
+          }
+        },
+        "required": ["candidateId", "name", "lastMessage", "lastMessageAt", "unreadMessages"]
+      },
+      "Message": {
         "type": "object",
         "properties": {
           "id": {
@@ -2585,7 +2503,12 @@
           "from": {
             "type": "string",
             "enum": ["salon", "seeker"],
-            "description": "The salon's team, or the applicant."
+            "description": "The salon's team, or the job seeker."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["text", "number_viewed"],
+            "description": "`text`, or `number_viewed`: a line saying the salon looked at the job seeker's number (no body)."
           },
           "senderName": {
             "type": ["string", "null"],
@@ -2594,13 +2517,85 @@
           "body": {
             "type": "string"
           },
+          "about": {
+            "type": ["object", "null"],
+            "properties": {
+              "applicationId": {
+                "type": "string"
+              },
+              "jobTitle": {
+                "type": "string"
+              }
+            },
+            "required": ["applicationId", "jobTitle"],
+            "description": "The application it's about, if any."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
             "example": "2026-11-25T03:00:00.000Z"
           }
         },
-        "required": ["id", "from", "senderName", "body", "createdAt"]
+        "required": ["id", "from", "kind", "senderName", "body", "about", "createdAt"]
+      },
+      "CandidateConversation": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "applications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationApplication"
+            },
+            "description": "Their applications to your salon, newest first."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "canSend": {
+            "type": "boolean",
+            "description": "Whether you can write in it now."
+          },
+          "sendHint": {
+            "type": ["string", "null"],
+            "description": "Why not, when you can't (the salon hasn't written yet, they don't take messages)."
+          }
+        },
+        "required": ["candidateId", "name", "applications", "messages", "canSend", "sendHint"]
+      },
+      "ConversationApplication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "jobId", "jobTitle", "status", "createdAt"]
       },
       "MyConversations": {
         "type": "object",
@@ -2615,40 +2610,60 @@
         "required": ["items"]
       },
       "MyConversation": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/MyApplication"
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "cnv_01k6q2x8h4f7tbn3m9vz5cdr0e"
           },
-          {
-            "type": "object",
-            "properties": {
-              "lastMessage": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ApplicationMessage"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+          "salon": {
+            "$ref": "#/components/schemas/SalonSummary"
+          },
+          "lastMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              },
+              {
+                "type": "null"
               }
-            },
-            "required": ["lastMessage"]
+            ]
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "The salon's messages you haven't read."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "You hid your profile from this salon (D-13)."
           }
-        ]
+        },
+        "required": ["id", "salon", "lastMessage", "lastMessageAt", "unreadMessages", "hidden"]
       },
-      "MyApplicationThread": {
+      "MyConversationThread": {
         "allOf": [
           {
-            "$ref": "#/components/schemas/MyApplication"
+            "$ref": "#/components/schemas/MyConversation"
           },
           {
             "type": "object",
             "properties": {
+              "applications": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConversationApplication"
+                },
+                "description": "Your applications to this salon, newest first."
+              },
               "messages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/ApplicationMessage"
+                  "$ref": "#/components/schemas/Message"
                 }
               },
               "canSend": {
@@ -2657,10 +2672,27 @@
               },
               "sendHint": {
                 "type": ["string", "null"],
-                "description": "Why not, when you can't (the salon hasn't written yet, today's limit)."
+                "description": "Why not, when you can't (the salon hasn't written yet, they don't take messages)."
               }
             },
-            "required": ["messages", "canSend", "sendHint"]
+            "required": ["applications", "messages", "canSend", "sendHint"]
+          }
+        ]
+      },
+      "MyApplicationDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MyApplication"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": ["string", "null"],
+                "description": "Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read."
+              }
+            },
+            "required": ["conversationId"]
           }
         ]
       },

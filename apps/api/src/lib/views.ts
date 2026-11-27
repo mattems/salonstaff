@@ -2,11 +2,11 @@
 import { isStandInEmail } from "@salonstaff/auth";
 import type {
   Applicant,
-  ApplicationMessage,
   Candidate,
   CheckSummary,
   Claim,
-  ContactRecord,
+  ConversationApplication,
+  ConversationMessage,
   DirectoryEntry,
   Endorsement,
   Experience,
@@ -19,8 +19,11 @@ import type {
   PortfolioItem,
   Salon,
   SalonApplicant,
+  SalonConversationSummary,
   SalonJob,
   SalonRole,
+  SalonThread,
+  SeekerConversationSummary,
   SeekerProfile,
   SharedProfile,
   ShownEndorsement,
@@ -145,18 +148,6 @@ export const myEndorsementJson = (e: Endorsement) => ({
   onSalonStaff: e.refereeSalonId !== null,
   writtenAt: iso(e.writtenAt),
   createdAt: e.createdAt.toISOString(),
-});
-
-/** A salon's message or number reveal, for the job seeker's list (D-13). */
-export const contactRecordJson = ({ contact, salon, sender, hidden }: ContactRecord) => ({
-  id: encodeId("profileContact", contact.id),
-  kind: contact.kind,
-  message: contact.message,
-  read: contact.readAt !== null,
-  sender: sender && contact.kind === "message" ? { name: sender.name, email: sender.email } : null,
-  createdAt: contact.createdAt.toISOString(),
-  salon: { id: encodeId("salon", salon.id), name: salon.name, path: salonPath(salon) },
-  hidden,
 });
 
 export const contactOptionsJson = (access: SalonAccess) => ({
@@ -416,25 +407,65 @@ export const claimJson = (claim: Claim, salon: Pick<Salon, "email">) => ({
   decidedAt: iso(claim.decidedAt),
 });
 
-// ---------- Conversations on applications (D-17) ----------
+// ---------- Conversations (D-17, D-19) ----------
 
-export const messageJson = (m: ApplicationMessage) => ({
+export const messageJson = (m: ConversationMessage) => ({
   id: encodeId("message", m.id),
   from: m.from,
+  kind: m.kind,
   senderName: m.senderName,
   body: m.body,
+  about:
+    m.applicationId && m.aboutJob
+      ? { applicationId: encodeId("application", m.applicationId), jobTitle: m.aboutJob }
+      : null,
   createdAt: m.createdAt.toISOString(),
 });
 
 const SEND_HINTS: Record<MessageBlocker, string> = {
   salon_suspended: "This salon can't send or receive messages right now.",
   wait_for_salon:
-    "You can reply once the salon writes to you. Your cover note is with them already.",
+    "You can reply once the salon writes to you. If you applied, your cover note is with them already.",
+  not_taking_messages:
+    "They don't take messages from salons they haven't applied to. Call them instead, if their profile shows a number.",
 };
 
 export const sendStateJson = (blocker: MessageBlocker | null) => ({
   canSend: blocker === null,
   sendHint: blocker ? SEND_HINTS[blocker] : null,
+});
+
+export const conversationApplicationJson = (a: ConversationApplication) => ({
+  id: encodeId("application", a.id),
+  jobId: encodeId("job", a.jobId),
+  jobTitle: a.jobTitle,
+  status: a.status,
+  createdAt: a.createdAt.toISOString(),
+});
+
+export const myConversationJson = (env: Env, row: SeekerConversationSummary) => ({
+  id: encodeId("conversation", row.conversationId),
+  salon: salonSummaryJson(env, row.salon),
+  lastMessage: row.lastMessage ? messageJson(row.lastMessage) : null,
+  lastMessageAt: row.lastMessageAt.toISOString(),
+  unreadMessages: row.unread,
+  hidden: row.hidden,
+});
+
+export const salonConversationSummaryJson = (row: SalonConversationSummary) => ({
+  candidateId: encodeId("user", row.seekerId),
+  name: row.name,
+  lastMessage: row.lastMessage ? messageJson(row.lastMessage) : null,
+  lastMessageAt: row.lastMessageAt.toISOString(),
+  unreadMessages: row.unread,
+});
+
+export const candidateConversationJson = (thread: SalonThread) => ({
+  candidateId: encodeId("user", thread.seekerId),
+  name: thread.name,
+  applications: thread.applications.map(conversationApplicationJson),
+  messages: thread.messages.map(messageJson),
+  ...sendStateJson(thread.blocker),
 });
 
 export const salonApplicantJson = (env: Env, row: SalonApplicant) => ({

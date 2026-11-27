@@ -27,6 +27,7 @@ export const ID_PREFIXES = {
   endorsement: "end",
   profileContact: "pct",
   message: "msg",
+  conversation: "cnv",
 } as const;
 
 export type IdKind = keyof typeof ID_PREFIXES;

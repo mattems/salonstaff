@@ -714,6 +714,60 @@ export const applicationMessages = pgTable(
   ],
 );
 
+/**
+ * The one conversation between a salon's team and a job seeker (D-19), however it started: from an
+ * application, or from their profile. Replaces `application_messages` and emailed profile messages.
+ */
+export const conversations = pgTable(
+  "conversations",
+  {
+    id: id(),
+    salonId: uuid("salon_id")
+      .notNull()
+      .references(() => salons.id, { onDelete: "cascade" }),
+    seekerId: uuid("seeker_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    /** The newest message, for sorting. */
+    lastMessageAt: ts("last_message_at").notNull().defaultNow(),
+    /** When the salon's team last read it: the job seeker's messages after it are unread. */
+    salonReadAt: ts("salon_read_at"),
+    /** When the job seeker last read it: the salon's messages after it are unread. */
+    seekerReadAt: ts("seeker_read_at"),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    uniqueIndex("conversations_salon_seeker_uq").on(table.salonId, table.seekerId),
+    index("conversations_seeker_idx").on(table.seekerId, table.lastMessageAt),
+    index("conversations_salon_idx").on(table.salonId, table.lastMessageAt),
+  ],
+);
+
+/** A message in a conversation, or a line saying the salon looked at the job seeker's number. */
+export const conversationMessages = pgTable(
+  "conversation_messages",
+  {
+    id: id(),
+    conversationId: uuid("conversation_id")
+      .notNull()
+      .references(() => conversations.id, { onDelete: "cascade" }),
+    from: text("from").$type<"salon" | "seeker">().notNull(),
+    kind: text("kind").$type<"text" | "number_viewed">().notNull().default("text"),
+    /** Who wrote it: the job seeker, or someone on the salon's team. Null once their account is gone. */
+    senderId: uuid("sender_id").references(() => users.id, { onDelete: "set null" }),
+    /** Empty for a number look. */
+    body: text("body").notNull().default(""),
+    /** The application it's about, if any. */
+    applicationId: uuid("application_id").references(() => applications.id, {
+      onDelete: "set null",
+    }),
+    createdAt: createdAt(),
+  },
+  (table) => [
+    index("conversation_messages_conversation_idx").on(table.conversationId, table.createdAt),
+  ],
+);
+
 export const savedJobs = pgTable(
   "saved_jobs",
   {

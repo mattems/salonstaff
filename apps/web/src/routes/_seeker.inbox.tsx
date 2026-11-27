@@ -1,146 +1,84 @@
+import { Badge } from "@salonstaff/ui/components/badge";
 import { Button } from "@salonstaff/ui/components/button";
 import { Card, CardContent } from "@salonstaff/ui/components/card";
-import { cn } from "@salonstaff/ui/lib/utils";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, Mail, Phone } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useRefresh } from "@/components/account-profile";
 import { AppLink } from "@/components/app-link";
+import { Conversation } from "@/components/conversation";
+import { ConversationList } from "@/components/conversation-list";
 import { EmptyState, PageHeader } from "@/components/page";
 import { api, errorMessage, type Schemas, unwrap } from "@/lib/api";
-import { ago, formatDate } from "@/lib/format";
+import { applicationStatusLabel } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
 /**
- * Salons getting in touch (D-13): their messages, and each day one looked at your number. A list on
- * the left, the chosen one on the right; opening one marks it seen.
+ * The job seeker's conversations with salons (D-19): about their applications, and from salons
+ * that found their profile. A list on the left, the chosen one on the right; opening one reads it.
  */
 export const Route = createFileRoute("/_seeker/inbox")({
-  validateSearch: (search: Record<string, unknown>): { id?: string | undefined } => ({
-    id: typeof search.id === "string" ? search.id : undefined,
+  validateSearch: (search: Record<string, unknown>): { c?: string | undefined } => ({
+    c: typeof search.c === "string" ? search.c : undefined,
   }),
-  loader: async () => {
-    const [contacts, conversations] = await Promise.all([
-      api.GET("/v1/me/profile/contacts"),
+  loaderDeps: ({ search }) => ({ c: search.c }),
+  loader: async ({ deps }) => {
+    const [list, thread] = await Promise.all([
       api.GET("/v1/me/conversations"),
+      deps.c
+        ? api.GET("/v1/me/conversations/{id}", { params: { path: { id: deps.c } } })
+        : Promise.resolve(null),
     ]);
-    return { items: unwrap(contacts).items, conversations: unwrap(conversations).items };
+    return {
+      items: unwrap(list).items,
+      thread: thread && thread.response.status !== 404 ? unwrap(thread) : null,
+    };
   },
   head: () => privatePage("Inbox"),
   component: Inbox,
 });
 
-type Item = Schemas["ProfileContact"];
-
-const summary = (item: Item) =>
-  item.kind === "message" ? (item.message ?? "") : "Looked at your number";
-
 function Inbox() {
-  const { items, conversations } = Route.useLoaderData();
-  const { id } = Route.useSearch();
-  const refresh = useRefresh();
-  const unread = items.filter((item) => !item.read).length;
-  const selected = items.find((item) => item.id === id) ?? null;
-
-  // Opening one marks it seen (and the count in the header goes down), once.
-  const marked = useRef(new Set<string>());
-  useEffect(() => {
-    if (!selected || selected.read || marked.current.has(selected.id)) return;
-    marked.current.add(selected.id);
-    api
-      .POST("/v1/me/profile/contacts/read", { body: { ids: [selected.id] } })
-      .then(unwrap)
-      .then(() => refresh())
-      .catch(() => {});
-  }, [selected, refresh]);
-
-  async function markAll() {
-    try {
-      unwrap(await api.POST("/v1/me/profile/contacts/read", { body: {} }));
-      await refresh("All marked as read");
-    } catch (error) {
-      toast.error(errorMessage(error));
-    }
-  }
-
+  const { items, thread } = Route.useLoaderData();
+  const { c } = Route.useSearch();
   return (
     <div className="space-y-6">
       <PageHeader
         title="Inbox"
-        description="Salons writing about your applications, and salons that found your profile."
-        actions={
-          unread > 0 && (
-            <Button variant="outline" size="sm" onClick={markAll}>
-              Mark all as read
-            </Button>
-          )
-        }
+        description="Your conversations with salons: about your applications, and from salons that found your profile."
       />
-      {conversations.length > 0 && <Conversations items={conversations} />}
       {items.length === 0 ? (
-        conversations.length === 0 && (
-          <EmptyState
-            title="Nothing yet"
-            description="When a salon messages you or looks at your number, it shows here."
-            action={
-              <Button asChild variant="outline">
-                <Link to="/account/sharing">Check who can see your profile</Link>
-              </Button>
-            }
-          />
-        )
+        <EmptyState
+          title="Nothing yet"
+          description="When a salon messages you or looks at your number, it shows here."
+          action={
+            <Button asChild variant="outline">
+              <Link to="/account/sharing">Check who can see your profile</Link>
+            </Button>
+          }
+        />
       ) : (
         <div className="grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-          <Card className={cn("py-0", selected && "hidden lg:block")}>
-            <ul className="divide-y">
-              {items.map((item) => (
-                <li key={item.id}>
-                  <Link
-                    to="/inbox"
-                    search={{ id: item.id }}
-                    className={cn(
-                      "flex gap-3 px-4 py-3 text-sm hover:bg-muted",
-                      item.id === selected?.id && "bg-muted",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "mt-1.5 size-2 shrink-0 rounded-full",
-                        item.read ? "bg-transparent" : "bg-primary",
-                      )}
-                      aria-hidden
-                    />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-baseline justify-between gap-2">
-                        <span className={cn("truncate", !item.read && "font-semibold")}>
-                          {item.salon.name}
-                        </span>
-                        <span className="shrink-0 text-muted-foreground text-xs">
-                          {ago(item.createdAt)}
-                        </span>
-                      </span>
-                      <span className="flex items-center gap-1.5 text-muted-foreground">
-                        {item.kind === "message" ? (
-                          <Mail className="size-3.5 shrink-0" aria-hidden />
-                        ) : (
-                          <Phone className="size-3.5 shrink-0" aria-hidden />
-                        )}
-                        <span className="truncate">{summary(item)}</span>
-                      </span>
-                      {!item.read && <span className="sr-only">Unread</span>}
-                    </span>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </Card>
-          {selected ? (
-            <Opened item={selected} />
+          <ConversationList
+            me="seeker"
+            selected={c}
+            className={thread ? "hidden lg:block" : undefined}
+            rows={items.map((item) => ({
+              key: item.id,
+              title: item.salon.name,
+              lastMessage: item.lastMessage,
+              lastMessageAt: item.lastMessageAt,
+              unread: item.unreadMessages,
+              link: (props) => <Link to="/inbox" search={{ c: item.id }} {...props} />,
+            }))}
+          />
+          {thread ? (
+            <Thread key={thread.id} thread={thread} />
           ) : (
             <Card className="hidden lg:flex">
               <CardContent className="m-auto py-16 text-muted-foreground text-sm">
-                Choose a message to read it.
+                Choose a conversation to read it.
               </CardContent>
             </Card>
           )}
@@ -150,20 +88,30 @@ function Inbox() {
   );
 }
 
-function Opened({ item }: { item: Item }) {
+function Thread({ thread }: { thread: Schemas["MyConversationThread"] }) {
+  const { me } = Route.useRouteContext();
   const refresh = useRefresh();
   const navigate = useNavigate();
   const [pending, setPending] = useState(false);
+  const { salon } = thread;
+
+  // Opening it read the salon's messages: bring the count in the header down, once.
+  const refreshed = useRef<string | null>(null);
+  useEffect(() => {
+    if (refreshed.current === thread.id || !me?.unreadMessages) return;
+    refreshed.current = thread.id;
+    void refresh();
+  }, [thread.id, me?.unreadMessages, refresh]);
 
   async function hide() {
     setPending(true);
     try {
       unwrap(
         await api.PUT("/v1/me/hidden-salons/{salonId}", {
-          params: { path: { salonId: item.salon.id } },
+          params: { path: { salonId: salon.id } },
         }),
       );
-      await refresh(`Hidden from ${item.salon.name}. They can't see or contact you now.`);
+      await refresh(`Hidden from ${salon.name}. They can't see or contact you now.`);
     } catch (error) {
       toast.error(errorMessage(error));
     } finally {
@@ -172,115 +120,64 @@ function Opened({ item }: { item: Item }) {
   }
 
   return (
-    <Card>
-      <CardContent className="space-y-5">
-        <Button
-          variant="ghost"
-          size="sm"
-          className="-ml-2 lg:hidden"
-          onClick={() => navigate({ to: "/inbox", search: {} })}
-        >
-          <ArrowLeft aria-hidden />
-          Inbox
-        </Button>
+    <div className="min-w-0 space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="space-y-1">
-          <AppLink href={item.salon.path} className="font-semibold text-lg hover:underline">
-            {item.salon.name}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="-ml-2 lg:hidden"
+            onClick={() => navigate({ to: "/inbox", search: {} })}
+          >
+            <ArrowLeft aria-hidden />
+            Inbox
+          </Button>
+          <AppLink href={salon.path} className="block font-semibold text-lg hover:underline">
+            {salon.name}
           </AppLink>
-          <p className="text-muted-foreground text-sm">
-            {item.kind === "message"
-              ? `${item.sender?.name || "Someone"} sent you a message · ${formatDate(item.createdAt)}`
-              : `Looked at your number · ${formatDate(item.createdAt)}`}
-          </p>
+          {thread.applications.length > 0 && (
+            <div className="flex flex-wrap gap-2 text-sm">
+              {thread.applications.map((application) => (
+                <Link
+                  key={application.id}
+                  to="/applications/$id"
+                  params={{ id: application.id }}
+                  className="flex items-center gap-1.5 hover:underline"
+                >
+                  {application.jobTitle}
+                  <Badge variant="secondary">{applicationStatusLabel(application.status)}</Badge>
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
-        {item.kind === "message" ? (
-          <p className="whitespace-pre-line leading-relaxed">{item.message}</p>
+        {thread.hidden ? (
+          <span className="text-muted-foreground text-sm">
+            You've hidden your profile from them.
+          </span>
         ) : (
-          <p className="text-sm">
-            They may call or text you. Want to know more about them first? Look at{" "}
-            <AppLink href={item.salon.path} className="underline">
-              their salon's page
-            </AppLink>
-            .
-          </p>
+          <Button variant="outline" size="sm" disabled={pending} onClick={hide}>
+            Hide from {salon.name}
+          </Button>
         )}
-        <div className="flex flex-wrap items-center gap-2 border-t pt-4">
-          {item.kind === "message" && item.sender && (
-            <Button asChild>
-              <a
-                href={`mailto:${item.sender.email}?subject=${encodeURIComponent(`Re: your message on Salon Staff`)}`}
-              >
-                <Mail aria-hidden />
-                Reply by email
-              </a>
-            </Button>
-          )}
-          {item.hidden ? (
-            <span className="text-muted-foreground text-sm">
-              You've hidden your profile from them.
-            </span>
-          ) : (
-            <Button variant="outline" disabled={pending} onClick={hide}>
-              Hide from {item.salon.name}
-            </Button>
-          )}
-        </div>
-        {item.kind === "message" && item.sender && (
-          <p className="text-muted-foreground text-xs">
-            We also emailed you this message: replying to that email reaches{" "}
-            {item.sender.name || "them"} too.
-          </p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Conversations about their applications (D-17): opening one goes to the application. */
-function Conversations({ items }: { items: Schemas["MyConversation"][] }) {
-  return (
-    <section className="space-y-2" aria-label="About your applications">
-      <h2 className="font-medium text-sm">About your applications</h2>
-      <Card className="py-0">
-        <ul className="divide-y">
-          {items.map((item) => (
-            <li key={item.id}>
-              <Link
-                to="/applications/$id"
-                params={{ id: item.id }}
-                className="flex gap-3 px-4 py-3 text-sm hover:bg-muted"
-              >
-                <span
-                  className={cn(
-                    "mt-1.5 size-2 shrink-0 rounded-full",
-                    item.unreadMessages > 0 ? "bg-primary" : "bg-transparent",
-                  )}
-                  aria-hidden
-                />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-baseline justify-between gap-2">
-                    <span className={cn("truncate", item.unreadMessages > 0 && "font-semibold")}>
-                      {item.job.salon.name} · {item.job.title}
-                    </span>
-                    {item.lastMessage && (
-                      <span className="shrink-0 text-muted-foreground text-xs">
-                        {ago(item.lastMessage.createdAt)}
-                      </span>
-                    )}
-                  </span>
-                  {item.lastMessage && (
-                    <span className="block truncate text-muted-foreground">
-                      {item.lastMessage.from === "seeker" ? "You: " : ""}
-                      {item.lastMessage.body}
-                    </span>
-                  )}
-                  {item.unreadMessages > 0 && <span className="sr-only">Unread</span>}
-                </span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </Card>
-    </section>
+      </div>
+      <Conversation
+        messages={thread.messages}
+        me="seeker"
+        livePath={`/api/v1/me/conversations/${thread.id}/live`}
+        canSend={thread.canSend}
+        sendHint={thread.sendHint}
+        placeholder={`Reply to ${salon.name}…`}
+        emptyMessage="No messages yet."
+        send={async (body) => {
+          unwrap(
+            await api.POST("/v1/me/conversations/{id}/messages", {
+              params: { path: { id: thread.id } },
+              body: { body },
+            }),
+          );
+        }}
+      />
+    </div>
   );
 }

@@ -1,73 +1,128 @@
 /**
- * Conversations on applications (D-17): the salon's team and the applicant, and the salon's view of
- * everyone who applied, filtered. `salonConversations` is scoped to one salon; `seekerConversations`
- * to one applicant.
+ * Conversations (D-19): one between a salon's team and a job seeker, however it started (an
+ * application, or their profile), and the salon's view of everyone who applied, filtered.
+ * `salonConversations` is scoped to one salon; `seekerConversations` to one job seeker.
  */
 import {
   APPLICATION_STATUS_VALUES,
   ApiError,
   type ApplicantSort,
   type ApplicationStatus,
+  contactLimitReached,
   type MessageBlocker,
   messageBlockerOf,
 } from "@salonstaff/shared";
 import { and, asc, desc, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, summariesFor } from "./checks";
+import {
+  addMessage,
+  type ConversationMessage,
+  conversationFor,
+  findConversation,
+  lastMessageForApplication,
+  messagesOf,
+  roomOf,
+  salonHasWritten,
+  toMessage,
+  unreadForApplication,
+  unreadIn,
+} from "./conversation-rows";
 import type { Db } from "./index";
 import { contains } from "./like";
-import type { Applicant, Contact } from "./salon";
 import {
-  applicationMessages,
+  type Applicant,
+  CONTACT_LIMIT_DETAIL,
+  type Contact,
+  notFoundCandidate,
+  salonAccessOf,
+} from "./salon";
+import {
   applications,
+  conversationMessages,
+  conversations,
   jobs,
+  salonMembers,
   salons,
   seekerChecks,
+  seekerHiddenSalons,
   seekerProfiles,
   users,
 } from "./schema";
 import type { Application, SeekerProfile } from "./seeker";
 import type { Job, Salon } from "./visibility";
 
-export type ApplicationMessage = typeof applicationMessages.$inferSelect & {
-  /** Who wrote it, as the other side sees them: a first name. Null once their account is gone. */
-  senderName: string | null;
-};
+export type { ConversationMessage } from "./conversation-rows";
+export { roomOf } from "./conversation-rows";
 
-const EPOCH = sql`'epoch'::timestamptz`;
+const DAY_MS = 24 * 60 * 60 * 1000;
 
-/** Messages from `from` after the other side last read the conversation. */
-const unreadFrom = (from: "salon" | "seeker") => {
-  const readAt = from === "seeker" ? applications.salonReadAt : applications.seekerReadAt;
-  return sql<number>`(select count(*)::int from ${applicationMessages} m
-    where m.application_id = ${applications.id} and m."from" = ${from}
-    and m.created_at > coalesce(${readAt}, ${EPOCH}))`;
-};
-
-const firstName = (name: string | null) => name?.trim().split(/\s+/)[0] ?? null;
-
-async function messagesOf(tx: Executor, applicationId: string): Promise<ApplicationMessage[]> {
-  const rows = await tx
-    .select({ message: applicationMessages, name: users.name })
-    .from(applicationMessages)
-    .leftJoin(users, eq(users.id, applicationMessages.senderId))
-    .where(eq(applicationMessages.applicationId, applicationId))
-    .orderBy(asc(applicationMessages.createdAt));
-  return rows.map((r) => ({ ...r.message, senderName: firstName(r.name) }));
+/** One of the job seeker's applications to the salon, shown at the top of their conversation. */
+export interface ConversationApplication {
+  id: string;
+  jobId: string;
+  jobTitle: string;
+  status: ApplicationStatus;
+  createdAt: Date;
 }
 
-async function salonHasWritten(tx: Executor, applicationId: string) {
-  const [row] = await tx
-    .select({ id: applicationMessages.id })
-    .from(applicationMessages)
-    .where(
-      and(
-        eq(applicationMessages.applicationId, applicationId),
-        eq(applicationMessages.from, "salon"),
-      ),
-    )
-    .limit(1);
-  return Boolean(row);
+async function applicationsBetween(
+  tx: Executor,
+  salonId: string,
+  seekerId: string,
+): Promise<ConversationApplication[]> {
+  return tx
+    .select({
+      id: applications.id,
+      jobId: jobs.id,
+      jobTitle: jobs.title,
+      status: applications.status,
+      createdAt: applications.createdAt,
+    })
+    .from(applications)
+    .innerJoin(jobs, eq(jobs.id, applications.jobId))
+    .where(and(eq(applications.seekerId, seekerId), eq(jobs.salonId, salonId)))
+    .orderBy(desc(applications.createdAt));
+}
+
+/** Checks an application belongs to this salon and job seeker; null for none. */
+async function aboutApplication(
+  tx: Executor,
+  salonId: string,
+  seekerId: string,
+  applicationId: string | null | undefined,
+): Promise<string | null> {
+  if (!applicationId) return null;
+  const mine = await applicationsBetween(tx, salonId, seekerId);
+  if (!mine.some((a) => a.id === applicationId)) {
+    throw new ApiError("validation_failed", {
+      detail: "That application isn't between you",
+      hint: "Leave out `applicationId`, or use one listed in the conversation's `applications`.",
+      errors: [{ path: "applicationId", message: "Not an application between you" }],
+    });
+  }
+  return applicationId;
+}
+
+/** The latest message from `from`, newest first per conversation. */
+async function lastMessages(
+  tx: Executor,
+  ids: string[],
+): Promise<Map<string, ConversationMessage>> {
+  if (!ids.length) return new Map();
+  const rows = await tx
+    .selectDistinctOn([conversationMessages.conversationId], {
+      message: conversationMessages,
+      name: users.name,
+      job: jobs.title,
+    })
+    .from(conversationMessages)
+    .leftJoin(users, eq(users.id, conversationMessages.senderId))
+    .leftJoin(applications, eq(applications.id, conversationMessages.applicationId))
+    .leftJoin(jobs, eq(jobs.id, applications.jobId))
+    .where(inArray(conversationMessages.conversationId, ids))
+    .orderBy(conversationMessages.conversationId, desc(conversationMessages.createdAt));
+  return new Map(rows.map((r) => [r.message.conversationId, toMessage(r)]));
 }
 
 const BLOCKED: Record<MessageBlocker, () => ApiError> = {
@@ -79,7 +134,12 @@ const BLOCKED: Record<MessageBlocker, () => ApiError> = {
   wait_for_salon: () =>
     new ApiError("conflict", {
       detail: "The salon hasn't written to you yet",
-      hint: "You can reply once the salon messages you about your application. Your cover note is with them already.",
+      hint: "You can reply once the salon messages you. If you applied, your cover note is with them already.",
+    }),
+  not_taking_messages: () =>
+    new ApiError("conflict", {
+      detail: "This person doesn't take messages",
+      hint: "Call them instead, if their profile shows a number.",
     }),
 };
 
@@ -88,7 +148,7 @@ const BLOCKED: Record<MessageBlocker, () => ApiError> = {
 export interface ApplicantFilters {
   jobId?: string | undefined;
   status?: ApplicationStatus | undefined;
-  /** Only applicants with replies the team hasn't read. */
+  /** Only applicants with messages the team hasn't read. */
   unread?: boolean | undefined;
   /** Checks that must all have passed. */
   verified?: ("identity" | "right_to_work" | "qualification")[] | undefined;
@@ -102,15 +162,27 @@ export interface ApplicantFilters {
 
 export interface SalonApplicant extends Applicant {
   job: Pick<Job, "id" | "title" | "slug" | "suburbSlug" | "state" | "status">;
-  /** Their messages the team hasn't read. */
+  /** Their messages the team hasn't read, in the conversation with them. */
   unread: number;
   lastMessageAt: Date | null;
 }
 
+/** Someone the salon is talking to, for its Messages page. */
+export interface SalonConversationSummary {
+  conversationId: string;
+  seekerId: string;
+  name: string;
+  lastMessage: ConversationMessage | null;
+  lastMessageAt: Date;
+  /** Their messages the team hasn't read. */
+  unread: number;
+}
+
 export interface SalonThread {
-  applicant: SalonApplicant;
-  salon: Salon;
-  messages: ApplicationMessage[];
+  seekerId: string;
+  name: string;
+  applications: ConversationApplication[];
+  messages: ConversationMessage[];
   blocker: MessageBlocker | null;
 }
 
@@ -118,7 +190,7 @@ export function salonConversations(db: Db, salonId: string) {
   const base = (filters: Omit<ApplicantFilters, "status" | "sort" | "limit">): SQL[] => {
     const where: SQL[] = [eq(jobs.salonId, salonId), isNull(users.suspendedAt)];
     if (filters.jobId) where.push(eq(applications.jobId, filters.jobId));
-    if (filters.unread) where.push(sql`${unreadFrom("seeker")} > 0`);
+    if (filters.unread) where.push(sql`${unreadForApplication("seeker")} > 0`);
     for (const kind of filters.verified ?? []) {
       where.push(
         sql`exists (select 1 from ${seekerChecks} c where c.user_id = ${applications.seekerId}
@@ -146,7 +218,7 @@ export function salonConversations(db: Db, salonId: string) {
       sql`${seekerProfiles.yearsExperience} desc nulls last`,
       desc(applications.createdAt),
     ],
-    message: [sql`${applications.lastMessageAt} desc nulls last`, desc(applications.createdAt)],
+    message: [sql`${lastMessageForApplication} desc nulls last`, desc(applications.createdAt)],
   };
 
   const select = () =>
@@ -164,7 +236,8 @@ export function salonConversations(db: Db, salonId: string) {
         email: users.email,
         phoneNumber: users.phoneNumber,
         profile: seekerProfiles,
-        unread: unreadFrom("seeker"),
+        unread: unreadForApplication("seeker"),
+        lastMessageAt: lastMessageForApplication,
       })
       .from(applications)
       .innerJoin(jobs, eq(jobs.id, applications.jobId))
@@ -196,7 +269,7 @@ export function salonConversations(db: Db, salonId: string) {
         checks: checks.get(r.application.seekerId) as CheckSummary,
         job: r.job as SalonApplicant["job"],
         unread: r.unread,
-        lastMessageAt: r.application.lastMessageAt,
+        lastMessageAt: r.lastMessageAt ? new Date(r.lastMessageAt) : null,
       };
     });
   };
@@ -221,8 +294,8 @@ export function salonConversations(db: Db, salonId: string) {
     });
   };
 
-  async function salonRow(): Promise<Salon> {
-    const [row] = await db.select().from(salons).where(eq(salons.id, salonId));
+  async function salonRow(tx: Executor = db): Promise<Salon> {
+    const [row] = await tx.select().from(salons).where(eq(salons.id, salonId));
     if (!row) throw new ApiError("not_found", { detail: "No such salon", hint: "Check the ID." });
     return row as Salon;
   }
@@ -238,6 +311,21 @@ export function salonConversations(db: Db, salonId: string) {
       });
     }
     return row;
+  }
+
+  /** Someone the salon may see (D-13), with their name; not found otherwise. */
+  async function personOf(seekerId: string, tx: Executor = db) {
+    const found = await salonAccessOf(tx, salonId, seekerId);
+    if (!found?.access.view) throw notFoundCandidate();
+    const [profile] = await tx
+      .select({ firstName: seekerProfiles.firstName, lastName: seekerProfiles.lastName })
+      .from(seekerProfiles)
+      .where(eq(seekerProfiles.userId, seekerId));
+    return {
+      ...found,
+      firstName: profile?.firstName ?? "",
+      name: profile ? `${profile.firstName} ${profile.lastName}`.trim() : "",
+    };
   }
 
   return {
@@ -286,119 +374,211 @@ export function salonConversations(db: Db, salonId: string) {
       };
     },
 
-    /** One application's conversation. Opening it marks the applicant's messages read. */
-    async thread(applicationId: string, actor: Actor): Promise<SalonThread> {
-      const row = await applicantRow(applicationId);
-      const fresh = row.application.status === "submitted" ? [row.application.id] : [];
-      await markViewed(fresh, actor);
-      await db
-        .update(applications)
-        .set({ salonReadAt: new Date() })
-        .where(eq(applications.id, applicationId));
-      const [salon, messages] = await Promise.all([salonRow(), messagesOf(db, applicationId)]);
-      const [applicant] = await toApplicants([{ ...row, unread: 0 }], new Set(fresh));
+    /** The salon's conversations, latest first (the last 200), without banned people. */
+    async list(): Promise<SalonConversationSummary[]> {
+      const rows = await db
+        .select({
+          conversation: conversations,
+          firstName: seekerProfiles.firstName,
+          lastName: seekerProfiles.lastName,
+          unread: unreadIn("seeker"),
+        })
+        .from(conversations)
+        .innerJoin(users, eq(users.id, conversations.seekerId))
+        .leftJoin(seekerProfiles, eq(seekerProfiles.userId, conversations.seekerId))
+        .where(and(eq(conversations.salonId, salonId), isNull(users.suspendedAt)))
+        .orderBy(desc(conversations.lastMessageAt))
+        .limit(200);
+      const last = await lastMessages(
+        db,
+        rows.map((r) => r.conversation.id),
+      );
+      return rows.map((r) => ({
+        conversationId: r.conversation.id,
+        seekerId: r.conversation.seekerId,
+        name: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim(),
+        lastMessage: last.get(r.conversation.id) ?? null,
+        lastMessageAt: r.conversation.lastMessageAt,
+        unread: r.unread,
+      }));
+    },
+
+    /**
+     * The conversation with someone the salon may see (it may have no messages yet). Opening it
+     * marks their messages read.
+     */
+    async thread(seekerId: string): Promise<SalonThread> {
+      const person = await personOf(seekerId);
+      const [salon, found, applied] = await Promise.all([
+        salonRow(),
+        findConversation(db, salonId, seekerId),
+        applicationsBetween(db, salonId, seekerId),
+      ]);
+      if (found) {
+        await db
+          .update(conversations)
+          .set({ salonReadAt: new Date() })
+          .where(eq(conversations.id, found.id));
+      }
       return {
-        applicant: applicant as SalonApplicant,
-        salon,
-        messages,
+        seekerId,
+        name: person.name,
+        applications: applied,
+        messages: found ? await messagesOf(db, found.id) : [],
         blocker: messageBlockerOf({
           side: "salon",
           salonActive: salon.status === "active",
           salonHasWritten: true,
+          takesMessages: person.access.message,
         }),
       };
     },
 
-    /** A message from someone on the team. Returns it, with who to tell. */
+    /**
+     * One application, with how many of the applicant's messages the team hasn't read (the
+     * conversation itself is on the Messages page, D-19). Opening it marks a new one viewed.
+     */
+    async application(applicationId: string, actor: Actor): Promise<SalonApplicant> {
+      const row = await applicantRow(applicationId);
+      const fresh = row.application.status === "submitted" ? [row.application.id] : [];
+      await markViewed(fresh, actor);
+      const [applicant] = await toApplicants([row], new Set(fresh));
+      return applicant as SalonApplicant;
+    },
+
+    /**
+     * A message from someone on the team: about an application, or to someone found by their
+     * profile, within the cold limits (D-19). Returns it, with who to tell.
+     */
     async send(
-      applicationId: string,
-      input: { senderId: string; body: string },
+      seekerId: string,
+      input: { senderId: string; body: string; applicationId?: string | null | undefined },
       actor: Actor,
     ): Promise<{
-      message: ApplicationMessage;
+      message: ConversationMessage;
+      conversationId: string;
       contact: Contact;
       firstName: string;
-      job: SalonApplicant["job"];
       salon: Salon;
+      room: string;
     }> {
-      const row = await applicantRow(applicationId);
       return db.transaction(async (tx) => {
-        // One application's messages happen one at a time, so two at once can't both pass the limit.
-        await tx
-          .select({ id: applications.id })
-          .from(applications)
-          .where(eq(applications.id, applicationId))
-          .for("update");
-        const [salon] = await tx.select().from(salons).where(eq(salons.id, salonId));
+        // One salon's messages happen one at a time, so two at once can't both pass the limits.
+        const [locked] = await tx.select().from(salons).where(eq(salons.id, salonId)).for("update");
+        const salon = locked as Salon;
+        const person = await personOf(seekerId, tx);
         const blocker = messageBlockerOf({
           side: "salon",
           salonActive: salon?.status === "active",
           salonHasWritten: true,
+          takesMessages: person.access.message,
         });
         if (blocker) throw BLOCKED[blocker]();
-        const now = new Date();
-        const [message] = await tx
-          .insert(applicationMessages)
-          .values({
-            applicationId,
-            from: "salon",
-            senderId: input.senderId,
-            body: input.body,
-            createdAt: now,
-          })
-          .returning();
-        await tx
-          .update(applications)
-          .set({ lastMessageAt: now, salonReadAt: now })
-          .where(eq(applications.id, applicationId));
-        await recordAudit(tx, actor, {
-          action: "application.message_sent",
-          targetType: "application",
-          targetId: applicationId,
-          after: { from: "salon", messageId: message?.id },
+        const applicationId = await aboutApplication(tx, salonId, seekerId, input.applicationId);
+        const existing = await findConversation(tx, salonId, seekerId);
+        const replied = existing
+          ? Boolean(
+              (
+                await tx
+                  .select({ id: conversationMessages.id })
+                  .from(conversationMessages)
+                  .where(
+                    and(
+                      eq(conversationMessages.conversationId, existing.id),
+                      eq(conversationMessages.from, "seeker"),
+                    ),
+                  )
+                  .limit(1)
+              )[0],
+            )
+          : false;
+        const cold = !person.applied && !replied;
+        if (cold) {
+          const dayAgo = new Date(Date.now() - DAY_MS);
+          const [today] = await tx
+            .select({
+              people: sql<number>`count(distinct ${conversationMessages.conversationId})::int`,
+              person: sql<number>`count(*) filter (where ${conversations.seekerId} = ${seekerId})::int`,
+            })
+            .from(conversationMessages)
+            .innerJoin(conversations, eq(conversations.id, conversationMessages.conversationId))
+            .where(
+              and(
+                eq(conversations.salonId, salonId),
+                eq(conversationMessages.from, "salon"),
+                eq(conversationMessages.kind, "text"),
+                sql`${conversationMessages.createdAt} > ${dayAgo}`,
+                // Still cold: they haven't applied here or replied.
+                sql`not exists (select 1 from ${conversationMessages} r
+                  where r.conversation_id = ${conversations.id} and r."from" = 'seeker')`,
+                sql`not exists (select 1 from ${applications} a join ${jobs} j on j.id = a.job_id
+                  where a.seeker_id = ${conversations.seekerId} and j.salon_id = ${salonId})`,
+              ),
+            );
+          const limit = contactLimitReached({
+            kind: "message",
+            cold,
+            salonColdToday: today?.people ?? 0,
+            personToday: today?.person ?? 0,
+          });
+          if (limit) {
+            throw new ApiError("rate_limited", {
+              detail: CONTACT_LIMIT_DETAIL[limit],
+              hint: "Try again tomorrow, or once they reply.",
+            });
+          }
+        }
+        const conversationId = existing?.id ?? (await conversationFor(tx, salonId, seekerId));
+        const message = await addMessage(tx, {
+          conversationId,
+          from: "salon",
+          senderId: input.senderId,
+          body: input.body,
+          applicationId,
         });
-        const [sender] = await tx
-          .select({ name: users.name })
-          .from(users)
-          .where(eq(users.id, input.senderId));
+        await recordAudit(tx, actor, {
+          action: "conversation.message_sent",
+          targetType: "conversation",
+          targetId: conversationId,
+          after: { from: "salon", messageId: message.id, salonId, seekerId, cold },
+        });
         return {
-          message: {
-            ...(message as typeof applicationMessages.$inferSelect),
-            senderName: firstName(sender?.name ?? null),
-          },
-          contact: {
-            userId: row.application.seekerId,
-            email: row.email,
-            phoneNumber: row.phoneNumber,
-          },
-          firstName: row.profile?.firstName ?? "",
-          job: row.job as SalonApplicant["job"],
-          salon: salon as Salon,
+          message,
+          conversationId,
+          contact: person.contact,
+          firstName: person.firstName,
+          salon,
+          room: roomOf(salonId, seekerId),
         };
       });
     },
 
     /**
-     * Checks the application is one of this salon's, for its live conversation (D-18). Returns the
-     * name the applicant sees while someone on the team is typing.
+     * Checks the salon may see this person, for the live conversation (D-18). Returns its room and
+     * the name the job seeker sees while someone on the team is typing.
      */
-    async live(applicationId: string): Promise<{ name: string }> {
-      await applicantRow(applicationId);
-      return { name: (await salonRow()).name };
+    async live(seekerId: string): Promise<{ room: string; name: string }> {
+      await personOf(seekerId);
+      return { room: roomOf(salonId, seekerId), name: (await salonRow()).name };
     },
 
-    /** Applications with replies the team hasn't read. */
+    /** The room for an application's conversation (D-18). */
+    async applicationRoom(applicationId: string): Promise<string> {
+      const row = await applicantRow(applicationId);
+      return roomOf(salonId, row.application.seekerId);
+    },
+
+    /** Conversations with messages the team hasn't read. */
     async unreadCount(): Promise<number> {
       const [row] = await db
         .select({ n: sql<number>`count(*)::int` })
-        .from(applications)
-        .innerJoin(jobs, eq(jobs.id, applications.jobId))
-        .innerJoin(users, eq(users.id, applications.seekerId))
+        .from(conversations)
+        .innerJoin(users, eq(users.id, conversations.seekerId))
         .where(
           and(
-            eq(jobs.salonId, salonId),
+            eq(conversations.salonId, salonId),
             isNull(users.suspendedAt),
-            sql`${unreadFrom("seeker")} > 0`,
+            sql`${unreadIn("seeker")} > 0`,
           ),
         );
       return row?.n ?? 0;
@@ -406,180 +586,273 @@ export function salonConversations(db: Db, salonId: string) {
   };
 }
 
-// ---------- The applicant's side ----------
+// ---------- The job seeker's side ----------
 
-export interface SeekerThreadSummary {
-  application: Application;
-  job: Job;
+export interface SeekerConversationSummary {
+  conversationId: string;
   salon: Salon;
-  lastMessage: ApplicationMessage | null;
+  lastMessage: ConversationMessage | null;
+  lastMessageAt: Date;
   /** The salon's messages they haven't read. */
   unread: number;
+  /** They hid their profile from this salon (D-13). */
+  hidden: boolean;
 }
 
-export interface SeekerThread extends SeekerThreadSummary {
-  messages: ApplicationMessage[];
+export interface SeekerThread extends SeekerConversationSummary {
+  applications: ConversationApplication[];
+  messages: ConversationMessage[];
   blocker: MessageBlocker | null;
 }
 
+export interface SeekerApplication {
+  application: Application;
+  job: Job;
+  salon: Salon;
+  /** Their conversation with the salon, once the salon has written or looked at their number. */
+  conversationId: string | null;
+  /** The salon's messages they haven't read there. */
+  unread: number;
+}
+
 export function seekerConversations(db: Db, userId: string) {
-  async function own(applicationId: string) {
-    const [row] = await db
-      .select({ application: applications, job: jobs, salon: salons, unread: unreadFrom("salon") })
-      .from(applications)
-      .innerJoin(jobs, eq(jobs.id, applications.jobId))
-      .innerJoin(salons, eq(salons.id, jobs.salonId))
-      .where(and(eq(applications.id, applicationId), eq(applications.seekerId, userId)));
+  const summaries = async (where: SQL): Promise<SeekerConversationSummary[]> => {
+    const rows = await db
+      .select({
+        conversation: conversations,
+        salon: salons,
+        unread: unreadIn("salon"),
+        hidden: seekerHiddenSalons.salonId,
+      })
+      .from(conversations)
+      .innerJoin(salons, eq(salons.id, conversations.salonId))
+      .leftJoin(
+        seekerHiddenSalons,
+        and(
+          eq(seekerHiddenSalons.userId, userId),
+          eq(seekerHiddenSalons.salonId, conversations.salonId),
+        ),
+      )
+      .where(and(eq(conversations.seekerId, userId), where))
+      .orderBy(desc(conversations.lastMessageAt))
+      .limit(200);
+    const last = await lastMessages(
+      db,
+      rows.map((r) => r.conversation.id),
+    );
+    return rows.map((r) => ({
+      conversationId: r.conversation.id,
+      salon: r.salon as Salon,
+      lastMessage: last.get(r.conversation.id) ?? null,
+      lastMessageAt: r.conversation.lastMessageAt,
+      unread: r.unread,
+      hidden: r.hidden !== null,
+    }));
+  };
+
+  async function own(conversationId: string): Promise<SeekerConversationSummary> {
+    const [row] = await summaries(eq(conversations.id, conversationId));
     if (!row) {
       throw new ApiError("not_found", {
-        detail: "You have no application with that ID",
-        hint: "List your applications with GET /v1/me/applications and use an `id` from there.",
+        detail: "You have no conversation with that ID",
+        hint: "List your conversations with GET /v1/me/conversations and use an `id` from there.",
       });
     }
     return row;
   }
 
+  const blockerFor = async (tx: Executor, salon: Salon, conversationId: string | null) =>
+    messageBlockerOf({
+      side: "seeker",
+      salonActive: salon.status === "active",
+      salonHasWritten: conversationId ? await salonHasWritten(tx, conversationId) : false,
+    });
+
+  const markRead = (conversationId: string) =>
+    db
+      .update(conversations)
+      .set({ seekerReadAt: new Date() })
+      .where(eq(conversations.id, conversationId));
+
   return {
-    /** Conversations with at least one message, latest first. */
-    async list(): Promise<SeekerThreadSummary[]> {
-      const rows = await db
-        .select({
-          application: applications,
-          job: jobs,
-          salon: salons,
-          unread: unreadFrom("salon"),
-        })
+    /** Their conversations with salons, latest first. */
+    list: () => summaries(sql`true`),
+
+    /** One conversation. Opening it marks the salon's messages read. */
+    async thread(conversationId: string): Promise<SeekerThread> {
+      const row = await own(conversationId);
+      await markRead(conversationId);
+      const [messages, applied, blocker] = await Promise.all([
+        messagesOf(db, conversationId),
+        applicationsBetween(db, row.salon.id, userId),
+        blockerFor(db, row.salon, conversationId),
+      ]);
+      return { ...row, unread: 0, applications: applied, messages, blocker };
+    },
+
+    /** One of their applications, and their conversation with that salon (unread, not opened). */
+    async application(applicationId: string): Promise<SeekerApplication> {
+      const [row] = await db
+        .select({ application: applications, job: jobs, salon: salons })
         .from(applications)
         .innerJoin(jobs, eq(jobs.id, applications.jobId))
         .innerJoin(salons, eq(salons.id, jobs.salonId))
-        .where(
-          and(eq(applications.seekerId, userId), sql`${applications.lastMessageAt} is not null`),
-        )
-        .orderBy(desc(applications.lastMessageAt));
-      const ids = rows.map((r) => r.application.id);
-      const last = ids.length
-        ? await db
-            .selectDistinctOn([applicationMessages.applicationId], {
-              message: applicationMessages,
-              name: users.name,
-            })
-            .from(applicationMessages)
-            .leftJoin(users, eq(users.id, applicationMessages.senderId))
-            .where(inArray(applicationMessages.applicationId, ids))
-            .orderBy(applicationMessages.applicationId, desc(applicationMessages.createdAt))
-        : [];
-      const lastBy = new Map(
-        last.map((l) => [l.message.applicationId, { ...l.message, senderName: firstName(l.name) }]),
-      );
-      return rows.map((r) => ({
-        application: r.application as Application,
-        job: r.job as Job,
-        salon: r.salon as Salon,
-        lastMessage: lastBy.get(r.application.id) ?? null,
-        unread: r.unread,
-      }));
-    },
-
-    /** One conversation. Opening it marks the salon's messages read. */
-    async thread(applicationId: string): Promise<SeekerThread> {
-      const row = await own(applicationId);
-      await db
-        .update(applications)
-        .set({ seekerReadAt: new Date() })
-        .where(eq(applications.id, applicationId));
-      const [messages, written] = await Promise.all([
-        messagesOf(db, applicationId),
-        salonHasWritten(db, applicationId),
-      ]);
+        .where(and(eq(applications.id, applicationId), eq(applications.seekerId, userId)));
+      if (!row) {
+        throw new ApiError("not_found", {
+          detail: "You have no application with that ID",
+          hint: "List your applications with GET /v1/me/applications and use an `id` from there.",
+        });
+      }
+      const [found] = await summaries(eq(conversations.salonId, row.salon.id));
       return {
         application: row.application as Application,
         job: row.job as Job,
         salon: row.salon as Salon,
-        messages,
-        lastMessage: messages.at(-1) ?? null,
-        unread: 0,
-        blocker: messageBlockerOf({
-          side: "seeker",
-          salonActive: row.salon.status === "active",
-          salonHasWritten: written,
-        }),
+        conversationId: found?.conversationId ?? null,
+        unread: found?.unread ?? 0,
       };
     },
 
-    /** The applicant's reply. Returns it, with the job and salon to tell. */
+    /**
+     * Their reply, once the salon has written. It's about the application given, or else the one
+     * the salon last wrote about. Returns it, with who on the team to tell.
+     */
     async send(
-      applicationId: string,
-      body: string,
+      conversationId: string,
+      input: { body: string; applicationId?: string | null | undefined },
       actor: Actor,
-    ): Promise<{ message: ApplicationMessage; job: Job; salon: Salon; senderName: string }> {
-      const row = await own(applicationId);
+    ): Promise<{
+      message: ConversationMessage;
+      salon: Salon;
+      senderName: string;
+      team: Contact[];
+      room: string;
+    }> {
+      const row = await own(conversationId);
       return db.transaction(async (tx) => {
         await tx
-          .select({ id: applications.id })
-          .from(applications)
-          .where(eq(applications.id, applicationId))
+          .select({ id: conversations.id })
+          .from(conversations)
+          .where(eq(conversations.id, conversationId))
           .for("update");
-        const blocker = messageBlockerOf({
-          side: "seeker",
-          salonActive: row.salon.status === "active",
-          salonHasWritten: await salonHasWritten(tx, applicationId),
-        });
+        const blocker = await blockerFor(tx, row.salon, conversationId);
         if (blocker) throw BLOCKED[blocker]();
-        const now = new Date();
-        const [message] = await tx
-          .insert(applicationMessages)
-          .values({ applicationId, from: "seeker", senderId: userId, body, createdAt: now })
-          .returning();
-        await tx
-          .update(applications)
-          .set({ lastMessageAt: now, seekerReadAt: now })
-          .where(eq(applications.id, applicationId));
+        let applicationId = await aboutApplication(tx, row.salon.id, userId, input.applicationId);
+        if (!applicationId) {
+          const [latest] = await tx
+            .select({ applicationId: conversationMessages.applicationId })
+            .from(conversationMessages)
+            .where(
+              and(
+                eq(conversationMessages.conversationId, conversationId),
+                eq(conversationMessages.from, "salon"),
+                eq(conversationMessages.kind, "text"),
+              ),
+            )
+            .orderBy(desc(conversationMessages.createdAt))
+            .limit(1);
+          applicationId = latest?.applicationId ?? null;
+        }
+        const message = await addMessage(tx, {
+          conversationId,
+          from: "seeker",
+          senderId: userId,
+          body: input.body,
+          applicationId,
+        });
         await recordAudit(tx, actor, {
-          action: "application.message_sent",
-          targetType: "application",
-          targetId: applicationId,
-          after: { from: "seeker", messageId: message?.id },
+          action: "conversation.message_sent",
+          targetType: "conversation",
+          targetId: conversationId,
+          after: { from: "seeker", messageId: message.id, salonId: row.salon.id },
         });
         const [profile] = await tx
           .select({ firstName: seekerProfiles.firstName, lastName: seekerProfiles.lastName })
           .from(seekerProfiles)
           .where(eq(seekerProfiles.userId, userId));
-        const name = profile ? `${profile.firstName} ${profile.lastName}`.trim() : "The applicant";
+        const name = profile ? `${profile.firstName} ${profile.lastName}`.trim() : "";
         return {
-          message: {
-            ...(message as typeof applicationMessages.$inferSelect),
-            senderName: firstName(name),
-          },
-          job: row.job as Job,
-          salon: row.salon as Salon,
-          senderName: name,
+          message,
+          salon: row.salon,
+          senderName: name || "A job seeker",
+          team: await teamToTell(tx, row.salon.id, conversationId, applicationId),
+          room: roomOf(row.salon.id, userId),
         };
       });
     },
 
     /**
-     * Checks the application is theirs, for its live conversation (D-18). Returns the name the
+     * Checks the conversation is theirs, for it live (D-18). Returns its room and the name the
      * salon's team sees while they're typing.
      */
-    async live(applicationId: string): Promise<{ name: string }> {
-      await own(applicationId);
+    async live(conversationId: string): Promise<{ room: string; name: string }> {
+      const row = await own(conversationId);
       const [profile] = await db
         .select({ firstName: seekerProfiles.firstName })
         .from(seekerProfiles)
         .where(eq(seekerProfiles.userId, userId));
-      return { name: profile?.firstName || "The applicant" };
+      return { room: roomOf(row.salon.id, userId), name: profile?.firstName || "The job seeker" };
     },
 
-    /** The salon messages they haven't read, across all their applications. */
+    /** The salon messages they haven't read, across all their conversations. */
     async unreadCount(): Promise<number> {
       const [row] = await db
-        .select({ n: sql<number>`coalesce(sum(${unreadFrom("salon")}), 0)::int` })
-        .from(applications)
-        .where(eq(applications.seekerId, userId));
+        .select({ n: sql<number>`coalesce(sum(${unreadIn("salon")}), 0)::int` })
+        .from(conversations)
+        .where(eq(conversations.seekerId, userId));
       return row?.n ?? 0;
     },
   };
 }
 
-/** Unread salon messages per application, for the applicant's list of applications. */
-export const seekerUnreadSql = unreadFrom("salon");
+/**
+ * Who on the team hears about a job seeker's reply: the people the job names, when it's about an
+ * application; otherwise those on the team who've written in the conversation; and failing those,
+ * everyone. Only people still on the team, and not banned.
+ */
+async function teamToTell(
+  tx: Executor,
+  salonId: string,
+  conversationId: string,
+  applicationId: string | null,
+): Promise<Contact[]> {
+  const members = (ids: string[] | null) =>
+    tx
+      .select({ userId: users.id, email: users.email, phoneNumber: users.phoneNumber })
+      .from(salonMembers)
+      .innerJoin(users, eq(users.id, salonMembers.userId))
+      .where(
+        and(
+          eq(salonMembers.salonId, salonId),
+          isNull(users.suspendedAt),
+          ids ? inArray(salonMembers.userId, ids) : undefined,
+        ),
+      );
+  if (applicationId) {
+    const [job] = await tx
+      .select({ notifyUserIds: jobs.notifyUserIds })
+      .from(applications)
+      .innerJoin(jobs, eq(jobs.id, applications.jobId))
+      .where(eq(applications.id, applicationId));
+    // The job's choice: null is everyone, an empty list nobody.
+    const chosen = job?.notifyUserIds ?? null;
+    if (chosen && chosen.length === 0) return [];
+    return members(chosen);
+  }
+  const writers = await tx
+    .selectDistinct({ id: conversationMessages.senderId })
+    .from(conversationMessages)
+    .where(
+      and(
+        eq(conversationMessages.conversationId, conversationId),
+        eq(conversationMessages.from, "salon"),
+      ),
+    );
+  const ids = writers.map((w) => w.id).filter((id): id is string => id !== null);
+  const still = ids.length ? await members(ids) : [];
+  return still.length ? still : members(null);
+}
+
+/** Unread salon messages per application (in the conversation with its salon), for job seekers. */
+export const seekerUnreadSql = unreadForApplication("salon");

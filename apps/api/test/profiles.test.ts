@@ -1,4 +1,4 @@
-/** D-13: who sees a job seeker's profile, sharing it, contacting them, their mobile and endorsements. */
+/** D-13, D-19: who sees a job seeker's profile, sharing it, contacting them, their mobile and endorsements. */
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { type Person, salonOwner, seekerWithProfile, uid } from "./fixtures";
@@ -158,12 +158,14 @@ describe("changing your mobile", () => {
 });
 
 describe("salons contacting a job seeker", () => {
-  it("messages by email with reply-to the sender, reveals the number, and records both", async () => {
+  it("writes in their conversation, shows number looks there, and limits cold messages", async () => {
     const app = createTestApp();
     const seeker = await seekerWithProfile(app, "Wanted");
     const mobile = await addMobile(app, seeker);
     const seekerId = await idOf(seeker);
     const { owner, salon } = await salonOwner(app);
+    const write = (body: string) =>
+      owner.api("POST", owner.at(`/candidates/${seekerId}/messages`), { body });
 
     const candidate = await owner.api<{ contact: unknown; applications: unknown[] }>(
       "GET",
@@ -173,63 +175,86 @@ describe("salons contacting a job seeker", () => {
     expect(candidate.body.contact).toEqual({ message: true, phone: true });
     expect(candidate.body.applications).toEqual([]);
 
-    const short = await owner.api("POST", owner.at(`/candidates/${seekerId}/messages`), {
-      message: "Hi!",
-    });
-    expect(short.status).toBe(400);
+    expect((await write(" ")).status).toBe(400);
     const message = `We'd love you to come in for a trial at our salon. ${uid()}`;
-    const sent = await owner.api("POST", owner.at(`/candidates/${seekerId}/messages`), {
-      message,
-    });
-    expect(sent.status).toBe(201);
+    expect((await write(message)).status).toBe(201);
     const mail = app.sent.findLast((m) => m.to === seeker.email);
-    expect(mail?.replyTo).toBe(owner.email);
+    expect(mail?.replyTo).toBeUndefined();
     expect(mail?.text).toContain(message);
-    expect(mail?.subject).toContain(salon.name);
-    // Once a day to the same person.
-    const twice = await owner.api("POST", owner.at(`/candidates/${seekerId}/messages`), {
-      message,
-    });
-    expect(twice.status).toBe(429);
+    expect(mail?.subject).toBe(`${salon.name} sent you a message`);
+    // Cold (not applied, not replied): once a day to the same person.
+    expect((await write("Just checking you got that?")).status).toBe(429);
 
     const phone = await owner.api<{ phone: string }>(
       "POST",
       owner.at(`/candidates/${seekerId}/phone`),
     );
     expect(phone.body.phone).toBe(mobile);
-    // Looking again the same day isn't counted again.
+    // Looking again the same day isn't counted or shown again.
     await owner.api("POST", owner.at(`/candidates/${seekerId}/phone`));
 
-    const contacts = await seeker.api<{
-      items: { kind: string; message: string | null; salon: { name: string } }[];
-    }>("GET", "/v1/me/profile/contacts");
-    expect(contacts.body.items.map((c) => c.kind)).toEqual(["phone", "message"]);
-    expect(contacts.body.items[1]).toMatchObject({ message, salon: { name: salon.name } });
-
-    // An inbox: both unread until seen, and replies go to whoever sent the message.
+    // Both in the one conversation, unread until opened.
     const unread = async () =>
       (await seeker.api<{ unreadMessages: number }>("GET", "/v1/me")).body.unreadMessages;
     expect(await unread()).toBe(2);
-    const inbox = await seeker.api<{
-      items: { id: string; read: boolean; sender: { email: string } | null }[];
-    }>("GET", "/v1/me/profile/contacts");
-    expect(inbox.body.items.map((c) => c.read)).toEqual([false, false]);
-    expect(inbox.body.items[1]?.sender?.email).toBe(owner.email);
-    expect(inbox.body.items[0]?.sender).toBeNull();
-    const one = await seeker.api<{ unread: number }>("POST", "/v1/me/profile/contacts/read", {
-      ids: [inbox.body.items[1]?.id, "not-an-id"],
-    });
-    expect(one.body.unread).toBe(1);
-    // Someone else can't mark them.
-    const other = await app.person("Nosy");
-    await other.api("POST", "/v1/me/profile/contacts/read", { ids: [inbox.body.items[0]?.id] });
-    expect(await unread()).toBe(1);
-    await seeker.api("POST", "/v1/me/profile/contacts/read", {});
+    const inbox = await seeker.api<{ items: { id: string; salon: { name: string } }[] }>(
+      "GET",
+      "/v1/me/conversations",
+    );
+    expect(inbox.body.items.map((c) => c.salon.name)).toEqual([salon.name]);
+    const id = inbox.body.items[0]?.id as string;
+    const opened = await seeker.api<{
+      messages: { kind: string; body: string }[];
+      canSend: boolean;
+    }>("GET", `/v1/me/conversations/${id}`);
+    expect(opened.body.messages.map((m) => m.kind)).toEqual(["text", "number_viewed"]);
+    expect(opened.body.messages[0]?.body).toBe(message);
+    expect(opened.body.canSend).toBe(true);
     expect(await unread()).toBe(0);
 
-    // Email only: no number.
+    // Once they reply it isn't cold, and the salon can keep writing.
+    expect(
+      (await seeker.api("POST", `/v1/me/conversations/${id}/messages`, { body: "Yes please!" }))
+        .status,
+    ).toBe(201);
+    expect((await write("Great, does Tuesday suit?")).status).toBe(201);
+    // Someone else can't read it.
+    const other = await app.person("Nosy");
+    expect((await other.api("GET", `/v1/me/conversations/${id}`)).status).not.toBe(200);
+
+    // Messages only: no number. Phone only: no messages.
     await seeker.api("PATCH", "/v1/me/profile/settings", { contactBy: "email" });
     expect((await owner.api("POST", owner.at(`/candidates/${seekerId}/phone`))).status).toBe(409);
+    await seeker.api("PATCH", "/v1/me/profile/settings", { contactBy: "phone" });
+    expect((await write("One more thing")).status).toBe(409);
+    const shut = await owner.api<{ canSend: boolean; sendHint: string }>(
+      "GET",
+      owner.at(`/candidates/${seekerId}/conversation`),
+    );
+    expect(shut.body.canSend).toBe(false);
+    expect(shut.body.sendHint).toContain("Call them instead");
+  });
+
+  it("limits how many new people a salon writes to cold each day", async () => {
+    const app = createTestApp();
+    const { owner } = await salonOwner(app);
+    const { CONTACT_LIMITS } = await import("@salonstaff/shared");
+    for (let i = 0; i < CONTACT_LIMITS.messagesPerDay; i++) {
+      const filler = await seekerWithProfile(app, `Filler${i}`);
+      const fillerId = await idOf(filler);
+      expect(
+        (await owner.api("POST", owner.at(`/candidates/${fillerId}/messages`), { body: "Hi" }))
+          .status,
+      ).toBe(201);
+    }
+    const next = await seekerWithProfile(app, "OneTooMany");
+    const refused = await owner.api<{ detail: string }>(
+      "POST",
+      owner.at(`/candidates/${await idOf(next)}/messages`),
+      { body: "Hi" },
+    );
+    expect(refused.status).toBe(429);
+    expect(refused.body.detail).toContain("new people");
   });
 
   it("keeps hidden profiles, and salons they hid from, out", async () => {
@@ -245,7 +270,7 @@ describe("salons contacting a job seeker", () => {
     expect(
       (
         await owner.api("POST", owner.at(`/candidates/${seekerId}/messages`), {
-          message: "Are you free for a chat this week?",
+          body: "Are you free for a chat this week?",
         })
       ).status,
     ).toBe(404);

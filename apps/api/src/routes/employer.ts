@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type Job,
+  roomOf,
   type Salon,
   type SalonJob,
   type SalonTeam,
@@ -12,8 +13,6 @@ import {
   ApiError,
   type ApplicationStatus,
   applicationStatusSchema,
-  BRAND,
-  contactMessageSchema,
   decodeId,
   entitlementOf,
   isValidAbn,
@@ -30,7 +29,8 @@ import {
 } from "@salonstaff/shared";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
-import { appUrl, notify, push, sendEmail } from "../lib/notify";
+import { broadcast } from "../lib/live";
+import { appUrl, notify } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import {
@@ -46,7 +46,7 @@ import {
   SalonParams,
 } from "../lib/schemas";
 import { idFrom, requireSalon, requireUser } from "../lib/session";
-import { applicantJson, candidateJson, mySalonJson, realEmail, salonJobJson } from "../lib/views";
+import { applicantJson, candidateJson, messageJson, mySalonJson, salonJobJson } from "../lib/views";
 
 /**
  * A salon team's pages (D-11): your salons, a salon's settings, jobs and publishing, applicants and
@@ -643,79 +643,10 @@ employerRoutes.openapi(
 employerRoutes.openapi(
   createRoute({
     method: "post",
-    path: "/v1/employer/salons/{salonId}/candidates/{userId}/messages",
-    summary: "Message a candidate",
-    description:
-      "We email your message to them with your name and salon, and replies come straight back to your email: they never see each other's address until they reply. Only if their `contact.message` is true. Your salon can message 25 people a day, each once a day. They see every message in their account.",
-    tags: TAGS,
-    request: { params: CandidateParams, ...jsonBody(contactMessageSchema) },
-    responses: {
-      201: json(z.object({ sent: z.literal(true) }).openapi("MessageSent"), "Sent"),
-      400: errors[400],
-      401: errors[401],
-      403: problemResponse("Your salon can't contact job seekers now"),
-      404: problemResponse("No profile you can see has that ID"),
-      409: problemResponse("They don't take messages, or your account has no email for replies"),
-      429: problemResponse("Today's limit reached"),
-    },
-  }),
-  async (c) => {
-    const { scope, salon, session, actor } = await requireSalon(c, c.req.valid("param").salonId);
-    const userId = idFrom("user", c.req.valid("param").userId, "candidate", candidateHint);
-    const { message } = c.req.valid("json");
-    const replyTo = session.user.email;
-    if (!replyTo) {
-      throw new ApiError("conflict", {
-        detail: "Add an email to your account first",
-        hint: "Replies go to your email. Add one with POST /v1/me/email.",
-      });
-    }
-    if (c.get("dryRun")) {
-      const found = await scope.access(userId);
-      if (!found?.access.view) throw noCandidate();
-      return c.json({ sent: true as const }, 201);
-    }
-    const { contact } = await scope.contact(
-      userId,
-      "message",
-      { message, senderId: session.user.id },
-      actor,
-    );
-    const sender = session.user.name || "Someone";
-    push(
-      c,
-      userId,
-      { title: `${sender} from ${salon.name}`, body: message, url: appUrl(c, "/inbox") },
-      "messages",
-    );
-    const to = realEmail(contact.email);
-    if (to) {
-      sendEmail(
-        c,
-        { email: to, userId },
-        {
-          topic: "messages",
-          subject: `${salon.name} sent you a message`,
-          title: `${sender} from ${salon.name} sent you a message`,
-          body: `${message}\n\nReply to this email to answer ${sender} directly. ${salon.name}: ${appUrl(c, salonPath(salon))}`,
-          action: "Open your inbox",
-          url: appUrl(c, "/inbox"),
-          replyTo,
-          footer: `${salon.name} found you on ${BRAND.name}. To stop them contacting you, hide your profile from them in your account.`,
-        },
-      );
-    }
-    return c.json({ sent: true as const }, 201);
-  },
-);
-
-employerRoutes.openapi(
-  createRoute({
-    method: "post",
     path: "/v1/employer/salons/{salonId}/candidates/{userId}/phone",
     summary: "See a candidate's mobile",
     description:
-      "Their verified mobile, only if their `contact.phone` is true. Each look is recorded, and they can see which salons looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
+      "Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
     tags: TAGS,
     request: { params: CandidateParams },
     responses: {
@@ -733,14 +664,21 @@ employerRoutes.openapi(
     },
   }),
   async (c) => {
-    const { scope, session, actor } = await requireSalon(c, c.req.valid("param").salonId);
+    const { scope, salon, session, actor } = await requireSalon(c, c.req.valid("param").salonId);
     const userId = idFrom("user", c.req.valid("param").userId, "candidate", candidateHint);
     if (c.get("dryRun")) {
       const found = await scope.access(userId);
       if (!found?.access.phone) throw noCandidate();
       return c.json({ phone: found.contact.phoneNumber ?? "" }, 200);
     }
-    const { contact } = await scope.contact(userId, "phone", { senderId: session.user.id }, actor);
+    const { contact, added } = await scope.viewNumber(userId, session.user.id, actor);
+    // Their open conversation shows the look straight away.
+    if (added) {
+      await broadcast(c, roomOf(salon.id, userId), {
+        type: "message",
+        message: messageJson(added),
+      });
+    }
     return c.json({ phone: contact.phoneNumber ?? "" }, 200);
   },
 );

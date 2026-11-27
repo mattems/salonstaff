@@ -1,4 +1,4 @@
-/** D-17: the salon's list of applicants, and the conversation on an application. */
+/** D-17, D-19: the salon's list of applicants, and the one conversation between a salon and a job seeker. */
 import { describe, expect, it } from "vitest";
 import {
   type Person,
@@ -16,6 +16,7 @@ type App = ReturnType<typeof createTestApp>;
 interface Applicants {
   items: {
     id: string;
+    candidateId: string;
     status: string;
     isNew: boolean;
     candidate: { firstName: string; lastName: string; yearsExperience: number | null } | null;
@@ -47,11 +48,6 @@ async function apply(person: Person, jobId: string) {
 
 const list = (owner: SalonPerson, query = "") =>
   owner.api<Applicants>("GET", owner.at(`/applicants${query}`));
-
-async function applicationOf(owner: SalonPerson, jobId: string) {
-  const found = await list(owner, `?jobId=${jobId}`);
-  return found.body.items[0]?.id as string;
-}
 
 describe("a salon's applicants", () => {
   it("lists every job's applicants, filtered, sorted and counted", async () => {
@@ -108,108 +104,163 @@ describe("a salon's applicants", () => {
   });
 });
 
-describe("the conversation on an application", () => {
+interface Message {
+  from: string;
+  kind: string;
+  body: string;
+  about: { applicationId: string; jobTitle: string } | null;
+}
+
+describe("the conversation between a salon and a job seeker", () => {
   async function setup(app: App) {
     const { owner, salon } = await salonOwner(app);
-    const job = await postJob(owner, { title: `Stylist ${uid()}` });
+    const first = await postJob(owner, { title: `Stylist ${uid()}` });
+    const second = await postJob(owner, { title: `Colourist ${uid()}` });
     const seeker = await readySeeker(app, "Chat");
-    await apply(seeker, job.id);
-    const applicationId = await applicationOf(owner, job.id);
-    return { owner, salon, job, seeker, applicationId };
+    await apply(seeker, first.id);
+    await apply(seeker, second.id);
+    const all = (await list(owner)).body.items;
+    const firstApp = all.find((i) => i.job.id === first.id) as Applicants["items"][number];
+    const secondApp = all.find((i) => i.job.id === second.id) as Applicants["items"][number];
+    const write = (body: string, applicationId?: string) =>
+      owner.api<Message>("POST", owner.at(`/candidates/${firstApp.candidateId}/messages`), {
+        body,
+        ...(applicationId ? { applicationId } : {}),
+      });
+    return { owner, salon, first, second, seeker, firstApp, secondApp, write };
   }
 
-  it("lets the salon write, tells the applicant, and lets them reply", async () => {
+  it("is one thread for every application, told to the other side, with replies", async () => {
     const app = createTestApp();
-    const { owner, salon, job, seeker, applicationId } = await setup(app);
+    const { owner, salon, first, second, seeker, firstApp, secondApp, write } = await setup(app);
 
-    // The applicant waits for the salon to write first.
-    const early = await seeker.api("POST", `/v1/me/applications/${applicationId}/messages`, {
-      body: "Hello?",
-    });
-    expect(early.status).toBe(409);
-    const before = await seeker.api<{ canSend: boolean; sendHint: string | null }>(
+    // No conversation until the salon writes.
+    const before = await seeker.api<{ conversationId: string | null; unreadMessages: number }>(
       "GET",
-      `/v1/me/applications/${applicationId}`,
+      `/v1/me/applications/${firstApp.id}`,
     );
-    expect(before.body).toMatchObject({ canSend: false });
-    expect(before.body.sendHint).toContain("once the salon writes");
+    expect(before.body).toMatchObject({ conversationId: null, unreadMessages: 0 });
 
     const text = `Could you come in for a trial on Saturday? ${uid()}`;
-    const sent = await owner.api<{ from: string; body: string }>(
-      "POST",
-      owner.at(`/applications/${applicationId}/messages`),
-      { body: text },
-    );
+    const sent = await write(text, firstApp.id);
     expect(sent.status).toBe(201);
-    expect(sent.body).toMatchObject({ from: "salon", body: text });
+    expect(sent.body).toMatchObject({
+      from: "salon",
+      kind: "text",
+      body: text,
+      about: { applicationId: firstApp.id, jobTitle: first.title },
+    });
     const mail = app.sent.findLast((m) => m.to === seeker.email);
-    expect(mail?.subject).toBe(`${salon.name} sent you a message about ${job.title}`);
+    expect(mail?.subject).toBe(`${salon.name} sent you a message about ${first.title}`);
     expect(mail?.text).toContain(text);
     expect(mail?.replyTo).toBeUndefined();
 
     const me = await seeker.api<{ unreadMessages: number }>("GET", "/v1/me");
     expect(me.body.unreadMessages).toBe(1);
     const conversations = await seeker.api<{
-      items: { id: string; unreadMessages: number; lastMessage: { body: string } }[];
+      items: { id: string; unreadMessages: number; salon: { name: string } }[];
     }>("GET", "/v1/me/conversations");
-    expect(conversations.body.items).toEqual([
-      expect.objectContaining({
-        id: applicationId,
-        unreadMessages: 1,
-        lastMessage: expect.objectContaining({ body: text }),
-      }),
-    ]);
-    const opened = await seeker.api<{ messages: { body: string }[]; canSend: boolean }>(
-      "GET",
-      `/v1/me/applications/${applicationId}`,
-    );
+    expect(conversations.body.items).toHaveLength(1);
+    const conversation = conversations.body.items[0] as (typeof conversations.body.items)[number];
+    expect(conversation).toMatchObject({ unreadMessages: 1, salon: { name: salon.name } });
+    expect(conversation.id).toMatch(/^cnv_/);
+
+    // Both applications point to the same conversation, unread until it's opened.
+    for (const application of [firstApp, secondApp]) {
+      const seen = await seeker.api<{ conversationId: string; unreadMessages: number }>(
+        "GET",
+        `/v1/me/applications/${application.id}`,
+      );
+      expect(seen.body).toEqual(
+        expect.objectContaining({ conversationId: conversation.id, unreadMessages: 1 }),
+      );
+    }
+
+    const opened = await seeker.api<{
+      applications: { jobTitle: string }[];
+      messages: Message[];
+      canSend: boolean;
+    }>("GET", `/v1/me/conversations/${conversation.id}`);
     expect(opened.body.messages.map((m) => m.body)).toEqual([text]);
-    expect(opened.body.canSend).toBe(true);
     expect(
       (await seeker.api<{ unreadMessages: number }>("GET", "/v1/me")).body.unreadMessages,
     ).toBe(0);
+    expect(opened.body.applications.map((a) => a.jobTitle).sort()).toEqual(
+      [first.title, second.title].sort(),
+    );
+    expect(opened.body.canSend).toBe(true);
 
-    const reply = `Saturday works, see you at 10. ${uid()}`;
-    const replied = await seeker.api("POST", `/v1/me/applications/${applicationId}/messages`, {
-      body: reply,
-    });
+    const reply = `Saturday works, and I'd love the colourist job too. ${uid()}`;
+    const replied = await seeker.api<Message>(
+      "POST",
+      `/v1/me/conversations/${conversation.id}/messages`,
+      { body: reply, applicationId: secondApp.id },
+    );
     expect(replied.status).toBe(201);
+    expect(replied.body.about?.jobTitle).toBe(second.title);
     const told = app.sent.findLast((m) => m.to === owner.email);
-    expect(told?.subject).toContain(`replied about ${job.title}`);
+    expect(told?.subject).toContain(`replied about ${second.title}`);
     expect(told?.text).toContain(reply);
+    // Without an application, a reply follows the salon's last message.
+    const followed = await seeker.api<Message>(
+      "POST",
+      `/v1/me/conversations/${conversation.id}/messages`,
+      { body: "See you then." },
+    );
+    expect(followed.body.about?.jobTitle).toBe(first.title);
 
     const salonView = await owner.api<{ unreadMessages: number }>("GET", owner.at());
     expect(salonView.body.unreadMessages).toBe(1);
-    expect((await list(owner, "?unread=true")).body.items.map((i) => i.id)).toEqual([
-      applicationId,
-    ]);
-    const thread = await owner.api<{ messages: { from: string }[]; canSend: boolean }>(
-      "GET",
-      owner.at(`/applications/${applicationId}`),
+    // Unread on both of their applications: it's the one conversation.
+    expect((await list(owner, "?unread=true")).body.items.map((i) => i.id).sort()).toEqual(
+      [firstApp.id, secondApp.id].sort(),
     );
-    expect(thread.body.messages.map((m) => m.from)).toEqual(["salon", "seeker"]);
+    const salonList = await owner.api<{
+      items: { candidateId: string; unreadMessages: number }[];
+    }>("GET", owner.at("/conversations"));
+    expect(salonList.body.items).toEqual([
+      expect.objectContaining({ candidateId: firstApp.candidateId, unreadMessages: 2 }),
+    ]);
+    const thread = await owner.api<{ messages: Message[]; applications: unknown[] }>(
+      "GET",
+      owner.at(`/candidates/${firstApp.candidateId}/conversation`),
+    );
+    expect(thread.body.messages.map((m) => m.from)).toEqual(["salon", "seeker", "seeker"]);
+    expect(thread.body.applications).toHaveLength(2);
     expect(
       (await owner.api<{ unreadMessages: number }>("GET", owner.at())).body.unreadMessages,
     ).toBe(0);
+    // The application says how many are unread; it doesn't open the conversation.
+    await seeker.api("POST", `/v1/me/conversations/${conversation.id}/messages`, {
+      body: "One more thing.",
+    });
+    const onApplication = await owner.api<{ unreadMessages: number; candidateId: string }>(
+      "GET",
+      owner.at(`/applications/${secondApp.id}`),
+    );
+    expect(onApplication.body).toMatchObject({
+      unreadMessages: 1,
+      candidateId: firstApp.candidateId,
+    });
+    expect(
+      (await owner.api<{ unreadMessages: number }>("GET", owner.at())).body.unreadMessages,
+    ).toBe(1);
 
-    // Nobody else can read it.
+    // Nobody else can read it, or write about an application that isn't between them.
     const stranger = await readySeeker(app, "Stranger");
-    expect((await stranger.api("GET", `/v1/me/applications/${applicationId}`)).status).toBe(404);
+    expect((await stranger.api("GET", `/v1/me/conversations/${conversation.id}`)).status).toBe(404);
+    const elsewhere = await salonOwner(app);
+    const theirs = await postJob(elsewhere.owner, { title: `Barber ${uid()}` });
+    await apply(seeker, theirs.id);
+    const theirApp = (await list(elsewhere.owner)).body.items[0]?.id as string;
+    expect((await write("About that other job", theirApp)).status).toBe(400);
   });
 
-  it("has no daily limit, but won't send an empty message", async () => {
+  it("has no daily limit once they've applied, but won't send an empty message", async () => {
     const app = createTestApp();
-    const { owner, applicationId } = await setup(app);
+    const { write } = await setup(app);
     // More than the 20 a day there used to be.
-    for (let i = 0; i < 21; i++) {
-      const sent = await owner.api("POST", owner.at(`/applications/${applicationId}/messages`), {
-        body: `Message ${i}`,
-      });
-      expect(sent.status).toBe(201);
-    }
-    expect(
-      (await owner.api("POST", owner.at(`/applications/${applicationId}/messages`), { body: "  " }))
-        .status,
-    ).toBe(400);
+    for (let i = 0; i < 21; i++) expect((await write(`Message ${i}`)).status).toBe(201);
+    expect((await write("  ")).status).toBe(400);
   });
 });

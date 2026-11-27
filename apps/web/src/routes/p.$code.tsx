@@ -102,7 +102,6 @@ function Reach({ shared, me }: { shared: Schemas["SharedProfile"]; me: Me | null
       <ContactActions
         key={chosen.id}
         salonId={chosen.id}
-        salonName={chosen.name}
         candidateId={chosen.candidateId}
         firstName={firstName}
         contact={chosen.contact}

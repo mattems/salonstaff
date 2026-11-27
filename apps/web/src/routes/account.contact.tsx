@@ -14,10 +14,11 @@ export const Route = createFileRoute("/account/contact")({
 });
 
 const DESCRIPTIONS: Record<Schemas["ProfileSettings"]["contactBy"], string> = {
-  both: "Salons can send you a message and see your mobile.",
+  both: "Salons can message you on Salon Staff and see your mobile.",
   email:
-    "Salons send you a message, which we email to you. They don't see your address until you reply.",
-  phone: "Salons can see your mobile and call or text you.",
+    "Salons can message you on Salon Staff. You reply in your inbox; they never see your email.",
+  phone:
+    "Salons can see your mobile and call or text you. Salons you apply to can still message you about it.",
 };
 
 function Contact() {
@@ -28,10 +29,7 @@ function Contact() {
   if (!full) return <NeedsProfile />;
   /** What the account lacks for an option: "an email", "a mobile", or both. */
   const needs = (value: string) =>
-    [
-      value !== "phone" && !me.email && "an email",
-      value !== "email" && !me.phoneNumber && "a mobile",
-    ].filter(Boolean);
+    [value !== "email" && !me.phoneNumber && "a mobile"].filter(Boolean);
   const missing = (value: string) => needs(value).length > 0;
 
   return (
@@ -41,10 +39,14 @@ function Contact() {
         description="Only people signed in on a salon's team can contact you, and only if they can see your profile."
         footer={
           <p className="pb-4">
-            Messages go to <strong>{me.email ?? "no email yet"}</strong>; salons who look see{" "}
+            Messages arrive in your{" "}
+            <Link to="/inbox" className="underline">
+              inbox
+            </Link>
+            , and we tell you by email (and on your phone, with the app). Salons who look see{" "}
             <strong>{me.phoneNumber ? localMobile(me.phoneNumber) : "no mobile yet"}</strong>.{" "}
             <Link to="/account/security" className="underline">
-              Change them
+              Change it
             </Link>
           </p>
         }

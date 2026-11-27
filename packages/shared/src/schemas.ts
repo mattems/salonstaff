@@ -258,16 +258,13 @@ export const endorsementSchema = z.object({
 export type EndorsementInput = z.infer<typeof endorsementSchema>;
 
 /** A salon's message to a job seeker, emailed with reply-to the sender (D-13). */
-export const contactMessageSchema = z.object({
-  message: trimmed(2000).min(20, "Write a little more (at least 20 characters)"),
-});
-export type ContactMessageInput = z.infer<typeof contactMessageSchema>;
-
-/** A message in the conversation on an application (D-17). */
-export const applicationMessageSchema = z.object({
+/** A message in the conversation between a salon and a job seeker (D-19). */
+export const conversationMessageSchema = z.object({
   body: trimmed(2000).min(1, "Write a message"),
+  /** The application it's about (`app_…`), if any: one between the two of you. */
+  applicationId: z.string().trim().max(40).optional(),
 });
-export type ApplicationMessageInput = z.infer<typeof applicationMessageSchema>;
+export type ConversationMessageInput = z.infer<typeof conversationMessageSchema>;
 
 export const applySchema = z.object({
   coverNote: optionalText(1500),

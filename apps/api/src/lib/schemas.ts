@@ -407,36 +407,75 @@ export const MyApplicationSchema = z
   .openapi("MyApplication");
 
 /** One message in the conversation on an application (D-17). */
-export const ApplicationMessageSchema = z
+export const MessageSchema = z
   .object({
     id: z.string().openapi({ example: "msg_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
     from: z
       .enum(["salon", "seeker"])
-      .openapi({ description: "The salon's team, or the applicant." }),
+      .openapi({ description: "The salon's team, or the job seeker." }),
+    kind: z.enum(["text", "number_viewed"]).openapi({
+      description:
+        "`text`, or `number_viewed`: a line saying the salon looked at the job seeker's number (no body).",
+    }),
     senderName: z
       .string()
       .nullable()
       .openapi({ description: "The writer's first name; null once their account is gone." }),
     body: z.string(),
+    about: z
+      .object({ applicationId: z.string(), jobTitle: z.string() })
+      .nullable()
+      .openapi({ description: "The application it's about, if any." }),
     createdAt: Timestamp,
   })
-  .openapi("ApplicationMessage");
+  .openapi("Message");
 
 const SendStateSchema = {
   canSend: z.boolean().openapi({ description: "Whether you can write in it now." }),
   sendHint: z.string().nullable().openapi({
-    description: "Why not, when you can't (the salon hasn't written yet, today's limit).",
+    description:
+      "Why not, when you can't (the salon hasn't written yet, they don't take messages).",
   }),
 };
 
-export const MyConversationSchema = MyApplicationSchema.extend({
-  lastMessage: orNull(ApplicationMessageSchema),
-}).openapi("MyConversation");
+export const ConversationApplicationSchema = z
+  .object({
+    id: z.string().openapi({ example: "app_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    jobId: z.string(),
+    jobTitle: z.string(),
+    status: ApplicationStatusSchema,
+    createdAt: Timestamp,
+  })
+  .openapi("ConversationApplication");
 
-export const MyApplicationThreadSchema = MyApplicationSchema.extend({
-  messages: z.array(ApplicationMessageSchema),
+export const MyConversationSchema = z
+  .object({
+    id: z.string().openapi({ example: "cnv_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    salon: SalonSummarySchema,
+    lastMessage: orNull(MessageSchema),
+    lastMessageAt: Timestamp,
+    unreadMessages: z
+      .number()
+      .int()
+      .openapi({ description: "The salon's messages you haven't read." }),
+    hidden: z.boolean().openapi({ description: "You hid your profile from this salon (D-13)." }),
+  })
+  .openapi("MyConversation");
+
+export const MyConversationThreadSchema = MyConversationSchema.extend({
+  applications: z
+    .array(ConversationApplicationSchema)
+    .openapi({ description: "Your applications to this salon, newest first." }),
+  messages: z.array(MessageSchema),
   ...SendStateSchema,
-}).openapi("MyApplicationThread");
+}).openapi("MyConversationThread");
+
+export const MyApplicationDetailSchema = MyApplicationSchema.extend({
+  conversationId: z.string().nullable().openapi({
+    description:
+      "Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read.",
+  }),
+}).openapi("MyApplicationDetail");
 
 // ---------------------------------------------------------------------------
 // Salons (owner's view)
@@ -587,19 +626,36 @@ export const SalonApplicantsSchema = z
   })
   .openapi("SalonApplicants");
 
-export const SalonConversationSchema = z
+export const SalonConversationSummarySchema = z
   .object({
-    applicant: SalonApplicantSchema,
-    messages: z.array(ApplicationMessageSchema),
+    candidateId: z.string().openapi({ example: "usr_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    name: z.string(),
+    lastMessage: orNull(MessageSchema),
+    lastMessageAt: Timestamp,
+    unreadMessages: z
+      .number()
+      .int()
+      .openapi({ description: "Their messages your team hasn't read." }),
+  })
+  .openapi("SalonConversationSummary");
+
+export const CandidateConversationSchema = z
+  .object({
+    candidateId: z.string().openapi({ example: "usr_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    name: z.string(),
+    applications: z
+      .array(ConversationApplicationSchema)
+      .openapi({ description: "Their applications to your salon, newest first." }),
+    messages: z.array(MessageSchema),
     ...SendStateSchema,
   })
-  .openapi("SalonConversation");
+  .openapi("CandidateConversation");
 
 export const ContactOptionsSchema = z
   .object({
     message: z.boolean().openapi({
       description:
-        "You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you.",
+        "You can write to them in your conversation (POST …/candidates/{userId}/messages, D-19).",
     }),
     phone: z
       .boolean()

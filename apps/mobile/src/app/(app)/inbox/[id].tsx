@@ -1,49 +1,73 @@
+import { APPLICATION_STATUSES, labelFor } from '@salonstaff/shared';
 import * as WebBrowser from 'expo-web-browser';
-import { Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { Alert, Linking, StyleSheet } from 'react-native';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
+import { Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { Button } from '@/components/button';
-import { Card } from '@/components/card';
-import { Screen } from '@/components/screen';
+import { Chat } from '@/components/chat';
+import { Pill } from '@/components/pill';
 import { ErrorView, LoadingView } from '@/components/state-views';
 import { Text } from '@/components/text';
+import { Radius, Spacing } from '@/constants/theme';
 import { useRequest } from '@/hooks/use-request';
-import { api, errorMessage, type ProfileContact } from '@/lib/api';
+import { useTheme } from '@/hooks/use-theme';
+import { api, type ConversationThread, errorMessage } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { siteUrl } from '@/lib/config';
-import { formatDate } from '@/lib/format';
 
-/** One salon's message, or that they looked at your number. Opening it marks it seen. */
-export default function InboxItemScreen() {
+/**
+ * Your conversation with one salon (D-19): about your applications, or from them finding your
+ * profile, with the times they looked at your number. Opening it reads it.
+ */
+export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, error, loading, reload } = useRequest(api.contacts);
+  const { refresh: refreshMe } = useAuth();
+  const { data, error, loading, reload, setData } = useRequest(() => api.conversation(id), {
+    key: id,
+    refetchOnFocus: true,
+  });
+
+  // Opening it read the salon's messages: bring the Inbox badge up to date.
+  useEffect(() => {
+    if (data) void refreshMe();
+  }, [data?.id, refreshMe]); // eslint-disable-line react-hooks/exhaustive-deps
+
   if (loading && !data) return <LoadingView />;
   if (error && !data) return <ErrorView message={error} onRetry={reload} />;
-  const item = data?.items.find((i) => i.id === id);
-  if (!item) return <ErrorView message="This message is no longer in your inbox." />;
-  return <Opened item={item} onChange={reload} />;
+  if (!data) return null;
+
+  return (
+    <>
+      <Stack.Screen options={{ title: data.salon.name }} />
+      <Chat
+        messages={data.messages}
+        setMessages={(update) =>
+          setData((prev) => (prev ? { ...prev, messages: update(prev.messages) } : prev))
+        }
+        livePath={`/v1/me/conversations/${id}/live`}
+        onTheirs={() => void reload().then(refreshMe)}
+        canSend={data.canSend}
+        sendHint={data.sendHint}
+        placeholder={`Reply to ${data.salon.name}`}
+        emptyText="No messages yet."
+        send={(body) => api.sendMessage(id, body)}
+        header={<About thread={data} onChange={reload} />}
+      />
+    </>
+  );
 }
 
-function Opened({ item, onChange }: { item: ProfileContact; onChange: () => Promise<void> }) {
-  const { refresh: refreshMe } = useAuth();
+/** The salon, your applications to it, and hiding from it. */
+function About({ thread, onChange }: { thread: ConversationThread; onChange: () => Promise<void> }) {
+  const theme = useTheme();
+  const router = useRouter();
   const [hiding, setHiding] = useState(false);
-  const marked = useRef(false);
-
-  useEffect(() => {
-    if (item.read || marked.current) return;
-    marked.current = true;
-    api
-      .markRead([item.id])
-      .then(() => refreshMe())
-      .catch(() => {});
-  }, [item, refreshMe]);
-
-  const openSalon = () => WebBrowser.openBrowserAsync(siteUrl(item.salon.path));
+  const { salon } = thread;
 
   function hide() {
     Alert.alert(
-      `Hide from ${item.salon.name}?`,
+      `Hide from ${salon.name}?`,
       'They won’t be able to see or contact you, unless you apply to one of their jobs.',
       [
         { text: 'Cancel', style: 'cancel' },
@@ -53,7 +77,7 @@ function Opened({ item, onChange }: { item: ProfileContact; onChange: () => Prom
           onPress: async () => {
             setHiding(true);
             try {
-              await api.hideFromSalon(item.salon.id);
+              await api.hideFromSalon(salon.id);
               await onChange();
             } catch (err) {
               Alert.alert('Couldn’t hide your profile', errorMessage(err));
@@ -67,53 +91,54 @@ function Opened({ item, onChange }: { item: ProfileContact; onChange: () => Prom
   }
 
   return (
-    <Screen>
-      <Stack.Screen options={{ title: item.salon.name }} />
-      <Card>
-        <Text variant="heading">{item.salon.name}</Text>
-        <Text variant="small" color="textSecondary">
-          {item.kind === 'message'
-            ? `${item.sender?.name || 'Someone'} sent you a message · ${formatDate(item.createdAt)}`
-            : `Looked at your number · ${formatDate(item.createdAt)}`}
-        </Text>
-        {item.kind === 'message' ? (
-          <Text selectable>{item.message}</Text>
-        ) : (
-          <Text variant="small">
-            They may call or text you. Want to know more about them first? Look at their salon’s
-            page.
-          </Text>
-        )}
-      </Card>
-      {item.kind === 'message' && item.sender ? (
-        <>
-          <Button
-            title="Reply by email"
-            icon="mail"
-            onPress={() =>
-              Linking.openURL(
-                `mailto:${item.sender?.email}?subject=${encodeURIComponent('Re: your message on Salon Staff')}`,
-              )
-            }
-          />
-          <Text variant="caption" color="textMuted" style={styles.center}>
-            We also emailed you this message: replying to that email reaches{' '}
-            {item.sender.name || 'them'} too.
-          </Text>
-        </>
-      ) : null}
-      <Button title="See their salon" variant="outline" onPress={openSalon} />
-      {item.hidden ? (
-        <Text variant="small" color="textMuted" style={styles.center}>
-          You’ve hidden your profile from them.
-        </Text>
+    <View style={[styles.about, { backgroundColor: theme.surface, borderColor: theme.border }]}>
+      {thread.applications.length ? (
+        thread.applications.map((application) => (
+          <Pressable
+            key={application.id}
+            onPress={() => router.push({ pathname: '/applications/[id]', params: { id: application.id } })}
+            accessibilityRole="button"
+            style={styles.application}>
+            <Text variant="bodyStrong" numberOfLines={1} style={styles.flex}>
+              {application.jobTitle}
+            </Text>
+            <Pill label={labelFor(APPLICATION_STATUSES, application.status)} tone="brand" />
+          </Pressable>
+        ))
       ) : (
-        <Button title={`Hide from ${item.salon.name}`} variant="ghost" loading={hiding} onPress={hide} />
+        <Text variant="small" color="textSecondary">
+          {salon.name} found your profile.
+        </Text>
       )}
-    </Screen>
+      <View style={styles.actions}>
+        <Button
+          title="Their salon"
+          size="sm"
+          variant="ghost"
+          onPress={() => WebBrowser.openBrowserAsync(siteUrl(salon.path))}
+        />
+        {thread.hidden ? (
+          <Text variant="caption" color="textMuted">
+            You’ve hidden your profile from them.
+          </Text>
+        ) : (
+          <Button title="Hide from them" size="sm" variant="ghost" loading={hiding} onPress={hide} />
+        )}
+      </View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  center: { textAlign: 'center' },
+  flex: { flex: 1 },
+  about: {
+    gap: Spacing.two,
+    marginHorizontal: Spacing.four,
+    marginTop: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  application: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
+  actions: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, flexWrap: 'wrap' },
 });

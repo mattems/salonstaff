@@ -190,7 +190,6 @@ describe("salonAccessTo", () => {
     applied: false,
     hiddenFromSalon: false,
     contactBy: "both" as const,
-    hasEmail: true,
     hasMobile: true,
   };
   const all = { view: true, message: true, phone: true };
@@ -204,7 +203,7 @@ describe("salonAccessTo", () => {
     ["hidden from this salon, but applied", { ...base, hiddenFromSalon: true, applied: true }, all],
     ["email only", { ...base, contactBy: "email" as const }, { ...all, phone: false }],
     ["phone only", { ...base, contactBy: "phone" as const }, { ...all, message: false }],
-    ["no email to send to", { ...base, hasEmail: false }, { ...all, message: false }],
+    ["phone only, but applied here", { ...base, contactBy: "phone" as const, applied: true }, all],
     ["no mobile to show", { ...base, hasMobile: false }, { ...all, phone: false }],
   ])("%s", (_label, input, expected) => {
     expect(salonAccessTo(input)).toEqual(expected);
@@ -238,11 +237,15 @@ describe("share links", () => {
 describe("contactLimitReached", () => {
   const { messagesPerDay, phoneRevealsPerDay } = CONTACT_LIMITS;
   it.each([
-    [{ kind: "message", salonToday: 0, personToday: 0 }, null],
-    [{ kind: "message", salonToday: 3, personToday: 1 }, "same_person"],
-    [{ kind: "message", salonToday: messagesPerDay, personToday: 0 }, "salon_messages"],
-    [{ kind: "phone", salonToday: phoneRevealsPerDay - 1, personToday: 5 }, null],
-    [{ kind: "phone", salonToday: phoneRevealsPerDay, personToday: 0 }, "salon_reveals"],
+    [{ kind: "message", cold: true, salonColdToday: 0, personToday: 0 }, null],
+    [{ kind: "message", cold: true, salonColdToday: 3, personToday: 1 }, "same_person"],
+    [
+      { kind: "message", cold: true, salonColdToday: messagesPerDay, personToday: 0 },
+      "salon_messages",
+    ],
+    [{ kind: "message", cold: false, salonColdToday: messagesPerDay, personToday: 9 }, null],
+    [{ kind: "phone", salonToday: phoneRevealsPerDay - 1 }, null],
+    [{ kind: "phone", salonToday: phoneRevealsPerDay }, "salon_reveals"],
   ] as const)("%o → %s", (input, expected) => {
     expect(contactLimitReached(input)).toBe(expected);
   });
@@ -257,6 +260,8 @@ describe("messageBlockerOf", () => {
     ["seeker", { ...ok, salonHasWritten: false }, "wait_for_salon"],
     ["salon", { ...ok, salonActive: false }, "salon_suspended"],
     ["seeker", { ...ok, salonActive: false }, "salon_suspended"],
+    ["salon", { ...ok, takesMessages: false }, "not_taking_messages"],
+    ["seeker", { ...ok, takesMessages: false }, null],
   ] as const)("%s %j → %s", (side, input, blocker) =>
     expect(messageBlockerOf({ side, ...input })).toBe(blocker),
   );

@@ -24,7 +24,6 @@ export const Route = createFileRoute("/employer/$salonId/candidates/$id")({
 
 function Candidate() {
   const candidate = Route.useLoaderData();
-  const { salon } = Route.useRouteContext();
   const { salonId } = Route.useParams();
   return (
     <ProfileView
@@ -32,7 +31,6 @@ function Candidate() {
       actions={
         <ContactActions
           salonId={salonId}
-          salonName={salon.name}
           candidateId={candidate.id}
           firstName={candidate.profile.firstName}
           contact={candidate.contact}

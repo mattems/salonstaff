@@ -1,5 +1,5 @@
 /**
- * The conversation on an application (D-17), for the salon's team or the applicant. Live while
+ * The conversation between a salon's team and a job seeker (D-19), for either side. Live while
  * it's on screen (D-18): new messages and "typing…" arrive over a WebSocket.
  */
 import {
@@ -36,7 +36,7 @@ import { FormMessage, useAction } from "@/components/form";
 import type { Schemas } from "@/lib/api";
 import { ago } from "@/lib/format";
 
-type ChatMessage = Schemas["ApplicationMessage"];
+type ChatMessage = Schemas["Message"];
 
 /** The socket for `path` on this site (`/api/...`): the website forwards it to the API. */
 function socketFor(path: string): LiveSocket {
@@ -167,7 +167,10 @@ export function Conversation({
               {messages.length === 0 && (
                 <p className="text-muted-foreground text-sm">{emptyMessage}</p>
               )}
-              {messages.map((message) => {
+              {messages.map((message, index) => {
+                const about = message.about?.jobTitle;
+                // Says what the conversation turned to, when it changes.
+                const turned = about && about !== aboutBefore(messages, index);
                 const align = message.from === me ? "end" : "start";
                 return (
                   // Drawn in full: off-screen placeholders change size as they render and
@@ -177,20 +180,31 @@ export function Conversation({
                     messageId={message.id}
                     className="[contain-intrinsic-size:none] [content-visibility:visible]"
                   >
-                    <Message align={align}>
-                      <MessageContent>
-                        <MessageHeader>
-                          {message.senderName ??
-                            (message.from === "salon" ? "The salon" : "The applicant")}{" "}
-                          · {ago(message.createdAt)}
-                        </MessageHeader>
-                        <Bubble align={align} variant={align === "end" ? "default" : "muted"}>
-                          <BubbleContent className="whitespace-pre-line">
-                            {message.body}
-                          </BubbleContent>
-                        </Bubble>
-                      </MessageContent>
-                    </Message>
+                    {turned && (
+                      <p className="pb-2 text-center text-muted-foreground text-xs">
+                        About {about}
+                      </p>
+                    )}
+                    {message.kind === "number_viewed" ? (
+                      <p className="text-center text-muted-foreground text-xs">
+                        {numberLine(message, me)} · {ago(message.createdAt)}
+                      </p>
+                    ) : (
+                      <Message align={align}>
+                        <MessageContent>
+                          <MessageHeader>
+                            {message.senderName ??
+                              (message.from === "salon" ? "The salon" : "The job seeker")}{" "}
+                            · {ago(message.createdAt)}
+                          </MessageHeader>
+                          <Bubble align={align} variant={align === "end" ? "default" : "muted"}>
+                            <BubbleContent className="whitespace-pre-line">
+                              {message.body}
+                            </BubbleContent>
+                          </Bubble>
+                        </MessageContent>
+                      </Message>
+                    )}
                   </MessageScrollerItem>
                 );
               })}
@@ -245,6 +259,21 @@ export function Conversation({
       )}
     </Card>
   );
+}
+
+/** What the last real message before `index` was about (number looks aren't about anything). */
+function aboutBefore(messages: ChatMessage[], index: number) {
+  for (let i = index - 1; i >= 0; i--) {
+    const message = messages[i];
+    if (message?.kind === "text") return message.about?.jobTitle;
+  }
+  return undefined;
+}
+
+/** "Sam looked at your number", or "…their number" to the salon. */
+function numberLine(message: ChatMessage, me: ChatMessage["from"]) {
+  const who = message.senderName ?? (me === "seeker" ? "The salon" : "Someone on your team");
+  return `${who} looked at ${me === "seeker" ? "your" : "their"} number`;
 }
 
 /** How close to the bottom still counts as reading the newest message. */

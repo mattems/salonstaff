@@ -16,18 +16,17 @@ import {
   type SeekerProfileInput,
   shareCode,
 } from "@salonstaff/shared";
-import { and, asc, count, desc, eq, gt, inArray, isNull, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { and, asc, count, desc, eq, gt, sql } from "drizzle-orm";
 import { type Actor, type Executor, recordAudit } from "./audit";
 import { type CheckSummary, type EducationCheck, educationChecks, summarise } from "./checks";
-import { seekerUnreadSql } from "./conversations";
+import { seekerConversations, seekerUnreadSql } from "./conversations";
 import type { Db } from "./index";
 import { type MySalon, salonsFor } from "./salon";
 import {
   applications,
   jobs,
   portfolioItems,
-  profileContacts,
+  type profileContacts,
   salons,
   savedJobs,
   seekerChecks,
@@ -65,16 +64,6 @@ export interface FullProfile {
 export interface ShownEndorsement {
   endorsement: Endorsement;
   refereeSalon: Pick<Salon, "name" | "state" | "suburbSlug" | "slug"> | null;
-}
-
-/** A salon that contacted the job seeker, for their own list (D-13). */
-export interface ContactRecord {
-  contact: ProfileContact;
-  salon: Salon;
-  /** Who on the salon's team, if their account still exists. */
-  sender: { name: string; email: string } | null;
-  /** They've hidden their profile from this salon. */
-  hidden: boolean;
 }
 
 /** Shown endorsements for a profile, newest first. */
@@ -174,10 +163,9 @@ export interface Account {
   /** The salons they're on the team of (D-11), in the order they joined. */
   salons: MySalon[];
   /** Salons' messages and number views they haven't seen in their inbox (D-13). */
-  unreadContacts: number;
+  /** Salon messages they haven't read (D-19). */
+  unreadMessages: number;
 }
-
-const sender = alias(users, "sender");
 
 export interface MyApplication extends JobWithSalon {
   application: Application;
@@ -190,13 +178,6 @@ export function seeker(db: Db, userId: string) {
     const [row] = await tx.select().from(seekerProfiles).where(eq(seekerProfiles.userId, userId));
     return row ?? null;
   };
-  const unread = async () => {
-    const [row] = await db
-      .select({ n: count() })
-      .from(profileContacts)
-      .where(and(eq(profileContacts.seekerId, userId), isNull(profileContacts.readAt)));
-    return row?.n ?? 0;
-  };
   const requireProfile = async (tx: Executor) => {
     const row = await profileRow(tx);
     if (!row) throw noProfile();
@@ -207,23 +188,19 @@ export function seeker(db: Db, userId: string) {
     async account(): Promise<Account | null> {
       const [user] = await db.select().from(users).where(eq(users.id, userId));
       if (!user) return null;
-      const [profile, checkRows, mySalons, unreadContacts, [conversations]] = await Promise.all([
+      const [profile, checkRows, mySalons, unreadMessages] = await Promise.all([
         profileRow(),
         db.select().from(seekerChecks).where(eq(seekerChecks.userId, userId)),
         salonsFor(db).ofUser(userId),
-        unread(),
-        db
-          .select({ n: sql<number>`coalesce(sum(${seekerUnreadSql}), 0)::int` })
-          .from(applications)
-          .where(eq(applications.seekerId, userId)),
+        seekerConversations(db, userId).unreadCount(),
       ]);
       return {
         user,
         profile,
         checks: summarise(checkRows),
         salons: mySalons,
-        // The inbox: salons' contacts, and messages on their applications (D-17).
-        unreadContacts: unreadContacts + (conversations?.n ?? 0),
+        // The inbox: their conversations with salons (D-19).
+        unreadMessages,
       };
     },
 
@@ -419,68 +396,6 @@ export function seeker(db: Db, userId: string) {
           });
         }
         return true;
-      });
-    },
-
-    /** Messages and number reveals from salons, newest first (the last 200). */
-    async contacts(): Promise<ContactRecord[]> {
-      const rows = await db
-        .select({
-          contact: profileContacts,
-          salon: salons,
-          hiddenSalon: seekerHiddenSalons.salonId,
-          senderName: sender.name,
-          senderEmail: sender.email,
-        })
-        .from(profileContacts)
-        .innerJoin(salons, eq(salons.id, profileContacts.salonId))
-        .leftJoin(sender, eq(sender.id, profileContacts.senderId))
-        .leftJoin(
-          seekerHiddenSalons,
-          and(
-            eq(seekerHiddenSalons.userId, userId),
-            eq(seekerHiddenSalons.salonId, profileContacts.salonId),
-          ),
-        )
-        .where(eq(profileContacts.seekerId, userId))
-        .orderBy(desc(profileContacts.createdAt))
-        .limit(200);
-      return rows.map((r) => ({
-        contact: r.contact,
-        salon: r.salon,
-        sender:
-          r.senderName !== null && r.senderEmail !== null
-            ? { name: r.senderName, email: r.senderEmail }
-            : null,
-        hidden: r.hiddenSalon !== null,
-      }));
-    },
-
-    unreadContacts: unread,
-
-    /** Marks messages and number views as seen: those given, or all. Returns how many changed. */
-    async markContactsRead(ids: string[] | null, actor: Actor): Promise<number> {
-      return db.transaction(async (tx) => {
-        const rows = await tx
-          .update(profileContacts)
-          .set({ readAt: new Date() })
-          .where(
-            and(
-              eq(profileContacts.seekerId, userId),
-              isNull(profileContacts.readAt),
-              ids ? inArray(profileContacts.id, ids) : undefined,
-            ),
-          )
-          .returning({ id: profileContacts.id });
-        if (rows.length > 0) {
-          await recordAudit(tx, actor, {
-            action: "profile.contacts_read",
-            targetType: "user",
-            targetId: userId,
-            after: { count: rows.length },
-          });
-        }
-        return rows.length;
       });
     },
 

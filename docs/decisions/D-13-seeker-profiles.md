@@ -1,6 +1,6 @@
 # D-13 Job seeker profiles: visibility, sharing, endorsements and contact
 
-**Status:** Accepted (2026-11-26)
+**Status:** Accepted (2026-11-26). Contact changed by D-19: "Contact {name}" writes in the salon's conversation with them instead of emailing, number looks show there, and the inbox is their conversations.
 
 **Decision.**
 

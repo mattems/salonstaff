@@ -1205,7 +1205,7 @@ export interface paths {
         head?: never;
         /**
          * Choose who sees your profile and how salons contact you
-         * @description `visibility`: `public` (salons can find you and your share link works), `salons` (salons can find you) or `hidden` (only salons you apply to). `contactBy`: `email` (salons send a message we email to you; they never see your address), `phone` (they can see your mobile), or `both`. Salons you applied to always see your profile. Going public the first time makes your share link.
+         * @description `visibility`: `public` (salons can find you and your share link works), `salons` (salons can find you) or `hidden` (only salons you apply to). `contactBy`: `email` (Messages: salons can write to you in a conversation on Salon Staff, D-19; neither sees the other's email), `phone` (they can see your mobile), or `both`. Salons you applied to always see your profile. Going public the first time makes your share link.
          */
         patch: {
             parameters: {
@@ -1512,133 +1512,6 @@ export interface paths {
                 };
             };
         };
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/profile/contacts": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Salons that contacted you
-         * @description Every message a salon sent you through us, and each day a salon looked at your number. Newest first, the last 200.
-         */
-        get: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody?: never;
-            responses: {
-                /** @description Who contacted you */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["ProfileContacts"];
-                    };
-                };
-                /** @description Not signed in */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Not allowed for this account */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-            };
-        };
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/me/profile/contacts/read": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Mark salons' messages as seen
-         * @description The ones in `ids`, or all of them when it's left out. Answers how many are still unseen.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path?: never;
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": components["schemas"]["ContactsRead"];
-                };
-            };
-            responses: {
-                /** @description Still unseen */
-                200: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["Unread"];
-                    };
-                };
-                /** @description The request is not valid */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Not signed in */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Not allowed for this account */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-            };
-        };
-        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -4091,8 +3964,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * One application, with its conversation
-         * @description The applicant, the job and every message, oldest first. Opening it marks their messages read (and a new application viewed).
+         * One application
+         * @description The applicant, the job, where it's up to and how many of their messages your team hasn't read (`unreadMessages`). Opening it makes a new application viewed. The conversation with them is GET …/candidates/{candidateId}/conversation (D-19).
          */
         get: {
             parameters: {
@@ -4112,7 +3985,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["SalonConversation"];
+                        "application/json": components["schemas"]["SalonApplicant"];
                     };
                 };
                 /** @description Not signed in */
@@ -4263,108 +4136,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/employer/salons/{salonId}/candidates/{userId}/messages": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Message a candidate
-         * @description We email your message to them with your name and salon, and replies come straight back to your email: they never see each other's address until they reply. Only if their `contact.message` is true. Your salon can message 25 people a day, each once a day. They see every message in their account.
-         */
-        post: {
-            parameters: {
-                query?: never;
-                header?: never;
-                path: {
-                    salonId: string;
-                    userId: string;
-                };
-                cookie?: never;
-            };
-            requestBody: {
-                content: {
-                    "application/json": {
-                        message: string;
-                    };
-                };
-            };
-            responses: {
-                /** @description Sent */
-                201: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/json": components["schemas"]["MessageSent"];
-                    };
-                };
-                /** @description The request is not valid */
-                400: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Not signed in */
-                401: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Your salon can't contact job seekers now */
-                403: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description No profile you can see has that ID */
-                404: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description They don't take messages, or your account has no email for replies */
-                409: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-                /** @description Today's limit reached */
-                429: {
-                    headers: {
-                        [name: string]: unknown;
-                    };
-                    content: {
-                        "application/problem+json": components["schemas"]["Problem"];
-                    };
-                };
-            };
-        };
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/v1/employer/salons/{salonId}/candidates/{userId}/phone": {
         parameters: {
             query?: never;
@@ -4376,7 +4147,7 @@ export interface paths {
         put?: never;
         /**
          * See a candidate's mobile
-         * @description Their verified mobile, only if their `contact.phone` is true. Each look is recorded, and they can see which salons looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.
+         * @description Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.
          */
         post: {
             parameters: {
@@ -4534,7 +4305,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/employer/salons/{salonId}/applications/{id}/live": {
+    "/v1/employer/salons/{salonId}/conversations": {
         parameters: {
             query?: never;
             header?: never;
@@ -4542,8 +4313,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * The conversation, live
-         * @description Opens a WebSocket for this conversation while it's on screen (D-18). Each new message arrives as `{"type":"message","message":{...}}` (the same message as in the conversation; ignore one you already have) and the applicant typing as `{"type":"typing","from":"salon"|"seeker","name":"..."}`. Send `{"type":"typing"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.
+         * Your salon's conversations
+         * @description Everyone your salon is talking to, from applications or their profiles, latest message first (the last 200), with how many of their messages your team hasn't read.
          */
         get: {
             parameters: {
@@ -4551,7 +4322,126 @@ export interface paths {
                 header?: never;
                 path: {
                     salonId: string;
-                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The conversations */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SalonConversations"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/employer/salons/{salonId}/candidates/{userId}/conversation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your conversation with someone
+         * @description Every message between your salon and this person, oldest first, and their applications to you. It may have no messages yet. Opening it marks their messages read.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    salonId: string;
+                    userId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The conversation */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["CandidateConversation"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/employer/salons/{salonId}/candidates/{userId}/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Your conversation with someone, live
+         * @description Opens a WebSocket for this conversation while it's on screen (D-18); there's one per salon and job seeker (D-19), whatever it's about. Each new message arrives as `{"type":"message","message":{...}}` (the same message as in the conversation; ignore one you already have) and the job seeker typing as `{"type":"typing","from":"salon"|"seeker","name":"..."}`. Send `{"type":"typing"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    salonId: string;
+                    userId: string;
                 };
                 cookie?: never;
             };
@@ -4610,7 +4500,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/employer/salons/{salonId}/applications/{id}/messages": {
+    "/v1/employer/salons/{salonId}/candidates/{userId}/messages": {
         parameters: {
             query?: never;
             header?: never;
@@ -4620,8 +4510,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Message an applicant
-         * @description Adds to the conversation on their application. They're told by push and email (as their notification settings allow) and reply in their inbox, on the website or in the app; neither of you sees the other's email.
+         * Message someone
+         * @description Writes in your conversation with them, starting it if there isn't one: someone who applied to your salon, or whose profile you can see and who takes messages (their `contact.message`). Say which application it's about with `applicationId`. They're told by push and email (as their notification settings allow) and reply on Salon Staff; neither of you sees the other's email. Until they've applied or replied, your salon can start conversations with 25 new people a day, and write to each once a day.
          */
         post: {
             parameters: {
@@ -4629,7 +4519,7 @@ export interface paths {
                 header?: never;
                 path: {
                     salonId: string;
-                    id: string;
+                    userId: string;
                 };
                 cookie?: never;
             };
@@ -4637,6 +4527,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         body: string;
+                        applicationId?: string;
                     };
                 };
             };
@@ -4647,7 +4538,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApplicationMessage"];
+                        "application/json": components["schemas"]["Message"];
                     };
                 };
                 /** @description The request is not valid */
@@ -4686,6 +4577,24 @@ export interface paths {
                         "application/problem+json": components["schemas"]["Problem"];
                     };
                 };
+                /** @description They don't take messages */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Today's limit for people who haven't applied or replied */
+                429: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
             };
         };
         delete?: never;
@@ -4703,7 +4612,7 @@ export interface paths {
         };
         /**
          * Your conversations with salons
-         * @description Your applications a salon has written about, latest message first, with how many of theirs you haven't read.
+         * @description Every salon that has written to you or looked at your number, latest first (the last 200), with how many of their messages you haven't read.
          */
         get: {
             parameters: {
@@ -4751,7 +4660,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/applications/{id}": {
+    "/v1/me/conversations/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -4759,8 +4668,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * One of your applications, with its conversation
-         * @description Where it's up to, and every message with the salon, oldest first. Opening it marks the salon's messages read.
+         * One of your conversations
+         * @description Every message with the salon, oldest first, and your applications to it. Opening it marks the salon's messages read.
          */
         get: {
             parameters: {
@@ -4773,13 +4682,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description Your application */
+                /** @description The conversation */
                 200: {
                     headers: {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["MyApplicationThread"];
+                        "application/json": components["schemas"]["MyConversationThread"];
                     };
                 };
                 /** @description Not signed in */
@@ -4819,7 +4728,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/applications/{id}/live": {
+    "/v1/me/conversations/{id}/live": {
         parameters: {
             query?: never;
             header?: never;
@@ -4827,8 +4736,8 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Your conversation, live
-         * @description Opens a WebSocket for this conversation while it's on screen (D-18). Each new message arrives as `{"type":"message","message":{...}}` (the same message as in the conversation; ignore one you already have) and the salon's team typing as `{"type":"typing","from":"salon"|"seeker","name":"..."}`. Send `{"type":"typing"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.
+         * One of your conversations, live
+         * @description Opens a WebSocket for this conversation while it's on screen (D-18); there's one per salon and job seeker (D-19), whatever it's about. Each new message arrives as `{"type":"message","message":{...}}` (the same message as in the conversation; ignore one you already have) and the salon's team typing as `{"type":"typing","from":"salon"|"seeker","name":"..."}`. Send `{"type":"typing"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.
          */
         get: {
             parameters: {
@@ -4894,7 +4803,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/me/applications/{id}/messages": {
+    "/v1/me/conversations/{id}/messages": {
         parameters: {
             query?: never;
             header?: never;
@@ -4904,8 +4813,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Reply to the salon
-         * @description Once the salon has written about your application. The people the job notifies are told by push and email.
+         * Reply to a salon
+         * @description Once the salon has written. Say which of your applications it's about with `applicationId`; without one it follows the salon's last message. The salon's team is told by push and email.
          */
         post: {
             parameters: {
@@ -4920,6 +4829,7 @@ export interface paths {
                 content: {
                     "application/json": {
                         body: string;
+                        applicationId?: string;
                     };
                 };
             };
@@ -4930,7 +4840,7 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content: {
-                        "application/json": components["schemas"]["ApplicationMessage"];
+                        "application/json": components["schemas"]["Message"];
                     };
                 };
                 /** @description The request is not valid */
@@ -4980,6 +4890,74 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/me/applications/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One of your applications
+         * @description Where it's up to, and your conversation with the salon (`conversationId`, once they've written) with how many of its messages you haven't read. Read and reply with GET and POST /v1/me/conversations/{conversationId}.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Your application */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MyApplicationDetail"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not allowed for this account */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -6801,44 +6779,6 @@ export interface components {
         HiddenFromSalon: {
             hidden: boolean;
         };
-        ProfileContacts: {
-            items: components["schemas"]["ProfileContact"][];
-        };
-        ProfileContact: {
-            /** @example pct_01k6q2x8h4f7tbn3m9vz5cdr0e */
-            id: string;
-            /**
-             * @description `message`: they sent you a message (emailed to you). `phone`: they looked at your number.
-             * @enum {string}
-             */
-            kind: "message" | "phone";
-            message: string | null;
-            /** @description You've seen it in your inbox. */
-            read: boolean;
-            /** @description Who sent a message, and where your reply goes (it's the message's reply-to). */
-            sender: {
-                name: string;
-                email: string;
-            } | null;
-            /**
-             * Format: date-time
-             * @example 2026-11-25T03:00:00.000Z
-             */
-            createdAt: string;
-            salon: {
-                id: string;
-                name: string;
-                path: string;
-            };
-            /** @description You've hidden your profile from this salon. */
-            hidden: boolean;
-        };
-        Unread: {
-            unread: number;
-        };
-        ContactsRead: {
-            ids?: string[];
-        };
         MyEndorsements: {
             items: components["schemas"]["MyEndorsement"][];
         };
@@ -7334,14 +7274,10 @@ export interface components {
             }[];
         };
         ContactOptions: {
-            /** @description You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you. */
+            /** @description You can write to them in your conversation (POST …/candidates/{userId}/messages, D-19). */
             message: boolean;
             /** @description You can see their mobile (POST …/candidates/{userId}/phone). */
             phone: boolean;
-        };
-        MessageSent: {
-            /** @enum {boolean} */
-            sent: true;
         };
         CandidatePhone: {
             /** @example +61412345678 */
@@ -7379,25 +7315,68 @@ export interface components {
              */
             lastMessageAt: string | null;
         };
-        SalonConversation: {
-            applicant: components["schemas"]["SalonApplicant"];
-            messages: components["schemas"]["ApplicationMessage"][];
-            /** @description Whether you can write in it now. */
-            canSend: boolean;
-            /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
-            sendHint: string | null;
+        SalonConversations: {
+            items: components["schemas"]["SalonConversationSummary"][];
         };
-        ApplicationMessage: {
+        SalonConversationSummary: {
+            /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
+            candidateId: string;
+            name: string;
+            lastMessage: components["schemas"]["Message"] | null;
+            /**
+             * Format: date-time
+             * @example 2026-11-25T03:00:00.000Z
+             */
+            lastMessageAt: string;
+            /** @description Their messages your team hasn't read. */
+            unreadMessages: number;
+        };
+        Message: {
             /** @example msg_01k6q2x8h4f7tbn3m9vz5cdr0e */
             id: string;
             /**
-             * @description The salon's team, or the applicant.
+             * @description The salon's team, or the job seeker.
              * @enum {string}
              */
             from: "salon" | "seeker";
+            /**
+             * @description `text`, or `number_viewed`: a line saying the salon looked at the job seeker's number (no body).
+             * @enum {string}
+             */
+            kind: "text" | "number_viewed";
             /** @description The writer's first name; null once their account is gone. */
             senderName: string | null;
             body: string;
+            /** @description The application it's about, if any. */
+            about: {
+                applicationId: string;
+                jobTitle: string;
+            } | null;
+            /**
+             * Format: date-time
+             * @example 2026-11-25T03:00:00.000Z
+             */
+            createdAt: string;
+        };
+        CandidateConversation: {
+            /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
+            candidateId: string;
+            name: string;
+            /** @description Their applications to your salon, newest first. */
+            applications: components["schemas"]["ConversationApplication"][];
+            messages: components["schemas"]["Message"][];
+            /** @description Whether you can write in it now. */
+            canSend: boolean;
+            /** @description Why not, when you can't (the salon hasn't written yet, they don't take messages). */
+            sendHint: string | null;
+        };
+        ConversationApplication: {
+            /** @example app_01k6q2x8h4f7tbn3m9vz5cdr0e */
+            id: string;
+            jobId: string;
+            jobTitle: string;
+            /** @enum {string} */
+            status: "submitted" | "viewed" | "shortlisted" | "interview" | "hired" | "declined";
             /**
              * Format: date-time
              * @example 2026-11-25T03:00:00.000Z
@@ -7407,15 +7386,33 @@ export interface components {
         MyConversations: {
             items: components["schemas"]["MyConversation"][];
         };
-        MyConversation: components["schemas"]["MyApplication"] & {
-            lastMessage: components["schemas"]["ApplicationMessage"] | null;
+        MyConversation: {
+            /** @example cnv_01k6q2x8h4f7tbn3m9vz5cdr0e */
+            id: string;
+            salon: components["schemas"]["SalonSummary"];
+            lastMessage: components["schemas"]["Message"] | null;
+            /**
+             * Format: date-time
+             * @example 2026-11-25T03:00:00.000Z
+             */
+            lastMessageAt: string;
+            /** @description The salon's messages you haven't read. */
+            unreadMessages: number;
+            /** @description You hid your profile from this salon (D-13). */
+            hidden: boolean;
         };
-        MyApplicationThread: components["schemas"]["MyApplication"] & {
-            messages: components["schemas"]["ApplicationMessage"][];
+        MyConversationThread: components["schemas"]["MyConversation"] & {
+            /** @description Your applications to this salon, newest first. */
+            applications: components["schemas"]["ConversationApplication"][];
+            messages: components["schemas"]["Message"][];
             /** @description Whether you can write in it now. */
             canSend: boolean;
-            /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
+            /** @description Why not, when you can't (the salon hasn't written yet, they don't take messages). */
             sendHint: string | null;
+        };
+        MyApplicationDetail: components["schemas"]["MyApplication"] & {
+            /** @description Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read. */
+            conversationId: string | null;
         };
         Team: {
             /** @description Owners first. */

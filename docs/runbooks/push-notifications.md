@@ -23,7 +23,7 @@ It also uses `APPLE_TEAM_ID` (a Sign in with Apple secret, [set-up-sign-in.md](s
 Without a key, pushes land in Mailpit as `push+<userId>@local.test`. To get real ones on the simulator (or a
 phone running a development build), put the four values in `apps/api/.dev.vars`: development builds use
 Apple's sandbox, and the app tells the API which. Without them the app knows pushes won't arrive and
-checks its Inbox badge once a minute instead.
+checks its Inbox badge every 15 seconds instead.
 
 To see how the app opens a push, without the API:
 ```bash

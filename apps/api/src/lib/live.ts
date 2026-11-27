@@ -1,6 +1,7 @@
 /**
- * Live conversations (D-18): connecting an open conversation view to its application's
- * ConversationRoom, and telling the room about a new message.
+ * Live conversations (D-18): connecting an open conversation view to its ConversationRoom (one
+ * per salon and job seeker, D-19: `roomOf` in @salonstaff/db), and telling the room about a new
+ * message.
  */
 import { ApiError } from "@salonstaff/shared";
 import type { Context } from "hono";
@@ -8,9 +9,9 @@ import type { AppEnv } from "../env";
 import { type LiveEvent, PARTICIPANT_HEADER, type Participant } from "../live/protocol";
 import { allowedOrigins } from "./actor";
 
-function room(c: Context<AppEnv>, applicationId: string) {
+function room(c: Context<AppEnv>, name: string) {
   const rooms = c.env.CONVERSATIONS;
-  return rooms.get(rooms.idFromName(applicationId));
+  return rooms.get(rooms.idFromName(name));
 }
 
 /**
@@ -34,13 +35,13 @@ export function requireWebSocket(c: Context<AppEnv>) {
   }
 }
 
-/** Hands the socket to the application's room, once the route has checked who's connecting. */
+/** Hands the socket to the conversation's room, once the route has checked who's connecting. */
 export async function connectLive(
   c: Context<AppEnv>,
-  applicationId: string,
+  roomName: string,
   participant: Participant,
 ): Promise<Response> {
-  const answer = await room(c, applicationId).fetch("https://room/connect", {
+  const answer = await room(c, roomName).fetch("https://room/connect", {
     headers: { Upgrade: "websocket", [PARTICIPANT_HEADER]: JSON.stringify(participant) },
   });
   if (!answer.webSocket) return answer;
@@ -55,11 +56,11 @@ export async function connectLive(
  */
 export async function broadcast(
   c: Context<AppEnv>,
-  applicationId: string,
+  roomName: string,
   event: LiveEvent,
 ): Promise<Set<string>> {
   try {
-    return new Set(await room(c, applicationId).broadcast(event));
+    return new Set(await room(c, roomName).broadcast(event));
   } catch (error) {
     console.error("Live conversation unreachable", error);
     return new Set();
