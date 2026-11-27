@@ -3367,44 +3367,6 @@ export interface components {
     HiddenFromSalon: {
       hidden: boolean;
     };
-    ProfileContacts: {
-      items: components["schemas"]["ProfileContact"][];
-    };
-    ProfileContact: {
-      /** @example pct_01k6q2x8h4f7tbn3m9vz5cdr0e */
-      id: string;
-      /**
-       * @description `message`: they sent you a message (emailed to you). `phone`: they looked at your number.
-       * @enum {string}
-       */
-      kind: "message" | "phone";
-      message: string | null;
-      /** @description You've seen it in your inbox. */
-      read: boolean;
-      /** @description Who sent a message, and where your reply goes (it's the message's reply-to). */
-      sender: {
-        name: string;
-        email: string;
-      } | null;
-      /**
-       * Format: date-time
-       * @example 2026-11-25T03:00:00.000Z
-       */
-      createdAt: string;
-      salon: {
-        id: string;
-        name: string;
-        path: string;
-      };
-      /** @description You've hidden your profile from this salon. */
-      hidden: boolean;
-    };
-    Unread: {
-      unread: number;
-    };
-    ContactsRead: {
-      ids?: string[];
-    };
     MyEndorsements: {
       items: components["schemas"]["MyEndorsement"][];
     };
@@ -4010,14 +3972,10 @@ export interface components {
       }[];
     };
     ContactOptions: {
-      /** @description You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you. */
+      /** @description You can write to them in your conversation (POST …/candidates/{userId}/messages, D-19). */
       message: boolean;
       /** @description You can see their mobile (POST …/candidates/{userId}/phone). */
       phone: boolean;
-    };
-    MessageSent: {
-      /** @enum {boolean} */
-      sent: true;
     };
     CandidatePhone: {
       /** @example +61412345678 */
@@ -4055,25 +4013,68 @@ export interface components {
        */
       lastMessageAt: string | null;
     };
-    SalonConversation: {
-      applicant: components["schemas"]["SalonApplicant"];
-      messages: components["schemas"]["ApplicationMessage"][];
-      /** @description Whether you can write in it now. */
-      canSend: boolean;
-      /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
-      sendHint: string | null;
+    SalonConversations: {
+      items: components["schemas"]["SalonConversationSummary"][];
     };
-    ApplicationMessage: {
+    SalonConversationSummary: {
+      /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      candidateId: string;
+      name: string;
+      lastMessage: components["schemas"]["Message"] | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      lastMessageAt: string;
+      /** @description Their messages your team hasn't read. */
+      unreadMessages: number;
+    };
+    Message: {
       /** @example msg_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       /**
-       * @description The salon's team, or the applicant.
+       * @description The salon's team, or the job seeker.
        * @enum {string}
        */
       from: "salon" | "seeker";
+      /**
+       * @description `text`, or `number_viewed`: a line saying the salon looked at the job seeker's number (no body).
+       * @enum {string}
+       */
+      kind: "text" | "number_viewed";
       /** @description The writer's first name; null once their account is gone. */
       senderName: string | null;
       body: string;
+      /** @description The application it's about, if any. */
+      about: {
+        applicationId: string;
+        jobTitle: string;
+      } | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      createdAt: string;
+    };
+    CandidateConversation: {
+      /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      candidateId: string;
+      name: string;
+      /** @description Their applications to your salon, newest first. */
+      applications: components["schemas"]["ConversationApplication"][];
+      messages: components["schemas"]["Message"][];
+      /** @description Whether you can write in it now. */
+      canSend: boolean;
+      /** @description Why not, when you can't (the salon hasn't written yet, they don't take messages). */
+      sendHint: string | null;
+    };
+    ConversationApplication: {
+      /** @example app_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      jobId: string;
+      jobTitle: string;
+      /** @enum {string} */
+      status: "submitted" | "viewed" | "shortlisted" | "interview" | "hired" | "declined";
       /**
        * Format: date-time
        * @example 2026-11-25T03:00:00.000Z
@@ -4083,15 +4084,33 @@ export interface components {
     MyConversations: {
       items: components["schemas"]["MyConversation"][];
     };
-    MyConversation: components["schemas"]["MyApplication"] & {
-      lastMessage: components["schemas"]["ApplicationMessage"] | null;
+    MyConversation: {
+      /** @example cnv_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      salon: components["schemas"]["SalonSummary"];
+      lastMessage: components["schemas"]["Message"] | null;
+      /**
+       * Format: date-time
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      lastMessageAt: string;
+      /** @description The salon's messages you haven't read. */
+      unreadMessages: number;
+      /** @description You hid your profile from this salon (D-13). */
+      hidden: boolean;
     };
-    MyApplicationThread: components["schemas"]["MyApplication"] & {
-      messages: components["schemas"]["ApplicationMessage"][];
+    MyConversationThread: components["schemas"]["MyConversation"] & {
+      /** @description Your applications to this salon, newest first. */
+      applications: components["schemas"]["ConversationApplication"][];
+      messages: components["schemas"]["Message"][];
       /** @description Whether you can write in it now. */
       canSend: boolean;
-      /** @description Why not, when you can't (the salon hasn't written yet, today's limit). */
+      /** @description Why not, when you can't (the salon hasn't written yet, they don't take messages). */
       sendHint: string | null;
+    };
+    MyApplicationDetail: components["schemas"]["MyApplication"] & {
+      /** @description Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read. */
+      conversationId: string | null;
     };
     Team: {
       /** @description Owners first. */

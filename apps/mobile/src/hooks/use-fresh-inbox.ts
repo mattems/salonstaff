@@ -11,13 +11,13 @@ const TABS = new Set(['/', '/saved', '/applications', '/inbox', '/profile']);
 /** Tab switches re-check at most this often. */
 const TAB_GAP_MS = 10_000;
 /** How often to re-check while the app is open, when message pushes don't reach this phone. */
-const POLL_MS = 60_000;
+const POLL_MS = 15_000;
 
 /**
  * Keeps the Inbox badge current without a socket. A push about a message re-checks it at once; so
  * do coming back to the app and switching tabs. When pushes about messages won't reach this phone
  * (turned off in Settings or on the phone, or the API can't send them, as locally), it also
- * re-checks once a minute while the app is open.
+ * re-checks every 15 seconds while the app is open.
  *
  * `pushReachesPhone` is what registering this phone for pushes said, or null before it has.
  */
@@ -67,7 +67,7 @@ export function useFreshInbox(refresh: () => Promise<unknown>, pushReachesPhone:
     if (TABS.has(pathname) && Date.now() - lastCheck.current > TAB_GAP_MS) check();
   }, [pathname, check, readSettings]);
 
-  // No pushes about messages: once a minute while the app is open.
+  // No pushes about messages: every 15 seconds while the app is open.
   const pushes = pushReachesPhone === true && messagePushes === true;
   useEffect(() => {
     if (!active || pushes) return;

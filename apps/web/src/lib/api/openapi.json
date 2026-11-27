@@ -918,99 +918,6 @@
         },
         "required": ["hidden"]
       },
-      "ProfileContacts": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ProfileContact"
-            }
-          }
-        },
-        "required": ["items"]
-      },
-      "ProfileContact": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
-          },
-          "kind": {
-            "type": "string",
-            "enum": ["message", "phone"],
-            "description": "`message`: they sent you a message (emailed to you). `phone`: they looked at your number."
-          },
-          "message": {
-            "type": ["string", "null"]
-          },
-          "read": {
-            "type": "boolean",
-            "description": "You've seen it in your inbox."
-          },
-          "sender": {
-            "type": ["object", "null"],
-            "properties": {
-              "name": {
-                "type": "string"
-              },
-              "email": {
-                "type": "string"
-              }
-            },
-            "required": ["name", "email"],
-            "description": "Who sent a message, and where your reply goes (it's the message's reply-to)."
-          },
-          "createdAt": {
-            "type": "string",
-            "format": "date-time",
-            "example": "2026-11-25T03:00:00.000Z"
-          },
-          "salon": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "path": {
-                "type": "string"
-              }
-            },
-            "required": ["id", "name", "path"]
-          },
-          "hidden": {
-            "type": "boolean",
-            "description": "You've hidden your profile from this salon."
-          }
-        },
-        "required": ["id", "kind", "message", "read", "sender", "createdAt", "salon", "hidden"]
-      },
-      "Unread": {
-        "type": "object",
-        "properties": {
-          "unread": {
-            "type": "integer"
-          }
-        },
-        "required": ["unread"]
-      },
-      "ContactsRead": {
-        "type": "object",
-        "properties": {
-          "ids": {
-            "type": "array",
-            "items": {
-              "type": "string",
-              "example": "pct_01k6q2x8h4f7tbn3m9vz5cdr0e"
-            },
-            "maxItems": 200
-          }
-        }
-      },
       "MyEndorsements": {
         "type": "object",
         "properties": {
@@ -2438,7 +2345,7 @@
         "properties": {
           "message": {
             "type": "boolean",
-            "description": "You can send them a message (POST …/candidates/{userId}/messages); we email it, reply-to you."
+            "description": "You can write to them in your conversation (POST …/candidates/{userId}/messages, D-19)."
           },
           "phone": {
             "type": "boolean",
@@ -2446,16 +2353,6 @@
           }
         },
         "required": ["message", "phone"]
-      },
-      "MessageSent": {
-        "type": "object",
-        "properties": {
-          "sent": {
-            "type": "boolean",
-            "enum": [true]
-          }
-        },
-        "required": ["sent"]
       },
       "CandidatePhone": {
         "type": "object",
@@ -2552,30 +2449,51 @@
           }
         ]
       },
-      "SalonConversation": {
+      "SalonConversations": {
         "type": "object",
         "properties": {
-          "applicant": {
-            "$ref": "#/components/schemas/SalonApplicant"
-          },
-          "messages": {
+          "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ApplicationMessage"
+              "$ref": "#/components/schemas/SalonConversationSummary"
             }
-          },
-          "canSend": {
-            "type": "boolean",
-            "description": "Whether you can write in it now."
-          },
-          "sendHint": {
-            "type": ["string", "null"],
-            "description": "Why not, when you can't (the salon hasn't written yet, today's limit)."
           }
         },
-        "required": ["applicant", "messages", "canSend", "sendHint"]
+        "required": ["items"]
       },
-      "ApplicationMessage": {
+      "SalonConversationSummary": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "lastMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "Their messages your team hasn't read."
+          }
+        },
+        "required": ["candidateId", "name", "lastMessage", "lastMessageAt", "unreadMessages"]
+      },
+      "Message": {
         "type": "object",
         "properties": {
           "id": {
@@ -2585,7 +2503,12 @@
           "from": {
             "type": "string",
             "enum": ["salon", "seeker"],
-            "description": "The salon's team, or the applicant."
+            "description": "The salon's team, or the job seeker."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["text", "number_viewed"],
+            "description": "`text`, or `number_viewed`: a line saying the salon looked at the job seeker's number (no body)."
           },
           "senderName": {
             "type": ["string", "null"],
@@ -2594,13 +2517,85 @@
           "body": {
             "type": "string"
           },
+          "about": {
+            "type": ["object", "null"],
+            "properties": {
+              "applicationId": {
+                "type": "string"
+              },
+              "jobTitle": {
+                "type": "string"
+              }
+            },
+            "required": ["applicationId", "jobTitle"],
+            "description": "The application it's about, if any."
+          },
           "createdAt": {
             "type": "string",
             "format": "date-time",
             "example": "2026-11-25T03:00:00.000Z"
           }
         },
-        "required": ["id", "from", "senderName", "body", "createdAt"]
+        "required": ["id", "from", "kind", "senderName", "body", "about", "createdAt"]
+      },
+      "CandidateConversation": {
+        "type": "object",
+        "properties": {
+          "candidateId": {
+            "type": "string",
+            "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          },
+          "applications": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ConversationApplication"
+            },
+            "description": "Their applications to your salon, newest first."
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Message"
+            }
+          },
+          "canSend": {
+            "type": "boolean",
+            "description": "Whether you can write in it now."
+          },
+          "sendHint": {
+            "type": ["string", "null"],
+            "description": "Why not, when you can't (the salon hasn't written yet, they don't take messages)."
+          }
+        },
+        "required": ["candidateId", "name", "applications", "messages", "canSend", "sendHint"]
+      },
+      "ConversationApplication": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "jobId": {
+            "type": "string"
+          },
+          "jobTitle": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["submitted", "viewed", "shortlisted", "interview", "hired", "declined"]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          }
+        },
+        "required": ["id", "jobId", "jobTitle", "status", "createdAt"]
       },
       "MyConversations": {
         "type": "object",
@@ -2615,40 +2610,60 @@
         "required": ["items"]
       },
       "MyConversation": {
-        "allOf": [
-          {
-            "$ref": "#/components/schemas/MyApplication"
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "cnv_01k6q2x8h4f7tbn3m9vz5cdr0e"
           },
-          {
-            "type": "object",
-            "properties": {
-              "lastMessage": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ApplicationMessage"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+          "salon": {
+            "$ref": "#/components/schemas/SalonSummary"
+          },
+          "lastMessage": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Message"
+              },
+              {
+                "type": "null"
               }
-            },
-            "required": ["lastMessage"]
+            ]
+          },
+          "lastMessageAt": {
+            "type": "string",
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z"
+          },
+          "unreadMessages": {
+            "type": "integer",
+            "description": "The salon's messages you haven't read."
+          },
+          "hidden": {
+            "type": "boolean",
+            "description": "You hid your profile from this salon (D-13)."
           }
-        ]
+        },
+        "required": ["id", "salon", "lastMessage", "lastMessageAt", "unreadMessages", "hidden"]
       },
-      "MyApplicationThread": {
+      "MyConversationThread": {
         "allOf": [
           {
-            "$ref": "#/components/schemas/MyApplication"
+            "$ref": "#/components/schemas/MyConversation"
           },
           {
             "type": "object",
             "properties": {
+              "applications": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/ConversationApplication"
+                },
+                "description": "Your applications to this salon, newest first."
+              },
               "messages": {
                 "type": "array",
                 "items": {
-                  "$ref": "#/components/schemas/ApplicationMessage"
+                  "$ref": "#/components/schemas/Message"
                 }
               },
               "canSend": {
@@ -2657,10 +2672,27 @@
               },
               "sendHint": {
                 "type": ["string", "null"],
-                "description": "Why not, when you can't (the salon hasn't written yet, today's limit)."
+                "description": "Why not, when you can't (the salon hasn't written yet, they don't take messages)."
               }
             },
-            "required": ["messages", "canSend", "sendHint"]
+            "required": ["applications", "messages", "canSend", "sendHint"]
+          }
+        ]
+      },
+      "MyApplicationDetail": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/MyApplication"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "conversationId": {
+                "type": ["string", "null"],
+                "description": "Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read."
+              }
+            },
+            "required": ["conversationId"]
           }
         ]
       },
@@ -4704,7 +4736,7 @@
     "/v1/me/profile/settings": {
       "patch": {
         "summary": "Choose who sees your profile and how salons contact you",
-        "description": "`visibility`: `public` (salons can find you and your share link works), `salons` (salons can find you) or `hidden` (only salons you apply to). `contactBy`: `email` (salons send a message we email to you; they never see your address), `phone` (they can see your mobile), or `both`. Salons you applied to always see your profile. Going public the first time makes your share link.",
+        "description": "`visibility`: `public` (salons can find you and your share link works), `salons` (salons can find you) or `hidden` (only salons you apply to). `contactBy`: `email` (Messages: salons can write to you in a conversation on Salon Staff, D-19; neither sees the other's email), `phone` (they can see your mobile), or `both`. Salons you applied to always see your profile. Going public the first time makes your share link.",
         "tags": ["Me"],
         "requestBody": {
           "required": true,
@@ -4975,104 +5007,6 @@
           },
           "404": {
             "description": "Not found",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/profile/contacts": {
-      "get": {
-        "summary": "Salons that contacted you",
-        "description": "Every message a salon sent you through us, and each day a salon looked at your number. Newest first, the last 200.",
-        "tags": ["Me"],
-        "responses": {
-          "200": {
-            "description": "Who contacted you",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProfileContacts"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed for this account",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/v1/me/profile/contacts/read": {
-      "post": {
-        "summary": "Mark salons' messages as seen",
-        "description": "The ones in `ids`, or all of them when it's left out. Answers how many are still unseen.",
-        "tags": ["Me"],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ContactsRead"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Still unseen",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Unread"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request is not valid",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Not allowed for this account",
             "content": {
               "application/problem+json": {
                 "schema": {
@@ -7695,8 +7629,8 @@
         }
       },
       "get": {
-        "summary": "One application, with its conversation",
-        "description": "The applicant, the job and every message, oldest first. Opening it marks their messages read (and a new application viewed).",
+        "summary": "One application",
+        "description": "The applicant, the job, where it's up to and how many of their messages your team hasn't read (`unreadMessages`). Opening it makes a new application viewed. The conversation with them is GET …/candidates/{candidateId}/conversation (D-19).",
         "tags": ["Applicants"],
         "parameters": [
           {
@@ -7724,7 +7658,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/SalonConversation"
+                  "$ref": "#/components/schemas/SalonApplicant"
                 }
               }
             }
@@ -7811,127 +7745,10 @@
         }
       }
     },
-    "/v1/employer/salons/{salonId}/candidates/{userId}/messages": {
-      "post": {
-        "summary": "Message a candidate",
-        "description": "We email your message to them with your name and salon, and replies come straight back to your email: they never see each other's address until they reply. Only if their `contact.message` is true. Your salon can message 25 people a day, each once a day. They see every message in their account.",
-        "tags": ["Salon"],
-        "parameters": [
-          {
-            "schema": {
-              "type": "string",
-              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
-            },
-            "required": true,
-            "name": "salonId",
-            "in": "path"
-          },
-          {
-            "schema": {
-              "type": "string",
-              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
-            },
-            "required": true,
-            "name": "userId",
-            "in": "path"
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "message": {
-                    "type": "string",
-                    "minLength": 20,
-                    "maxLength": 2000
-                  }
-                },
-                "required": ["message"]
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Sent",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/MessageSent"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The request is not valid",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Not signed in",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Your salon can't contact job seekers now",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No profile you can see has that ID",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "They don't take messages, or your account has no email for replies",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Today's limit reached",
-            "content": {
-              "application/problem+json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/v1/employer/salons/{salonId}/candidates/{userId}/phone": {
       "post": {
         "summary": "See a candidate's mobile",
-        "description": "Their verified mobile, only if their `contact.phone` is true. Each look is recorded, and they can see which salons looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
+        "description": "Their verified mobile, only if their `contact.phone` is true. Each look is recorded and shown in your conversation with them (D-19), so they know who looked. Your salon can look at 50 numbers a day; looking at the same one again that day doesn't count.",
         "tags": ["Salon"],
         "parameters": [
           {
@@ -8160,11 +7977,61 @@
         }
       }
     },
-    "/v1/employer/salons/{salonId}/applications/{id}/live": {
+    "/v1/employer/salons/{salonId}/conversations": {
       "get": {
-        "summary": "The conversation, live",
-        "description": "Opens a WebSocket for this conversation while it's on screen (D-18). Each new message arrives as `{\"type\":\"message\",\"message\":{...}}` (the same message as in the conversation; ignore one you already have) and the applicant typing as `{\"type\":\"typing\",\"from\":\"salon\"|\"seeker\",\"name\":\"...\"}`. Send `{\"type\":\"typing\"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.",
-        "tags": ["Applicants"],
+        "summary": "Your salon's conversations",
+        "description": "Everyone your salon is talking to, from applications or their profiles, latest message first (the last 200), with how many of their messages your team hasn't read.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversations",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SalonConversations"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/candidates/{userId}/conversation": {
+      "get": {
+        "summary": "Your conversation with someone",
+        "description": "Every message between your salon and this person, oldest first, and their applications to you. It may have no messages yet. Opening it marks their messages read.",
+        "tags": ["Messages"],
         "parameters": [
           {
             "schema": {
@@ -8178,10 +8045,69 @@
           {
             "schema": {
               "type": "string",
-              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
             },
             "required": true,
-            "name": "id",
+            "name": "userId",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The conversation",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CandidateConversation"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/employer/salons/{salonId}/candidates/{userId}/live": {
+      "get": {
+        "summary": "Your conversation with someone, live",
+        "description": "Opens a WebSocket for this conversation while it's on screen (D-18); there's one per salon and job seeker (D-19), whatever it's about. Each new message arrives as `{\"type\":\"message\",\"message\":{...}}` (the same message as in the conversation; ignore one you already have) and the job seeker typing as `{\"type\":\"typing\",\"from\":\"salon\"|\"seeker\",\"name\":\"...\"}`. Send `{\"type\":\"typing\"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.",
+        "tags": ["Messages"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "salonId",
+            "in": "path"
+          },
+          {
+            "schema": {
+              "type": "string",
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "userId",
             "in": "path"
           }
         ],
@@ -8232,11 +8158,11 @@
         }
       }
     },
-    "/v1/employer/salons/{salonId}/applications/{id}/messages": {
+    "/v1/employer/salons/{salonId}/candidates/{userId}/messages": {
       "post": {
-        "summary": "Message an applicant",
-        "description": "Adds to the conversation on their application. They're told by push and email (as their notification settings allow) and reply in their inbox, on the website or in the app; neither of you sees the other's email.",
-        "tags": ["Applicants"],
+        "summary": "Message someone",
+        "description": "Writes in your conversation with them, starting it if there isn't one: someone who applied to your salon, or whose profile you can see and who takes messages (their `contact.message`). Say which application it's about with `applicationId`. They're told by push and email (as their notification settings allow) and reply on Salon Staff; neither of you sees the other's email. Until they've applied or replied, your salon can start conversations with 25 new people a day, and write to each once a day.",
+        "tags": ["Messages"],
         "parameters": [
           {
             "schema": {
@@ -8250,10 +8176,10 @@
           {
             "schema": {
               "type": "string",
-              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
             },
             "required": true,
-            "name": "id",
+            "name": "userId",
             "in": "path"
           }
         ],
@@ -8268,6 +8194,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "applicationId": {
+                    "type": "string",
+                    "maxLength": 40
                   }
                 },
                 "required": ["body"]
@@ -8281,7 +8211,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApplicationMessage"
+                  "$ref": "#/components/schemas/Message"
                 }
               }
             }
@@ -8325,6 +8255,26 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "They don't take messages",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Today's limit for people who haven't applied or replied",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
           }
         }
       }
@@ -8332,8 +8282,8 @@
     "/v1/me/conversations": {
       "get": {
         "summary": "Your conversations with salons",
-        "description": "Your applications a salon has written about, latest message first, with how many of theirs you haven't read.",
-        "tags": ["Your applications"],
+        "description": "Every salon that has written to you or looked at your number, latest first (the last 200), with how many of their messages you haven't read.",
+        "tags": ["Your messages"],
         "responses": {
           "200": {
             "description": "Your conversations",
@@ -8368,16 +8318,16 @@
         }
       }
     },
-    "/v1/me/applications/{id}": {
+    "/v1/me/conversations/{id}": {
       "get": {
-        "summary": "One of your applications, with its conversation",
-        "description": "Where it's up to, and every message with the salon, oldest first. Opening it marks the salon's messages read.",
-        "tags": ["Your applications"],
+        "summary": "One of your conversations",
+        "description": "Every message with the salon, oldest first, and your applications to it. Opening it marks the salon's messages read.",
+        "tags": ["Your messages"],
         "parameters": [
           {
             "schema": {
               "type": "string",
-              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              "example": "cnv_01k6q2x8h4f7tbn3m9vz5cdr0e"
             },
             "required": true,
             "name": "id",
@@ -8386,11 +8336,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Your application",
+            "description": "The conversation",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/MyApplicationThread"
+                  "$ref": "#/components/schemas/MyConversationThread"
                 }
               }
             }
@@ -8428,16 +8378,16 @@
         }
       }
     },
-    "/v1/me/applications/{id}/live": {
+    "/v1/me/conversations/{id}/live": {
       "get": {
-        "summary": "Your conversation, live",
-        "description": "Opens a WebSocket for this conversation while it's on screen (D-18). Each new message arrives as `{\"type\":\"message\",\"message\":{...}}` (the same message as in the conversation; ignore one you already have) and the salon's team typing as `{\"type\":\"typing\",\"from\":\"salon\"|\"seeker\",\"name\":\"...\"}`. Send `{\"type\":\"typing\"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.",
-        "tags": ["Your applications"],
+        "summary": "One of your conversations, live",
+        "description": "Opens a WebSocket for this conversation while it's on screen (D-18); there's one per salon and job seeker (D-19), whatever it's about. Each new message arrives as `{\"type\":\"message\",\"message\":{...}}` (the same message as in the conversation; ignore one you already have) and the salon's team typing as `{\"type\":\"typing\",\"from\":\"salon\"|\"seeker\",\"name\":\"...\"}`. Send `{\"type\":\"typing\"}` every few seconds while your person types, and `ping` (answered `pong`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.",
+        "tags": ["Your messages"],
         "parameters": [
           {
             "schema": {
               "type": "string",
-              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              "example": "cnv_01k6q2x8h4f7tbn3m9vz5cdr0e"
             },
             "required": true,
             "name": "id",
@@ -8491,16 +8441,16 @@
         }
       }
     },
-    "/v1/me/applications/{id}/messages": {
+    "/v1/me/conversations/{id}/messages": {
       "post": {
-        "summary": "Reply to the salon",
-        "description": "Once the salon has written about your application. The people the job notifies are told by push and email.",
-        "tags": ["Your applications"],
+        "summary": "Reply to a salon",
+        "description": "Once the salon has written. Say which of your applications it's about with `applicationId`; without one it follows the salon's last message. The salon's team is told by push and email.",
+        "tags": ["Your messages"],
         "parameters": [
           {
             "schema": {
               "type": "string",
-              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+              "example": "cnv_01k6q2x8h4f7tbn3m9vz5cdr0e"
             },
             "required": true,
             "name": "id",
@@ -8518,6 +8468,10 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 2000
+                  },
+                  "applicationId": {
+                    "type": "string",
+                    "maxLength": 40
                   }
                 },
                 "required": ["body"]
@@ -8531,7 +8485,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApplicationMessage"
+                  "$ref": "#/components/schemas/Message"
                 }
               }
             }
@@ -8578,6 +8532,66 @@
           },
           "409": {
             "description": "The salon hasn't written yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/applications/{id}": {
+      "get": {
+        "summary": "One of your applications",
+        "description": "Where it's up to, and your conversation with the salon (`conversationId`, once they've written) with how many of its messages you haven't read. Read and reply with GET and POST /v1/me/conversations/{conversationId}.",
+        "tags": ["Your applications"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "example": "app_01k6q2x8h4f7tbn3m9vz5cdr0e"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Your application",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyApplicationDetail"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not found",
             "content": {
               "application/problem+json": {
                 "schema": {

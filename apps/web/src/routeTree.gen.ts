@@ -54,6 +54,7 @@ import { Route as SeekerApplicationsSavedRouteImport } from './routes/_seeker.ap
 import { Route as EmployerSalonIdIndexRouteImport } from './routes/employer.$salonId.index'
 import { Route as EmployerSalonIdApplicantsRouteImport } from './routes/employer.$salonId.applicants'
 import { Route as EmployerSalonIdBillingRouteImport } from './routes/employer.$salonId.billing'
+import { Route as EmployerSalonIdMessagesRouteImport } from './routes/employer.$salonId.messages'
 import { Route as EmployerSalonIdSettingsRouteImport } from './routes/employer.$salonId.settings'
 import { Route as EmployerSalonIdTeamRouteImport } from './routes/employer.$salonId.team'
 import { Route as EmployerSalonIdApplicationsIdRouteImport } from './routes/employer.$salonId.applications.$id'
@@ -287,6 +288,11 @@ const EmployerSalonIdBillingRoute = EmployerSalonIdBillingRouteImport.update({
   path: '/billing',
   getParentRoute: () => EmployerSalonIdRoute,
 } as any)
+const EmployerSalonIdMessagesRoute = EmployerSalonIdMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => EmployerSalonIdRoute,
+} as any)
 const EmployerSalonIdSettingsRoute = EmployerSalonIdSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -370,6 +376,7 @@ export interface FileRoutesByFullPath {
   '/applications/saved': typeof SeekerApplicationsSavedRoute
   '/employer/$salonId/applicants': typeof EmployerSalonIdApplicantsRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
+  '/employer/$salonId/messages': typeof EmployerSalonIdMessagesRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
   '/applications/': typeof SeekerApplicationsIndexRoute
@@ -419,6 +426,7 @@ export interface FileRoutesByTo {
   '/applications/saved': typeof SeekerApplicationsSavedRoute
   '/employer/$salonId/applicants': typeof EmployerSalonIdApplicantsRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
+  '/employer/$salonId/messages': typeof EmployerSalonIdMessagesRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
   '/applications': typeof SeekerApplicationsIndexRoute
@@ -474,6 +482,7 @@ export interface FileRoutesById {
   '/_seeker/applications/saved': typeof SeekerApplicationsSavedRoute
   '/employer/$salonId/applicants': typeof EmployerSalonIdApplicantsRoute
   '/employer/$salonId/billing': typeof EmployerSalonIdBillingRoute
+  '/employer/$salonId/messages': typeof EmployerSalonIdMessagesRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
   '/_seeker/applications/': typeof SeekerApplicationsIndexRoute
@@ -529,6 +538,7 @@ export interface FileRouteTypes {
     | '/applications/saved'
     | '/employer/$salonId/applicants'
     | '/employer/$salonId/billing'
+    | '/employer/$salonId/messages'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
     | '/applications/'
@@ -578,6 +588,7 @@ export interface FileRouteTypes {
     | '/applications/saved'
     | '/employer/$salonId/applicants'
     | '/employer/$salonId/billing'
+    | '/employer/$salonId/messages'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
     | '/applications'
@@ -632,6 +643,7 @@ export interface FileRouteTypes {
     | '/_seeker/applications/saved'
     | '/employer/$salonId/applicants'
     | '/employer/$salonId/billing'
+    | '/employer/$salonId/messages'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
     | '/_seeker/applications/'
@@ -984,6 +996,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployerSalonIdBillingRouteImport
       parentRoute: typeof EmployerSalonIdRoute
     }
+    '/employer/$salonId/messages': {
+      id: '/employer/$salonId/messages'
+      path: '/messages'
+      fullPath: '/employer/$salonId/messages'
+      preLoaderRoute: typeof EmployerSalonIdMessagesRouteImport
+      parentRoute: typeof EmployerSalonIdRoute
+    }
     '/employer/$salonId/settings': {
       id: '/employer/$salonId/settings'
       path: '/settings'
@@ -1100,6 +1119,7 @@ const AccountRouteWithChildren =
 interface EmployerSalonIdRouteChildren {
   EmployerSalonIdApplicantsRoute: typeof EmployerSalonIdApplicantsRoute
   EmployerSalonIdBillingRoute: typeof EmployerSalonIdBillingRoute
+  EmployerSalonIdMessagesRoute: typeof EmployerSalonIdMessagesRoute
   EmployerSalonIdSettingsRoute: typeof EmployerSalonIdSettingsRoute
   EmployerSalonIdTeamRoute: typeof EmployerSalonIdTeamRoute
   EmployerSalonIdIndexRoute: typeof EmployerSalonIdIndexRoute
@@ -1113,6 +1133,7 @@ interface EmployerSalonIdRouteChildren {
 const EmployerSalonIdRouteChildren: EmployerSalonIdRouteChildren = {
   EmployerSalonIdApplicantsRoute: EmployerSalonIdApplicantsRoute,
   EmployerSalonIdBillingRoute: EmployerSalonIdBillingRoute,
+  EmployerSalonIdMessagesRoute: EmployerSalonIdMessagesRoute,
   EmployerSalonIdSettingsRoute: EmployerSalonIdSettingsRoute,
   EmployerSalonIdTeamRoute: EmployerSalonIdTeamRoute,
   EmployerSalonIdIndexRoute: EmployerSalonIdIndexRoute,

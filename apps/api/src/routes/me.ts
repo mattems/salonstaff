@@ -60,7 +60,7 @@ const TAGS = ["Me"];
 
 /** The `Me` answer for an account. */
 export function meJson(c: Context<AppEnv>, account: Account) {
-  const { user, profile, checks, salons, unreadContacts } = account;
+  const { user, profile, checks, salons, unreadMessages } = account;
   return {
     id: encodeId("user", user.id),
     name: user.name,
@@ -77,7 +77,7 @@ export function meJson(c: Context<AppEnv>, account: Account) {
       status: salon.status,
       role,
     })),
-    unreadMessages: unreadContacts,
+    unreadMessages,
   };
 }
 

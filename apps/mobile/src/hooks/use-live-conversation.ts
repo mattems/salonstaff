@@ -7,7 +7,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import { AppState } from 'react-native';
 
-import { liveSocket, type ApplicationMessage } from '@/lib/api';
+import { liveSocket, type Message } from '@/lib/api';
 
 /**
  * Keeps a conversation live while its screen is open and the app is in front (D-18): new
@@ -18,7 +18,7 @@ import { liveSocket, type ApplicationMessage } from '@/lib/api';
 export function useLiveConversation(
   path: string | undefined,
   me: LiveSide,
-  handlers: { onMessage(message: ApplicationMessage): void; onReconnect(): void },
+  handlers: { onMessage(message: Message): void; onReconnect(): void },
 ) {
   const [typing, setTyping] = useState<string | null>(null);
   const live = useRef<LiveConnection | null>(null);
@@ -31,7 +31,7 @@ export function useLiveConversation(
     if (!path) return;
     let hideTyping: ReturnType<typeof setTimeout> | undefined;
     const start = () => {
-      live.current ??= openLive<ApplicationMessage>(() => liveSocket(path), {
+      live.current ??= openLive<Message>(() => liveSocket(path), {
         onMessage(message) {
           if (message.from !== me) setTyping(null);
           latest.current.onMessage(message);

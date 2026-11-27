@@ -1,6 +1,6 @@
 # D-17 Salons and applicants talk in a conversation on the application
 
-**Status:** Accepted (2026-11-27)
+**Status:** Accepted (2026-11-27). The conversation is now one per salon and job seeker, not per application (D-19).
 
 **Decision.**
 

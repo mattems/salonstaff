@@ -16,8 +16,9 @@ export type Schemas = components['schemas'];
 export type Me = Schemas['Me'];
 export type NotificationPreferences = Schemas['NotificationPreferences'];
 export type MyConversation = Schemas['MyConversation'];
-export type ApplicationThread = Schemas['MyApplicationThread'];
-export type ApplicationMessage = Schemas['ApplicationMessage'];
+export type ConversationThread = Schemas['MyConversationThread'];
+export type ApplicationDetail = Schemas['MyApplicationDetail'];
+export type Message = Schemas['Message'];
 export type SeekerProfile = Schemas['SeekerProfile'];
 export type Verification = Schemas['Verification'];
 export type VerificationStatus = Verification['identity'];
@@ -55,7 +56,6 @@ export type SettingsInput = NonNullable<
 >['content']['application/json'];
 export type ProfileSettings = Schemas['ProfileSettings'];
 export type MyEndorsement = Schemas['MyEndorsement'];
-export type ProfileContact = Schemas['ProfileContact'];
 export type HiddenSalon = Schemas['HiddenSalon'];
 export type SignInSession = Schemas['SignInSession'];
 export type SignInMethods = Schemas['SignInMethods'];
@@ -271,14 +271,19 @@ export const api = {
     unwrap(await client.GET('/v1/me', token ? { headers: headersFor(token) } : {})),
   deleteAccount: async () => unwrap(await client.DELETE('/v1/me')),
   myApplications: async () => unwrap(await client.GET('/v1/me/applications')),
-  // Conversations with salons about applications (D-17)
+  // Conversations with salons (D-19): one per salon, about applications or from their profile
   conversations: async () => unwrap(await client.GET('/v1/me/conversations')),
+  conversation: async (id: string) =>
+    unwrap(await client.GET('/v1/me/conversations/{id}', { params: path(id) })),
+  sendMessage: async (conversationId: string, body: string, applicationId?: string) =>
+    unwrap(
+      await client.POST('/v1/me/conversations/{id}/messages', {
+        params: path(conversationId),
+        body: applicationId ? { body, applicationId } : { body },
+      }),
+    ),
   application: async (id: string) =>
     unwrap(await client.GET('/v1/me/applications/{id}', { params: path(id) })),
-  sendApplicationMessage: async (id: string, body: string) =>
-    unwrap(
-      await client.POST('/v1/me/applications/{id}/messages', { params: path(id), body: { body } }),
-    ),
   mySaved: async () => unwrap(await client.GET('/v1/me/saved')),
 
   // Profile
@@ -332,12 +337,6 @@ export const api = {
     ),
   searchSalons: async (q: string) =>
     unwrap(await client.GET('/v1/salons', { params: { query: { q } } })),
-
-  // Inbox
-  contacts: async () => unwrap(await client.GET('/v1/me/profile/contacts')),
-  /** No ids: all of them. */
-  markRead: async (ids?: string[]) =>
-    unwrap(await client.POST('/v1/me/profile/contacts/read', { body: ids ? { ids } : {} })),
 
   // Sign-in and security
   changeEmail: async (email: string) =>

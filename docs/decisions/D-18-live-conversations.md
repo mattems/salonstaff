@@ -1,6 +1,6 @@
 # D-18 Conversations are live while they're open
 
-**Status:** Accepted (2026-11-27)
+**Status:** Accepted (2026-11-27). Rooms are now one per salon and job seeker (D-19): `GET /v1/me/conversations/{id}/live` and `GET /v1/employer/salons/{salonId}/candidates/{userId}/live`.
 
 **Decision.**
 

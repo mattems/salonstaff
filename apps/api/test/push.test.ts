@@ -108,7 +108,7 @@ describe("pushes", () => {
     await seeker.api("PUT", "/v1/me/push-device", { platform: "ios", token: token() });
     const message = `Come in for a trial on Saturday? ${"So much to say. ".repeat(20)}${uid()}`;
     const sent = await owner.api("POST", owner.at(`/candidates/${me.body.id}/messages`), {
-      message,
+      body: message,
     });
     expect(sent.status).toBe(201);
     const pushes = pushesTo(app, seekerUserId);
@@ -170,7 +170,7 @@ describe("notification preferences", () => {
     const { owner } = await salonOwner(app);
     const message = `A trial on Saturday? ${uid()}`;
     const sent = await owner.api("POST", owner.at(`/candidates/${me.body.id}/messages`), {
-      message,
+      body: message,
     });
     expect(sent.status).toBe(201);
     expect(pushesTo(app, seekerUserId)).toEqual([]);

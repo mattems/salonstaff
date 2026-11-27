@@ -1,4 +1,4 @@
-/** D-18: live conversations over a WebSocket, through each application's ConversationRoom. */
+/** D-18: live conversations over a WebSocket, through the ConversationRoom of each salon and job seeker (D-19). */
 import { describe, expect, it } from "vitest";
 import { type Person, postJob, readySeeker, type SalonPerson, salonOwner, uid } from "./fixtures";
 import { APP_ORIGIN, createTestApp } from "./helpers";
@@ -10,11 +10,24 @@ async function setup(app: App) {
   const job = await postJob(owner, { title: `Stylist ${uid()}` });
   const seeker = await readySeeker(app, "Live");
   expect((await seeker.api("POST", `/v1/jobs/${job.id}/apply`, {})).status).toBe(201);
-  const found = await owner.api<{ items: { id: string }[] }>(
+  const found = await owner.api<{ items: { candidateId: string }[] }>(
     "GET",
     owner.at(`/applicants?jobId=${job.id}`),
   );
-  return { owner, salon, job, seeker, applicationId: found.body.items[0]?.id as string };
+  const candidateId = found.body.items[0]?.candidateId as string;
+  const write = (body: string) =>
+    owner.api<{ id: string }>("POST", owner.at(`/candidates/${candidateId}/messages`), { body });
+  // The salon writes first, which starts the conversation.
+  expect((await write("Thanks for applying!")).status).toBe(201);
+  const mine = await seeker.api<{ items: { id: string }[] }>("GET", "/v1/me/conversations");
+  return {
+    owner,
+    salon,
+    seeker,
+    candidateId,
+    conversationId: mine.body.items[0]?.id as string,
+    write,
+  };
 }
 
 /** Opens a live conversation as `person`, the way the website does (cookie, our own origin). */
@@ -50,55 +63,53 @@ function listen(response: Response) {
   return { socket, frames, next };
 }
 
-const seekerLive = (applicationId: string) => `/v1/me/applications/${applicationId}/live`;
-const salonLive = (owner: SalonPerson, applicationId: string) =>
-  owner.at(`/applications/${applicationId}/live`);
+const seekerLive = (conversationId: string) => `/v1/me/conversations/${conversationId}/live`;
+const salonLive = (owner: SalonPerson, candidateId: string) =>
+  owner.at(`/candidates/${candidateId}/live`);
 
 describe("a live conversation", () => {
   it("takes only a WebSocket, from someone who can see the conversation", async () => {
     const app = createTestApp();
-    const { owner, seeker, applicationId } = await setup(app);
+    const { owner, seeker, candidateId, conversationId } = await setup(app);
 
-    const plain = await seeker.api("GET", seekerLive(applicationId));
+    const plain = await seeker.api("GET", seekerLive(conversationId));
     expect(plain.status).toBe(400);
 
     const stranger = await readySeeker(app, "Stranger");
-    expect((await connect(app, stranger, seekerLive(applicationId))).status).toBe(404);
+    expect((await connect(app, stranger, seekerLive(conversationId))).status).toBe(404);
+    // A salon they've hidden their profile from can't see them, so can't open one.
     const otherSalon = await salonOwner(app);
+    await seeker.api("PUT", `/v1/me/hidden-salons/${otherSalon.salon.id}`);
     expect(
-      (await connect(app, otherSalon.owner, salonLive(otherSalon.owner, applicationId))).status,
+      (await connect(app, otherSalon.owner, salonLive(otherSalon.owner, candidateId))).status,
     ).toBe(404);
 
     // Another site's page can't open it with the website's cookie.
-    const forged = await connect(app, seeker, seekerLive(applicationId), {
+    const forged = await connect(app, seeker, seekerLive(conversationId), {
       Origin: "https://elsewhere.example",
     });
     expect(forged.status).toBe(403);
 
-    const signedOut = await app.call(seekerLive(applicationId), {
+    const signedOut = await app.call(seekerLive(conversationId), {
       headers: { Upgrade: "websocket" },
     });
     expect(signedOut.status).toBe(401);
 
-    expect((await connect(app, owner, salonLive(owner, applicationId))).status).toBe(101);
+    expect((await connect(app, owner, salonLive(owner, candidateId))).status).toBe(101);
   });
 
   it("passes on new messages and typing, and skips the email to someone watching", async () => {
     const app = createTestApp();
-    const { owner, salon, seeker, applicationId } = await setup(app);
-    const theirs = listen(await connect(app, seeker, seekerLive(applicationId)));
-    const ours = listen(await connect(app, owner, salonLive(owner, applicationId)));
+    const { owner, salon, seeker, candidateId, conversationId, write } = await setup(app);
+    const theirs = listen(await connect(app, seeker, seekerLive(conversationId)));
+    const ours = listen(await connect(app, owner, salonLive(owner, candidateId)));
 
     theirs.socket.send("ping");
     expect(await theirs.next()).toBe("pong");
 
     const text = `Can you do a trial on Tuesday? ${uid()}`;
     const arriving = theirs.next();
-    const sent = await owner.api<{ id: string }>(
-      "POST",
-      owner.at(`/applications/${applicationId}/messages`),
-      { body: text },
-    );
+    const sent = await write(text);
     expect(sent.status).toBe(201);
     expect(await arriving).toMatchObject({
       type: "message",
@@ -119,7 +130,7 @@ describe("a live conversation", () => {
     ours.socket.close(1000);
     await new Promise((resolve) => setTimeout(resolve, 100));
     const later = `And bring your kit ${uid()}`;
-    await owner.api("POST", owner.at(`/applications/${applicationId}/messages`), { body: later });
+    await write(later);
     expect(app.sent.some((m) => m.to === seeker.email && m.text.includes(later))).toBe(true);
   });
 });

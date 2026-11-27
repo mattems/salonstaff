@@ -27,7 +27,8 @@ export const Route = createFileRoute("/employer/$salonId")({
 
 const TABS = [
   { to: "/employer/$salonId", label: "Dashboard", exact: true },
-  { to: "/employer/$salonId/applicants", label: "Applicants", inbox: true },
+  { to: "/employer/$salonId/applicants", label: "Applicants" },
+  { to: "/employer/$salonId/messages", label: "Messages", inbox: true },
   { to: "/employer/$salonId/jobs/new", label: "Post a job" },
   { to: "/employer/$salonId/team", label: "Team" },
   { to: "/employer/$salonId/billing", label: "Billing", owners: true },
@@ -50,7 +51,7 @@ function SalonLayout() {
             >
               {tab.label}
               {"inbox" in tab && salon.unreadMessages > 0 && (
-                <Badge className="ml-1" aria-label={`${salon.unreadMessages} with unread replies`}>
+                <Badge className="ml-1" aria-label={`${salon.unreadMessages} with unread messages`}>
                   {salon.unreadMessages}
                 </Badge>
               )}

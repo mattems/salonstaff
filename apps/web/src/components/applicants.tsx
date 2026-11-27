@@ -122,133 +122,142 @@ export function ApplicantsBrowser({
     set({ q: typeof q === "string" && q.trim() ? q.trim() : undefined });
   }
 
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap gap-1" role="tablist" aria-label="Status">
-        <Button
-          size="sm"
-          variant={search.status ? "ghost" : "secondary"}
-          onClick={() => set({ status: undefined })}
-        >
-          All <span className="text-muted-foreground">{data.total}</span>
-        </Button>
-        {APPLICATION_STATUSES.map((s) => (
-          <Button
-            key={s.value}
-            size="sm"
-            variant={search.status === s.value ? "secondary" : "ghost"}
-            onClick={() => set({ status: s.value })}
-          >
-            {s.value === "submitted" ? "New" : s.label}{" "}
-            <span className="text-muted-foreground">{data.counts[s.value] ?? 0}</span>
-          </Button>
-        ))}
-      </div>
+  const statuses: { value: Status | undefined; label: string; count: number }[] = [
+    { value: undefined, label: "All", count: data.total },
+    ...APPLICATION_STATUSES.map((s) => ({
+      value: s.value,
+      label: s.value === "submitted" ? "New" : s.label,
+      count: data.counts[s.value] ?? 0,
+    })),
+  ];
 
-      <div className="flex flex-wrap items-center gap-3 text-sm">
-        <form onSubmit={searchName} className="flex gap-2">
-          <Input
-            name="q"
-            defaultValue={search.q ?? ""}
-            placeholder="Search by name"
-            className="w-48"
-            aria-label="Search by name"
-          />
-        </form>
-        {jobs && (
+  // Statuses down the left from tablet width up, a row above the list on a phone.
+  return (
+    <div className="space-y-4 md:grid md:grid-cols-[12rem_minmax(0,1fr)] md:items-start md:gap-6 md:space-y-0">
+      <nav aria-label="Status" className="flex flex-wrap gap-1 md:flex-col">
+        {statuses.map((s) => {
+          const selected = search.status === s.value;
+          return (
+            <Button
+              key={s.value ?? "all"}
+              size="sm"
+              variant={selected ? "secondary" : "ghost"}
+              aria-pressed={selected}
+              onClick={() => set({ status: s.value })}
+              className="md:w-full md:justify-between"
+            >
+              {s.label} <span className="text-muted-foreground">{s.count}</span>
+            </Button>
+          );
+        })}
+      </nav>
+
+      <div className="min-w-0 space-y-4">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <form onSubmit={searchName} className="flex gap-2">
+            <Input
+              name="q"
+              defaultValue={search.q ?? ""}
+              placeholder="Search by name"
+              className="w-48"
+              aria-label="Search by name"
+            />
+          </form>
+          {jobs && (
+            <select
+              className={cn(selectClass, "w-auto")}
+              value={search.job ?? ""}
+              onChange={(e) => set({ job: e.target.value || undefined })}
+              aria-label="Job"
+            >
+              <option value="">All jobs</option>
+              {jobs.map((job) => (
+                <option key={job.id} value={job.id}>
+                  {job.title}
+                </option>
+              ))}
+            </select>
+          )}
           <select
             className={cn(selectClass, "w-auto")}
-            value={search.job ?? ""}
-            onChange={(e) => set({ job: e.target.value || undefined })}
-            aria-label="Job"
+            value={search.sort ?? "newest"}
+            onChange={(e) => set({ sort: e.target.value as ApplicantSort })}
+            aria-label="Sort"
           >
-            <option value="">All jobs</option>
-            {jobs.map((job) => (
-              <option key={job.id} value={job.id}>
-                {job.title}
+            {APPLICANT_SORTS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
               </option>
             ))}
           </select>
-        )}
-        <select
-          className={cn(selectClass, "w-auto")}
-          value={search.sort ?? "newest"}
-          onChange={(e) => set({ sort: e.target.value as ApplicantSort })}
-          aria-label="Sort"
-        >
-          {APPLICANT_SORTS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-        <select
-          className={cn(selectClass, "w-auto")}
-          value={search.minYears ?? ""}
-          onChange={(e) => set({ minYears: e.target.value ? Number(e.target.value) : undefined })}
-          aria-label="Experience"
-        >
-          <option value="">Any experience</option>
-          {[1, 2, 3, 5, 10].map((y) => (
-            <option key={y} value={y}>
-              {y}+ years
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4 text-sm">
-        <Check
-          label="Unread replies"
-          checked={!!search.unread}
-          onChange={(on) => set({ unread: on || undefined })}
-        />
-        <Check
-          label="Open to work"
-          checked={!!search.openToWork}
-          onChange={(on) => set({ openToWork: on || undefined })}
-        />
-        {CHECKS.map((check) => (
-          <Check
-            key={check.value}
-            label={check.label}
-            checked={verified.has(check.value)}
-            onChange={(on) => toggleCheck(check.value, on)}
-          />
-        ))}
-        {filtered && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onSearch({ status: search.status, sort: search.sort })}
+          <select
+            className={cn(selectClass, "w-auto")}
+            value={search.minYears ?? ""}
+            onChange={(e) => set({ minYears: e.target.value ? Number(e.target.value) : undefined })}
+            aria-label="Experience"
           >
-            Clear filters
-          </Button>
-        )}
-      </div>
+            <option value="">Any experience</option>
+            {[1, 2, 3, 5, 10].map((y) => (
+              <option key={y} value={y}>
+                {y}+ years
+              </option>
+            ))}
+          </select>
+        </div>
 
-      {data.items.length === 0 ? (
-        <EmptyState
-          title={filtered || search.status ? "Nobody matches" : "No applicants yet"}
-          description={filtered || search.status ? "Try fewer filters." : emptyMessage}
-        />
-      ) : (
-        <div className="grid gap-3">
-          {data.items.map((applicant) => (
-            <ApplicantCard
-              key={applicant.id}
-              applicant={applicant}
-              salonId={salonId}
-              showJob={!!jobs}
+        <div className="flex flex-wrap items-center gap-4 text-sm">
+          <Check
+            label="Unread replies"
+            checked={!!search.unread}
+            onChange={(on) => set({ unread: on || undefined })}
+          />
+          <Check
+            label="Open to work"
+            checked={!!search.openToWork}
+            onChange={(on) => set({ openToWork: on || undefined })}
+          />
+          {CHECKS.map((check) => (
+            <Check
+              key={check.value}
+              label={check.label}
+              checked={verified.has(check.value)}
+              onChange={(on) => toggleCheck(check.value, on)}
             />
           ))}
-          {data.truncated && (
-            <p className="text-muted-foreground text-sm">
-              Showing the first {data.items.length}. Narrow the filters to see the rest.
-            </p>
+          {filtered && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => onSearch({ status: search.status, sort: search.sort })}
+            >
+              Clear filters
+            </Button>
           )}
         </div>
-      )}
+
+        {data.items.length === 0 ? (
+          <EmptyState
+            title={filtered || search.status ? "Nobody matches" : "No applicants yet"}
+            description={filtered || search.status ? "Try fewer filters." : emptyMessage}
+          />
+        ) : (
+          <div className="grid gap-3">
+            {data.items.map((applicant) => (
+              <ApplicantCard
+                key={applicant.id}
+                applicant={applicant}
+                salonId={salonId}
+                showJob={!!jobs}
+              />
+            ))}
+            {data.truncated && (
+              <p className="text-muted-foreground text-sm">
+                Showing the first {data.items.length}. Narrow the filters to see the rest.
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -390,8 +399,9 @@ export function ApplicantCard({
               </Button>
               <Button asChild size="sm">
                 <Link
-                  to="/employer/$salonId/applications/$id"
-                  params={{ salonId, id: applicant.id }}
+                  to="/employer/$salonId/messages"
+                  params={{ salonId }}
+                  search={{ with: applicant.candidateId }}
                 >
                   {applicant.lastMessageAt ? "Messages" : "Message"}
                 </Link>

@@ -78,8 +78,13 @@ export function destinationOf(
   const url = response.notification.request.content.data?.url;
   if (typeof url !== 'string') return null;
   try {
-    const { pathname, search } = new URL(url);
-    // A conversation about one application (D-17).
+    const { pathname, search, searchParams } = new URL(url);
+    // A conversation with a salon (D-19): /inbox?c=cnv_….
+    const conversation = searchParams.get('c');
+    if (pathname === '/inbox' && conversation?.startsWith('cnv_')) {
+      return { screen: { pathname: '/inbox/[id]', params: { id: conversation } } };
+    }
+    // One application (and its conversation).
     const application = pathname.match(/^\/applications\/(app_[a-z0-9]+)$/);
     if (application?.[1]) {
       return { screen: { pathname: '/applications/[id]', params: { id: application[1] } } };

@@ -256,8 +256,9 @@ export const PROFILE_VISIBILITY_VALUES = PROFILE_VISIBILITY.map((v) => v.value) 
 
 /** How salons may contact a job seeker (D-13). */
 export const CONTACT_BY = [
-  { value: "both", label: "Email and phone" },
-  { value: "email", label: "Email only" },
+  // `email` is "Messages" since D-19: salons write in the conversation, which is emailed and pushed.
+  { value: "both", label: "Messages and phone" },
+  { value: "email", label: "Messages only" },
   { value: "phone", label: "Phone only" },
 ] as const;
 export type ContactBy = (typeof CONTACT_BY)[number]["value"];
@@ -346,9 +347,10 @@ export const APPLICANT_SORT_VALUES = APPLICANT_SORTS.map((s) => s.value) as [
 
 /** Keeping salons' contact with job seekers useful and spam-free (D-13). Per salon, per day. */
 export const CONTACT_LIMITS = {
+  /** People a salon writes to cold (not applied, not replied) a day (D-19). */
   messagesPerDay: 25,
   phoneRevealsPerDay: 50,
-  /** Messages from one salon to the same person. */
+  /** Messages from one salon to the same person a day, while it's cold. */
   messagesPerPersonPerDay: 1,
   /** Endorsement requests a job seeker can send. */
   endorsementRequestsPerDay: 5,

@@ -78,6 +78,13 @@
       "when": 1795760567693,
       "tag": "0010_application_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1795779107945,
+      "tag": "0011_conversations",
+      "breakpoints": true
     }
   ]
 }

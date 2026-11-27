@@ -109,16 +109,21 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   development builds the API, website, build kind and device, shareable.
 - A new name after the ID check expires it (D-16): verification status `expired`; the website and app warn
   before saving and the verification pages explain it.
-- Conversations on applications (D-17, migration 0010): the salon's team writes to an applicant from the
-  application (with quick replies) and the applicant replies once the salon has written, on the website
-  (`/employer/{salon}/applications/{id}`, `/applications/{id}`) and in the app; push and email to the other
-  side under "Messages from salons"; unread counts in the salon's Applicants tab, the job seeker's inbox
-  badge and each application; no daily limit on messages. A new salon-wide Applicants page,
-  and the same on each job's page: status counts, job, unread replies, verified checks, open to work,
+- Conversations (D-17, D-19; migrations 0010, 0011): one conversation per salon and job seeker
+  (`conversations`, `conversation_messages`), however it started. The salon's team writes from an application
+  (with quick replies), from the person's profile ("Message {name}", when they take messages) or from its new
+  Messages page (`/employer/{salon}/messages?with={usr}`, unread count on its tab); each message can say
+  which application it's about. "Show number" also puts a line in the conversation. The job seeker replies
+  once the salon has written, in one Inbox (`/inbox?c={cnv}`, and the app's Inbox tab). Conversations are
+  read and written only there and on the salon's Messages page; applications link to them.
+  Push and email under "Messages from salons"; nobody's email is shown, and emailed profile messages with
+  reply-to are gone. Limits only while cold (not applied, not replied): 25 new people a day per salon, one
+  message a day to each. A salon-wide Applicants page,
+  and the same on each job's page: statuses with their counts down the left (a row on a phone), job, unread replies, verified checks, open to work,
   experience, name search, sort (`GET /v1/employer/salons/{salonId}/applicants`, up to 200).
 - Live conversations (D-18): while a conversation is open on the website or in the app, new messages and
-  "Jess is typing…" arrive at once over a WebSocket held by a Durable Object per application
-  (`ConversationRoom`, `/v1/.../applications/{id}/live`). Whoever has it open isn't also pushed or emailed.
+  "Jess is typing…" arrive at once over a WebSocket held by a Durable Object per salon and job seeker
+  (`ConversationRoom`, `/v1/me/conversations/{id}/live`, `/v1/employer/salons/{salonId}/candidates/{userId}/live`). Whoever has it open isn't also pushed or emailed.
   `bun run phone` / `ios:device` forward the socket too (restart them to pick that up). On the website the
   conversation is shadcn's chat parts (`message`, `bubble`, `message-scroller` in packages/ui): a fixed-height
   window that keeps to the newest message, with a jump-down button when reading further up. The
@@ -129,7 +134,8 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - The app's Inbox badge stays current without a socket: a push re-checks it, as do coming back to the
   app and switching tabs; when message pushes don't reach the phone (turned off, not allowed, or the API
   can't send them, as locally without an APNs key: `PUT /v1/me/push-device` says `delivered`), it also
-  re-checks once a minute while the app is open (`hooks/use-fresh-inbox.ts`).
+  re-checks every 15 seconds while the app is open (`hooks/use-fresh-inbox.ts`). Locally there is no APNs
+  key, so that is how the badge updates on a phone or the simulator; with pushes it updates at once.
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
 
@@ -158,7 +164,9 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 
 ### Not done yet
 - Drop `salons.owner_id` in a later migration, once deployed code no longer reads it (D-11). Likewise
-  `seeker_profiles.phone`, `pay_expectation` and `qualifications` (D-13).
+  `seeker_profiles.phone`, `pay_expectation` and `qualifications` (D-13), and `application_messages`,
+  `applications.last_message_at`/`salon_read_at`/`seeker_read_at` and `profile_contacts.message`/`read_at`
+  (copied into conversations by migration 0011, D-19).
 - Salons searching and browsing job seeker profiles (by role, place, pay, availability): next, maybe a
   Salon Plan feature (D-13). Reporting spam messages to staff.
 - Nothing runs on GitHub while developing locally: CI only runs when a deploy calls it (none yet). Run

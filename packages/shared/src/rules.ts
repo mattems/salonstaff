@@ -171,29 +171,28 @@ export interface SalonAccessInput {
   /** They hid their profile from this salon. */
   hiddenFromSalon: boolean;
   contactBy: ContactBy;
-  /** The account has a real email to send messages to. */
-  hasEmail: boolean;
   /** The account has a verified mobile to show. */
   hasMobile: boolean;
 }
 
 export interface SalonAccess {
   view: boolean;
-  /** Can send a message through us (emailed, reply-to the sender). */
+  /** Can write to them in their conversation with the salon (D-19). */
   message: boolean;
   /** Can reveal their mobile. */
   phone: boolean;
 }
 
 /**
- * What a salon's team may do with a job seeker's profile. Applying always lets the salon in;
- * otherwise a hidden profile, or one hidden from this salon, stays shut.
+ * What a salon's team may do with a job seeker's profile. Applying always lets the salon in, and
+ * write to them; otherwise a hidden profile, or one hidden from this salon, stays shut, and messages
+ * need "Messages" in how they take contact.
  */
 export function salonAccessTo(input: SalonAccessInput): SalonAccess {
   const view = input.applied || (input.visibility !== "hidden" && !input.hiddenFromSalon);
   return {
     view,
-    message: view && input.contactBy !== "phone" && input.hasEmail,
+    message: view && (input.applied || input.contactBy !== "phone"),
     phone: view && input.contactBy !== "email" && input.hasMobile,
   };
 }
@@ -210,19 +209,23 @@ export function publicName(firstName: string, lastName: string): string {
 export type ContactLimit = "salon_messages" | "salon_reveals" | "same_person";
 
 /**
- * Whether a salon has used up today's contact (D-13). `salonToday` counts the salon's messages or
- * reveals in the last 24 hours; `personToday` its messages to this person.
+ * Whether a salon has used up today's contact (D-13, D-19).
+ * - Number looks: `salonToday` counts the salon's looks in the last 24 hours.
+ * - Messages are limited only while it's cold: the person hasn't applied to the salon or replied.
+ *   `salonColdToday` counts the people the salon wrote to cold in the last 24 hours; `personToday`
+ *   its messages to this person.
  */
-export function contactLimitReached(input: {
-  kind: "message" | "phone";
-  salonToday: number;
-  personToday: number;
-}): ContactLimit | null {
+export function contactLimitReached(
+  input:
+    | { kind: "phone"; salonToday: number }
+    | { kind: "message"; cold: boolean; salonColdToday: number; personToday: number },
+): ContactLimit | null {
   if (input.kind === "phone") {
     return input.salonToday >= CONTACT_LIMITS.phoneRevealsPerDay ? "salon_reveals" : null;
   }
+  if (!input.cold) return null;
   if (input.personToday >= CONTACT_LIMITS.messagesPerPersonPerDay) return "same_person";
-  if (input.salonToday >= CONTACT_LIMITS.messagesPerDay) return "salon_messages";
+  if (input.salonColdToday >= CONTACT_LIMITS.messagesPerDay) return "salon_messages";
   return null;
 }
 
@@ -291,20 +294,25 @@ export function formatDistance(km: number): string {
   return `${Math.round(km)}km`;
 }
 
-// ---------- Conversations on applications (D-17) ----------
+// ---------- Conversations (D-17, D-19) ----------
 
-export type MessageBlocker = "salon_suspended" | "wait_for_salon";
+export type MessageBlocker = "salon_suspended" | "wait_for_salon" | "not_taking_messages";
 
 /**
- * Why one side can't write in an application's conversation right now, or null if they can. The
- * applicant replies once the salon has written. There's no daily limit: it's a live conversation.
+ * Why one side can't write in their conversation right now, or null if they can (D-19). The job
+ * seeker replies once the salon has written; the salon writes to people who applied to it, or who
+ * take messages (`salonAccessTo`). Cold messages have daily limits (`contactLimitReached`),
+ * checked when sending.
  */
 export function messageBlockerOf(input: {
   side: "salon" | "seeker";
   salonActive: boolean;
   salonHasWritten: boolean;
+  /** For the salon: whether this person may be written to (`SalonAccess.message`). */
+  takesMessages?: boolean;
 }): MessageBlocker | null {
   if (!input.salonActive) return "salon_suspended";
+  if (input.side === "salon" && input.takesMessages === false) return "not_taking_messages";
   if (input.side === "seeker" && !input.salonHasWritten) return "wait_for_salon";
   return null;
 }
