@@ -11,4 +11,6 @@ regexTarget = "line"
 regexes = [
   # The Cloudflare Access audience tag identifies an application; it grants nothing.
   '''"ACCESS_AUD":''',
+  # A made-up secret for the sign-in library in a test (apps/api/test/hardening.test.ts).
+  '''secret: "a-test-secret-that-is-long-enough-000"''',
 ]

@@ -7,22 +7,29 @@ import {
   claimMethods,
   contactLimitReached,
   distanceKm,
+  distinctiveWords,
   eligibilityOf,
   entitlementOf,
   fillQuickReply,
   formatDistance,
+  hourIn,
   isValidAbn,
   maskEmail,
+  maskPhone,
   messageBlockerOf,
+  NAME_MATCH_MIN,
   nameChangeExpiresIdentity,
   nameMatches,
+  nameMatchScore,
   plainLine,
   publicName,
   roughCoordinate,
   salonAbnStatus,
   salonAccessTo,
   shareLinkWorks,
+  spokenCode,
   verificationLevel,
+  withinCallingHours,
 } from "./rules";
 import { webAddress } from "./schemas";
 
@@ -132,8 +139,77 @@ it("ABN checksum", () => {
 
 it("claims", () => {
   expect(maskEmail("hello@salon.com")).toBe("he•••@salon.com");
-  expect(claimMethods({ email: "a@b.co" })).toEqual(["email", "review"]);
-  expect(claimMethods({ email: null })).toEqual(["review"]);
+  expect(maskPhone("+61412345678")).toBe("04•• ••• 678");
+  expect(maskPhone("0412 345 678")).toBe("04•• ••• 678");
+  expect(claimMethods({ email: "a@b.co", phone: null })).toEqual(["email", "review"]);
+  expect(claimMethods({ email: null, phone: null })).toEqual(["review"]);
+  // A mobile takes an SMS; a landline doesn't.
+  // A mobile can take a text or a call.
+  expect(claimMethods({ email: "a@b.co", phone: "0412 345 678" })).toEqual([
+    "email",
+    "phone",
+    "call",
+    "review",
+  ]);
+  // A landline gets a call that reads out the code.
+  expect(claimMethods({ email: null, phone: "(07) 3000 1111" })).toEqual(["call", "review"]);
+  expect(claimMethods({ email: null, phone: "+61 2 9000 1234" })).toEqual(["call", "review"]);
+  // A 1300 or 13 number is routed (often to a menu): neither.
+  expect(claimMethods({ email: null, phone: "1300 123 456" })).toEqual(["review"]);
+  expect(claimMethods({ email: null, phone: "13 12 34" })).toEqual(["review"]);
+
+  expect(maskPhone("+61730001111")).toBe("07•• ••• 111");
+  expect(spokenCode("123456")).toBe("1 2 3, 4 5 6");
+});
+
+describe("calling hours, the salon's own time", () => {
+  // 2026-07-01 22:30 UTC: 8:30am in Sydney and Brisbane (no daylight saving in July), 8am in
+  // Adelaide, 6:30am in Perth.
+  const morning = new Date("2026-07-01T22:30:00Z");
+  it.each([
+    ["NSW", 8, true],
+    ["QLD", 8, true],
+    ["SA", 8, true],
+    ["NT", 8, true],
+    ["WA", 6, false],
+  ] as const)("%s is at hour %i", (state, hour, ok) => {
+    expect(hourIn(state, morning)).toBe(hour);
+    expect(withinCallingHours(state, morning)).toBe(ok);
+  });
+
+  it("stops at 8pm, and follows daylight saving", () => {
+    // 2026-12-01 09:00 UTC: 8pm in Sydney (daylight saving), 7pm in Brisbane (none).
+    const evening = new Date("2026-12-01T09:00:00Z");
+    expect(withinCallingHours("NSW", evening)).toBe(false);
+    expect(withinCallingHours("QLD", evening)).toBe(true);
+  });
+});
+
+describe("finding a listed salon by name", () => {
+  it.each([
+    ["Bella Rosa Hair", "Bella Rosa Hair", 1],
+    ["bella rosa hair", "Bella Rosa Hair!", 1],
+    ["Smith & Co", "Smith and Co", 1],
+    ["Café Noir", "Cafe Noir", 1],
+  ])("%s is %s", (typed, listed, score) => {
+    expect(nameMatchScore(typed, listed)).toBe(score);
+  });
+
+  it("scores shared distinctive words, ignoring the common ones", () => {
+    expect(nameMatchScore("Bella Rosa", "Bella Rosa Hair Studio")).toBeCloseTo(0.9);
+    expect(nameMatchScore("Bella", "Bella Rosa Hair")).toBeCloseTo(0.45);
+    expect(nameMatchScore("Bellas", "Bella Hair")).toBeCloseTo(0.9);
+    // Only common words in common: no match.
+    expect(nameMatchScore("The Hair Studio", "Hair Studio Fitzroy")).toBe(0);
+    expect(nameMatchScore("Fade Room", "Bella Rosa")).toBe(0);
+    expect(nameMatchScore("", "Bella")).toBe(0);
+  });
+
+  it("keeps the common words when a name is only those", () => {
+    expect(distinctiveWords("The Hair Studio")).toEqual(["the", "hair", "studio"]);
+    expect(distinctiveWords("Studio 54 Hair")).toEqual(["54"]);
+    expect(nameMatchScore("Hair Studio", "The Hair Studio")).toBeGreaterThanOrEqual(NAME_MATCH_MIN);
+  });
 });
 
 describe("near me", () => {

@@ -3,12 +3,14 @@
  * nowhere else: the API, web app and admin portal all call these.
  */
 import {
+  type AuState,
   CONTACT_LIMITS,
   type ContactBy,
   PRICING,
   type ProfileVisibility,
   type VerificationStatus,
 } from "./constants";
+import { normaliseAuLandline, normaliseAuMobile } from "./schemas";
 
 // ---------- ABN ----------
 
@@ -306,13 +308,163 @@ export function maskEmail(email: string): string {
   return `${user.slice(0, 2)}${"•".repeat(Math.max(user.length - 2, 3))}@${domain}`;
 }
 
-/**
- * How a claim can be proven. ABNs are public, so a matching ABN is necessary but not enough:
- * the claimant also clicks a link sent to the listing's business email, or an admin approves.
- */
-export function claimMethods(listing: { email: string | null }): ("email" | "review")[] {
-  return listing.email ? ["email", "review"] : ["review"];
+/** "+61412345678" → "04•• ••• 678", for showing where a claim code went. */
+export function maskPhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "").replace(/^61/, "0");
+  return `${digits.slice(0, 2)}•• ••• ${digits.slice(-3)}`;
 }
+
+export type ClaimMethod = "email" | "phone" | "call" | "review";
+
+/**
+ * How a claim can be proven (D-04, D-22). ABNs are public, so a matching ABN is necessary but not
+ * enough: the claimant also types a code sent to the listing's own business email (which also
+ * carries a link), texted to its own mobile, or read out in a phone call to its own landline, or
+ * staff check it. Only details already on the listing count: never an address or number the
+ * claimant gives.
+ */
+export function claimMethods(listing: {
+  email: string | null;
+  phone: string | null;
+}): ClaimMethod[] {
+  const methods: ClaimMethod[] = [];
+  if (listing.email) methods.push("email");
+  if (listing.phone && normaliseAuMobile(listing.phone)) methods.push("phone");
+  if (callableNumber(listing.phone)) methods.push("call");
+  methods.push("review");
+  return methods;
+}
+
+/**
+ * The number a claim code call goes to: the listing's landline or its mobile (a mobile can take a
+ * text or a call, D-22). E.164, or null for a routed 13/1300/1800 number or anything else.
+ */
+export function callableNumber(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  return normaliseAuLandline(phone) ?? normaliseAuMobile(phone);
+}
+
+/** Calls that read out a claim code are made only in these hours, the salon's own time. */
+export const CLAIM_CALL_HOURS = { from: 8, until: 20 } as const;
+
+const STATE_TIME_ZONES: Record<AuState, string> = {
+  NSW: "Australia/Sydney",
+  ACT: "Australia/Sydney",
+  VIC: "Australia/Melbourne",
+  TAS: "Australia/Hobart",
+  QLD: "Australia/Brisbane",
+  SA: "Australia/Adelaide",
+  NT: "Australia/Darwin",
+  WA: "Australia/Perth",
+};
+
+/** The hour (0–23) it is in a state's capital at `now`. */
+export function hourIn(state: AuState, now: Date): number {
+  const hour = new Intl.DateTimeFormat("en-AU", {
+    timeZone: STATE_TIME_ZONES[state],
+    hour: "numeric",
+    hourCycle: "h23",
+  }).format(now);
+  return Number(hour) % 24;
+}
+
+/** Whether a salon in `state` may be phoned with a claim code at `now` (8am to 8pm there). */
+export function withinCallingHours(state: AuState, now: Date): boolean {
+  const hour = hourIn(state, now);
+  return hour >= CLAIM_CALL_HOURS.from && hour < CLAIM_CALL_HOURS.until;
+}
+
+/** A code to be read out: "1 2 3, 4 5 6", so it's spoken digit by digit with a pause. */
+export const spokenCode = (code: string) =>
+  `${code.slice(0, 3).split("").join(" ")}, ${code.slice(3).split("").join(" ")}`;
+
+/** Wrong codes a claim takes before it stops taking them (the claimant starts again). */
+export const CLAIM_CODE_ATTEMPTS = 5;
+
+// ---------- Finding a salon that's already listed (D-22) ----------
+
+/** Words too common in salon names to tell two apart. */
+const COMMON_NAME_WORDS = new Set([
+  "the",
+  "and",
+  "a",
+  "of",
+  "by",
+  "on",
+  "at",
+  "co",
+  "salon",
+  "salons",
+  "hair",
+  "hairdressing",
+  "hairdresser",
+  "hairdressers",
+  "beauty",
+  "studio",
+  "studios",
+  "bar",
+  "barber",
+  "barbers",
+  "barbershop",
+  "spa",
+  "lounge",
+  "house",
+  "room",
+  "boutique",
+  "nails",
+  "nail",
+  "lash",
+  "lashes",
+  "brow",
+  "brows",
+  "skin",
+  "clinic",
+  "design",
+  "designs",
+  "pty",
+  "ltd",
+]);
+
+/** A salon name's words, lowercased, without accents, punctuation or "&". */
+export function nameWords(name: string): string[] {
+  return name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/&/g, " and ")
+    .replace(/['’]/g, "")
+    .split(/[^a-z0-9]+/)
+    .filter(Boolean);
+}
+
+/** The words that tell a salon's name apart (the common ones dropped, unless that's all it has). */
+export function distinctiveWords(name: string): string[] {
+  const words = nameWords(name);
+  const distinctive = words.filter((w) => !COMMON_NAME_WORDS.has(w) && w.length > 1);
+  return distinctive.length > 0 ? distinctive : words;
+}
+
+/**
+ * How alike a name someone typed is to a listing's, from 0 to 1: 1 for the same words, then the
+ * share of distinctive words they have in common (a word that starts the other counts, so "Bella"
+ * finds "Bellas"). Below `NAME_MATCH_MIN` it isn't offered as a match.
+ */
+export function nameMatchScore(typed: string, listed: string): number {
+  const a = nameWords(typed).join(" ");
+  const b = nameWords(listed).join(" ");
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const typedWords = distinctiveWords(typed);
+  const listedWords = distinctiveWords(listed);
+  const alike = (x: string, y: string) =>
+    x === y || (Math.min(x.length, y.length) >= 4 && (x.startsWith(y) || y.startsWith(x)));
+  const shared = typedWords.filter((w) => listedWords.some((l) => alike(w, l))).length;
+  if (shared === 0) return 0;
+  // Shared over the longer list: "Bella" vs "Bella Rosa Hair" is a partial match.
+  return (0.9 * shared) / Math.max(typedWords.length, listedWords.length);
+}
+
+export const NAME_MATCH_MIN = 0.3;
 
 // ---------- Near me (D-10) ----------
 

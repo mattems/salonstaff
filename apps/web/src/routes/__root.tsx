@@ -5,7 +5,7 @@ import { BRAND } from "@salonstaff/shared";
 import { Toaster } from "@salonstaff/ui/components/sonner";
 import { TooltipProvider } from "@salonstaff/ui/components/tooltip";
 import { EnvironmentBadge } from "@salonstaff/ui/environment-badge";
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useLocation } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 import { NotFound, PageError } from "@/components/page";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
@@ -59,8 +59,22 @@ function RootDocument({ children }: { children: ReactNode }) {
   );
 }
 
+/** The salon management area has its own frame, with a sidebar (D-20). */
+const ownFrame = (pathname: string) =>
+  pathname === "/employer" || pathname.startsWith("/employer/");
+
 function RootLayout() {
   const { me } = Route.useRouteContext();
+  const { pathname } = useLocation();
+  if (ownFrame(pathname)) {
+    return (
+      <TooltipProvider>
+        <Outlet />
+        <Toaster />
+        <EnvironmentBadge />
+      </TooltipProvider>
+    );
+  }
   return (
     <TooltipProvider>
       <SiteHeader me={me} />

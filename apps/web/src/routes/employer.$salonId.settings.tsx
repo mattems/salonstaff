@@ -1,9 +1,16 @@
-import { Card, CardContent } from "@salonstaff/ui/components/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@salonstaff/ui/components/card";
 import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { AbnBadge, readSalonForm, SalonFields, SalonStatusBanner } from "@/components/employer";
 import { FormMessage, SubmitButton, useAction } from "@/components/form";
 import { PageHeader } from "@/components/page";
+import { SalonPictures } from "@/components/salon-pictures";
 import { api, unwrap } from "@/lib/api";
 import { privatePage } from "@/lib/seo";
 import { forgetMe } from "@/lib/session";
@@ -33,6 +40,25 @@ function Settings() {
       <SalonStatusBanner salon={salon} />
       <AbnBadge salon={salon} />
       <Card>
+        <CardHeader>
+          <CardTitle>Photos</CardTitle>
+          <CardDescription>The cover photo and logo on your salon's page.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SalonPictures
+            key={salon.id}
+            salon={salon}
+            onChange={() => {
+              forgetMe();
+              void router.invalidate();
+            }}
+          />
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Details</CardTitle>
+        </CardHeader>
         <CardContent>
           <form
             className="space-y-4"

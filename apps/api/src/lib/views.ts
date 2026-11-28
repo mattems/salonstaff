@@ -37,6 +37,7 @@ import {
   jobPath,
   type MessageBlocker,
   maskEmail,
+  maskPhone,
   profilePath,
   publicName,
   type SalonAccess,
@@ -320,6 +321,7 @@ export const mySalonJson = (env: Env, salon: Salon, role: SalonRole) => ({
   postcode: salon.postcode,
   about: salon.about,
   logoUrl: mediaUrl(env, salon.logoKey),
+  heroUrl: mediaUrl(env, salon.heroKey),
   status: salon.status,
   statusReason: salon.statusReason,
   source: salon.source,
@@ -353,6 +355,7 @@ export const directorySalonJson = (env: Env, { salon, liveJobs, distanceKm }: Di
   ...salonSummaryJson(env, salon),
   suburbSlug: salon.suburbSlug,
   about: salon.about,
+  heroUrl: mediaUrl(env, salon.heroKey),
   liveJobs,
   distanceKm: roundedKm(distanceKm),
 });
@@ -397,15 +400,27 @@ export const candidateJson = (env: Env, userId: string, candidate: Candidate) =>
   })),
 });
 
-export const claimJson = (claim: Claim, salon: Pick<Salon, "email">) => ({
-  id: encodeId("claim", claim.id),
-  salonId: encodeId("salon", claim.salonId),
-  status: claim.status,
-  sentTo: claim.status === "pending_email" && salon.email ? maskEmail(salon.email) : null,
-  decisionNote: claim.decisionNote,
-  createdAt: claim.createdAt.toISOString(),
-  decidedAt: iso(claim.decidedAt),
-});
+export function claimJson(claim: Claim, salon: Pick<Salon, "email" | "phone">) {
+  const waiting = claim.status === "pending_email";
+  const via = waiting ? (claim.verifyVia ?? "email") : null;
+  const sentTo =
+    via === "email" && salon.email
+      ? maskEmail(salon.email)
+      : (via === "phone" || via === "call") && salon.phone
+        ? maskPhone(salon.phone)
+        : null;
+  return {
+    id: encodeId("claim", claim.id),
+    salonId: encodeId("salon", claim.salonId),
+    status: claim.status,
+    via,
+    sentTo,
+    codeExpiresAt: waiting ? iso(claim.tokenExpiresAt) : null,
+    decisionNote: claim.decisionNote,
+    createdAt: claim.createdAt.toISOString(),
+    decidedAt: iso(claim.decidedAt),
+  };
+}
 
 // ---------- Conversations (D-17, D-19) ----------
 
@@ -452,7 +467,13 @@ export const myConversationJson = (env: Env, row: SeekerConversationSummary) => 
   hidden: row.hidden,
 });
 
+const salonRefJson = (salon: { id: string; name: string }) => ({
+  id: encodeId("salon", salon.id),
+  name: salon.name,
+});
+
 export const salonConversationSummaryJson = (row: SalonConversationSummary) => ({
+  salon: salonRefJson(row.salon),
   candidateId: encodeId("user", row.seekerId),
   name: row.name,
   lastMessage: row.lastMessage ? messageJson(row.lastMessage) : null,
@@ -470,6 +491,7 @@ export const candidateConversationJson = (thread: SalonThread) => ({
 
 export const salonApplicantJson = (env: Env, row: SalonApplicant) => ({
   ...applicantJson(env, row),
+  salon: salonRefJson(row.salon),
   job: {
     id: encodeId("job", row.job.id),
     title: row.job.title,

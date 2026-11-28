@@ -139,6 +139,8 @@ describe("notification preferences", () => {
     messages: { push: true, email: true },
     applications: { push: true, email: true },
     account: { push: true, email: true },
+    applicants: { push: true, email: true },
+    replies: { push: true, email: true },
   };
 
   it("start all on, and save what's switched off", async () => {
@@ -155,6 +157,71 @@ describe("notification preferences", () => {
     expect(
       (await person.api("PUT", "/v1/me/notifications", { messages: { push: false } })).status,
     ).toBe(400);
+  });
+
+  it("keep a salon team's choices when an older app saves only the job seeker's", async () => {
+    const app = createTestApp();
+    const person = await app.person("Older app");
+    const quiet = { ...allOn, applicants: { push: true, email: false } };
+    expect((await person.api("PUT", "/v1/me/notifications", quiet)).status).toBe(200);
+    const { applicants: _, replies: __, ...seekerOnly } = allOn;
+    const saved = await person.api("PUT", "/v1/me/notifications", {
+      ...seekerOnly,
+      account: { push: false, email: true },
+    });
+    expect(saved.body).toEqual({ ...quiet, account: { push: false, email: true } });
+  });
+
+  it("hold back a new applicant's email to the salon's team, but still push it (D-20)", async () => {
+    const app = createTestApp();
+    const { owner } = await salonOwner(app);
+    const ownerUserId = await userIdOf(owner);
+    await owner.api("PUT", "/v1/me/push-device", { platform: "ios", token: token() });
+    await owner.api("PUT", "/v1/me/notifications", {
+      ...allOn,
+      applicants: { push: true, email: false },
+    });
+    const job = await postJob(owner);
+    const seeker = await readySeeker(app, "Applier");
+    expect((await seeker.api("POST", `/v1/jobs/${job.id}/apply`, {})).status).toBe(201);
+    expect(pushesTo(app, ownerUserId).map((m) => m.subject)).toEqual([
+      expect.stringContaining("New applicant"),
+    ]);
+    expect(app.sent.filter((m) => m.to === owner.email)).toEqual([]);
+  });
+
+  it("hold back a job seeker's reply to the salon's team by its own topic, not theirs", async () => {
+    const app = createTestApp();
+    const { owner } = await salonOwner(app);
+    const ownerUserId = await userIdOf(owner);
+    await owner.api("PUT", "/v1/me/push-device", { platform: "ios", token: token() });
+    // The job seeker's "Messages from salons" being off doesn't stop a salon hearing replies.
+    await owner.api("PUT", "/v1/me/notifications", {
+      ...allOn,
+      messages: { push: false, email: false },
+      replies: { push: false, email: true },
+    });
+    const job = await postJob(owner);
+    const seeker = await readySeeker(app, "Replier");
+    expect((await seeker.api("POST", `/v1/jobs/${job.id}/apply`, {})).status).toBe(201);
+    const me = await seeker.api<{ id: string }>("GET", "/v1/me");
+    const wrote = await owner.api("POST", owner.at(`/candidates/${me.body.id}/messages`), {
+      body: "Can you come in Tuesday?",
+    });
+    expect(wrote.status).toBe(201);
+    const inbox = await seeker.api<{ items: { id: string }[] }>("GET", "/v1/me/conversations");
+    const reply = `Tuesday works ${uid()}`;
+    const sent = await seeker.api(
+      "POST",
+      `/v1/me/conversations/${inbox.body.items[0]?.id}/messages`,
+      { body: reply },
+    );
+    expect(sent.status).toBe(201);
+    expect(pushesTo(app, ownerUserId).map((m) => m.subject)).not.toContainEqual(
+      expect.stringContaining("replied"),
+    );
+    // By email still (the new applicant's email came first).
+    expect(app.sent.filter((m) => m.to === owner.email && m.text.includes(reply))).toHaveLength(1);
   });
 
   it("hold back a salon's message by the channels switched off", async () => {

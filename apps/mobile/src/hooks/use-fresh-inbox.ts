@@ -7,7 +7,18 @@ import { api } from '@/lib/api';
 import { pushAvailable, pushesAllowed } from '@/lib/push-notifications';
 
 /** The tabs, by path: switching to one re-checks the Inbox count. */
-const TABS = new Set(['/', '/saved', '/applications', '/inbox', '/profile']);
+const TABS = new Set([
+  '/',
+  '/saved',
+  '/applications',
+  '/inbox',
+  '/profile',
+  // The salon side's (D-20).
+  '/hiring',
+  '/applicants',
+  '/messages',
+  '/salon',
+]);
 /** Tab switches re-check at most this often. */
 const TAB_GAP_MS = 10_000;
 /** How often to re-check while the app is open, when message pushes don't reach this phone. */

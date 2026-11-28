@@ -554,7 +554,8 @@ export interface paths {
               | "salon.delete"
               | "claim.approve"
               | "salon.unclaim"
-              | "salon.change_email";
+              | "salon.change_email"
+              | "salon.change_phone";
             /** @description The ID or code of what is being changed, or `new` when adding something. */
             target: string;
           };
@@ -1671,7 +1672,7 @@ export interface paths {
     head?: never;
     /**
      * Change a salon's details
-     * @description Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing, so changing it is confirmed with a passkey (action `salon.change_email`, target the salon's ID).
+     * @description Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email and phone are where claim codes go (D-22), so changing either is confirmed with a passkey (action `salon.change_email`, or `salon.change_phone` when only the phone changes; target the salon's ID).
      */
     patch: {
       parameters: {
@@ -3512,6 +3513,14 @@ export interface components {
      *       "account": {
      *         "push": false,
      *         "email": true
+     *       },
+     *       "applicants": {
+     *         "push": true,
+     *         "email": true
+     *       },
+     *       "replies": {
+     *         "push": true,
+     *         "email": false
      *       }
      *     }
      */
@@ -3529,6 +3538,18 @@ export interface components {
         email: boolean;
       };
       account: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+      applicants: {
+        /** @description A push to your phones with the app */
+        push: boolean;
+        /** @description An email, or a text if your account has no email */
+        email: boolean;
+      };
+      replies: {
         /** @description A push to your phones with the app */
         push: boolean;
         /** @description An email, or a text if your account has no email */
@@ -3745,6 +3766,8 @@ export interface components {
       postcode: string;
       about: string | null;
       logoUrl: string | null;
+      /** @description The wide picture across the top of the salon's page. */
+      heroUrl: string | null;
       /** @enum {string} */
       status: "active" | "suspended" | "removed";
       statusReason: string | null;
@@ -3783,10 +3806,10 @@ export interface components {
       reason: "suspended" | "needs_listing" | null;
     };
     MySalons: {
-      items: components["schemas"]["MySalon"][];
+      items: components["schemas"]["MySalonWithInbox"][];
     };
     MySalonWithInbox: components["schemas"]["MySalon"] & {
-      /** @description Applications with replies your team hasn't read (D-17). */
+      /** @description Conversations with messages the salon's team hasn't read (D-19). */
       unreadMessages: number;
     };
     SalonJobs: {
@@ -4022,6 +4045,7 @@ export interface components {
       truncated: boolean;
     };
     SalonApplicant: components["schemas"]["Applicant"] & {
+      salon: components["schemas"]["SalonRef"];
       job: {
         id: string;
         title: string;
@@ -4037,10 +4061,16 @@ export interface components {
        */
       lastMessageAt: string | null;
     };
+    SalonRef: {
+      /** @example sln_01k6q2x8h4f7tbn3m9vz5cdr0e */
+      id: string;
+      name: string;
+    };
     SalonConversations: {
       items: components["schemas"]["SalonConversationSummary"][];
     };
     SalonConversationSummary: {
+      salon: components["schemas"]["SalonRef"];
       /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
       candidateId: string;
       name: string;
@@ -4136,6 +4166,12 @@ export interface components {
       /** @description Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read. */
       conversationId: string | null;
     };
+    AllSalonJobs: {
+      items: components["schemas"]["SalonJob"][];
+    };
+    AllSalonConversations: {
+      items: components["schemas"]["SalonConversationSummary"][];
+    };
     Team: {
       /** @description Owners first. */
       members: components["schemas"]["TeamMember"][];
@@ -4210,6 +4246,8 @@ export interface components {
     DirectorySalon: components["schemas"]["SalonSummary"] & {
       suburbSlug: string;
       about: string | null;
+      /** @description The wide picture across the top of the salon's page. */
+      heroUrl: string | null;
       liveJobs: number;
       /** @description Kilometres from the point searched near (between suburb centres), or null. */
       distanceKm: number | null;
@@ -4256,14 +4294,58 @@ export interface components {
         address: string | null;
       } | null;
     };
+    SalonMatches: {
+      items: components["schemas"]["SalonMatch"][];
+    };
+    SalonMatch: components["schemas"]["DirectorySalon"] & {
+      postcode: string;
+      /** @description How alike the names are, from 0 to 1. */
+      score: number;
+      /**
+       * @description You're on its team already.
+       * @enum {string|null}
+       */
+      yourRole: "owner" | "manager" | null;
+    };
+    ClaimOptions: {
+      salonId: string;
+      /** @description It has owners already: they're emailed if your claim is approved. */
+      claimed: boolean;
+      /** @description The listing has an ABN: yours must match it. Otherwise it must be active on the ABR. */
+      abnOnFile: boolean;
+      methods: {
+        /** @enum {string} */
+        method: "email" | "phone" | "call" | "review";
+        /** @description Where the code would go, masked. Null for `review`. */
+        sentTo: string | null;
+        /** @description Why it can't be used right now (a call outside calling hours), or null. */
+        unavailable: string | null;
+      }[];
+      /** @description Wrong codes a claim takes. */
+      codeAttempts: number;
+    };
     Claim: {
       /** @example clm_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       salonId: string;
-      /** @enum {string} */
+      /**
+       * @description `pending_email`: waiting for the code (or link) sent to the listing's own email or mobile (`via`). `pending_review`: staff are checking it.
+       * @enum {string}
+       */
       status: "pending_email" | "pending_review" | "approved" | "rejected";
-      /** @description Where the confirmation link went, masked (`he•••@salon.com`). */
+      /**
+       * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call).
+       * @enum {string|null}
+       */
+      via: "email" | "phone" | "call" | null;
+      /** @description Where the code went, masked (`he•••@salon.com`, `04•• ••• 678`), while `pending_email`. */
       sentTo: string | null;
+      /**
+       * Format: date-time
+       * @description When the code stops working, while `pending_email`: 48 hours for ours, 10 minutes for Twilio Verify's.
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      codeExpiresAt: string | null;
       decisionNote: string | null;
       /**
        * Format: date-time
@@ -4277,19 +4359,23 @@ export interface components {
       decidedAt: string | null;
     };
     StartClaim: {
-      abn: string;
+      /** @description The business's ABN. Optional when a code proves the claim; needed for `method: review`. When given it must match the listing's, or be active on the ABR. */
+      abn?: string;
       contactName: string;
       phone: string;
       /**
-       * @description `email`: a link to the listing's business email (when it has one). `review`: staff check it.
+       * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
        * @default email
        * @enum {string}
        */
-      method: "email" | "review";
+      method: "email" | "phone" | "call" | "review";
     };
     ClaimConfirmed: {
       claim: components["schemas"]["Claim"];
       salon: components["schemas"]["MySalon"];
+    };
+    ClaimCode: {
+      code: string;
     };
     SharedProfile: {
       /** @example Jess D. */
@@ -4664,6 +4750,7 @@ export interface components {
       address: string | null;
       about: string | null;
       logo_url: string | null;
+      hero_url: string | null;
       /** @description The registered name the ABR gave. */
       abn_entity_name: string | null;
       founding: boolean;
@@ -4715,7 +4802,7 @@ export interface components {
       claims: {
         id: string;
         status: string;
-        abn: string;
+        abn: string | null;
         contact_name: string;
         claimant: {
           id: string;
@@ -4837,10 +4924,10 @@ export interface components {
       /** @enum {string} */
       status: "pending_email" | "pending_review" | "approved" | "rejected";
       /**
-       * @description `email`: proven by the link sent to the listing's email. `review`: staff decide.
+       * @description `email`: proven by the code or link sent to the listing's email. `phone`: by the code texted to the listing's mobile (D-22). `call`: by the code read out in a call to its landline. `review`: staff decide.
        * @enum {string}
        */
-      method: "email" | "review";
+      method: "email" | "phone" | "call" | "review";
       salon: {
         id: string;
         name: string;
@@ -4859,7 +4946,8 @@ export interface components {
       };
       contact_name: string;
       contact_phone: string;
-      abn_given: string;
+      /** @description Null when the claimant proved it by code without giving one (D-22). */
+      abn_given: string | null;
       listing_abn: string | null;
       /** @description Whether the ABN given is the listing's. Null when the listing had none. */
       abn_matches: boolean | null;

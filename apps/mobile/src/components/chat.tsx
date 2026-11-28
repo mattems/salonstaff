@@ -8,6 +8,7 @@ import {
   type NativeSyntheticEvent,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
   View,
@@ -15,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
+import { Chip } from '@/components/chip';
 import { Icon } from '@/components/icon';
 import { Text } from '@/components/text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -24,10 +26,13 @@ import { errorMessage, type Message } from '@/lib/api';
 import { timeAgo } from '@/lib/format';
 
 /**
- * The job seeker's conversation with a salon (D-19): live while on screen (D-18), with a "new
- * messages" button when the salon writes while you're reading further up, and the reply box.
+ * A conversation between a salon and a job seeker (D-19), from either side (`me`): live while on
+ * screen (D-18), with a "new messages" button when they write while you're reading further up,
+ * and the reply box.
  */
 export function Chat({
+  me = 'seeker',
+  quickReplies,
   messages,
   setMessages,
   livePath,
@@ -39,12 +44,16 @@ export function Chat({
   send,
   header,
 }: {
+  /** Whose side this is: the job seeker's (their inbox) or the salon's. */
+  me?: 'seeker' | 'salon';
+  /** Ready-made replies above the box (the salon's side), each filling it in. */
+  quickReplies?: { label: string; text: string }[];
   messages: Message[];
   /** Changes the screen's copy of the messages. */
   setMessages: (update: (messages: Message[]) => Message[]) => void;
   /** The conversation's socket, once there is one. */
   livePath: string | undefined;
-  /** The salon wrote, or the socket came back: read the conversation again (marks it read). */
+  /** They wrote, or the socket came back: read the conversation again (marks it read). */
   onTheirs: () => void;
   canSend: boolean;
   sendHint: string | null;
@@ -62,10 +71,11 @@ export function Chat({
   // The newest message when you scrolled up from the bottom to read; null while you're at the
   // bottom. Anything the salon sends after it waits below, behind the "new messages" button.
   const [readTo, setReadTo] = useState<string | null>(null);
-  const { typing, live } = useLiveConversation(livePath, 'seeker', {
+  const them = me === 'seeker' ? 'salon' : 'seeker';
+  const { typing, live } = useLiveConversation(livePath, me, {
     onMessage(message) {
       setMessages((prev) => withMessage(prev, message));
-      if (message.from === 'salon') onTheirs();
+      if (message.from === them) onTheirs();
     },
     onReconnect: onTheirs,
   });
@@ -100,7 +110,7 @@ export function Chat({
 
   const readIndex = readTo === null ? -1 : messages.findIndex((m) => m.id === readTo);
   const newBelow =
-    readIndex < 0 ? 0 : messages.slice(readIndex + 1).filter((m) => m.from === 'salon').length;
+    readIndex < 0 ? 0 : messages.slice(readIndex + 1).filter((m) => m.from === them).length;
   const newestFirst = [...messages].reverse();
 
   return (
@@ -128,6 +138,7 @@ export function Chat({
             }}
             renderItem={({ item, index }) => (
               <Item
+                me={me}
                 message={item}
                 before={newestFirst.slice(index + 1).find((m) => m.kind === 'text')}
               />
@@ -170,6 +181,17 @@ export function Chat({
           styles.composer,
           { borderTopColor: theme.border, paddingBottom: Math.max(insets.bottom, Spacing.three) },
         ]}>
+        {canSend && quickReplies?.length && !draft ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickReplies}
+            keyboardShouldPersistTaps="handled">
+            {quickReplies.map((reply) => (
+              <Chip key={reply.label} label={reply.label} onPress={() => setDraft(reply.text)} />
+            ))}
+          </ScrollView>
+        ) : null}
         {canSend ? (
           <View style={styles.inputRow}>
             <TextInput
@@ -210,7 +232,15 @@ export function Chat({
  * A message, or a line saying the salon looked at your number; "About {job}" when it differs from
  * the last message before it (`before`).
  */
-function Item({ message, before }: { message: Message; before: Message | undefined }) {
+function Item({
+  me,
+  message,
+  before,
+}: {
+  me: 'seeker' | 'salon';
+  message: Message;
+  before: Message | undefined;
+}) {
   const about = message.about?.jobTitle;
   const turned = about && about !== before?.about?.jobTitle;
   return (
@@ -222,22 +252,28 @@ function Item({ message, before }: { message: Message; before: Message | undefin
       ) : null}
       {message.kind === 'number_viewed' ? (
         <Text variant="caption" color="textMuted" style={styles.centred}>
-          {message.senderName ?? 'The salon'} looked at your number · {timeAgo(message.createdAt)}
+          {me === 'seeker'
+            ? `${message.senderName ?? 'The salon'} looked at your number`
+            : `${message.senderName ?? 'Your team'} looked at their number`}{' '}
+          · {timeAgo(message.createdAt)}
         </Text>
       ) : (
-        <Bubble message={message} />
+        <Bubble me={me} message={message} />
       )}
     </View>
   );
 }
 
-function Bubble({ message }: { message: Message }) {
+function Bubble({ me, message }: { me: 'seeker' | 'salon'; message: Message }) {
   const theme = useTheme();
-  const mine = message.from === 'seeker';
+  const mine = message.from === me;
   return (
     <View style={[styles.bubbleRow, mine ? styles.right : styles.left]}>
       <Text variant="caption" color="textMuted" style={mine ? styles.rightText : undefined}>
-        {mine ? 'You' : (message.senderName ?? 'The salon')} · {timeAgo(message.createdAt)}
+        {mine && me === 'seeker'
+          ? 'You'
+          : (message.senderName ?? (me === 'seeker' ? 'The salon' : 'Them'))}{' '}
+        · {timeAgo(message.createdAt)}
       </Text>
       <View
         style={[
@@ -263,6 +299,7 @@ const LINE_HEIGHT = 20;
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  quickReplies: { gap: Spacing.two, paddingBottom: Spacing.two },
   list: { padding: Spacing.four, gap: Spacing.three, flexGrow: 1 },
   item: { gap: Spacing.three },
   centred: { textAlign: 'center' },

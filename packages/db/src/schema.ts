@@ -489,6 +489,8 @@ export const salons = pgTable(
     postcode: text("postcode").notNull(),
     about: text("about"),
     logoKey: text("logo_key"),
+    /** The wide picture across the top of the salon's page. */
+    heroKey: text("hero_key"),
     founding: boolean("founding").notNull().default(false),
     freeUntil: ts("free_until"),
     listingCredits: integer("listing_credits").notNull().default(0),
@@ -565,7 +567,13 @@ export const salonInvites = pgTable(
   ],
 );
 
+/**
+ * `pending_email` waits for the claimant to prove control through the listing's own email or
+ * mobile (`verify_via`); the name is older than the mobile.
+ */
 export type ClaimStatus = "pending_email" | "pending_review" | "approved" | "rejected";
+/** `phone`: texted to the listing's mobile. `call`: read out in a call to its landline. */
+export type ClaimProof = "email" | "phone" | "call";
 
 export const salonClaims = pgTable(
   "salon_claims",
@@ -577,7 +585,8 @@ export const salonClaims = pgTable(
     userId: uuid("user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    abn: text("abn").notNull(),
+    /** The ABN the claimant gave: optional when a code proves the claim, needed for a staff check. */
+    abn: text("abn"),
     abnEntityName: text("abn_entity_name"),
     contactName: text("contact_name").notNull(),
     phone: text("phone").notNull(),
@@ -585,6 +594,20 @@ export const salonClaims = pgTable(
     /** SHA-256 of the token in the link emailed to the listing's address. */
     tokenHash: text("token_hash"),
     tokenExpiresAt: ts("token_expires_at"),
+    /**
+     * Where a `pending_email` claim's proof went: the listing's own `email`, its own mobile
+     * (`phone`, by SMS) or landline (`call`, read out). Null for older claims (email) and reviews.
+     */
+    verifyVia: text("verify_via").$type<ClaimProof>(),
+    /** SHA-256 of the claim ID and the six-digit code sent with the proof (both ways). */
+    codeHash: text("code_hash"),
+    /**
+     * `twilio_verify` when Twilio Verify made and checks the code (D-23): then there's no
+     * `code_hash`. Null when we made it.
+     */
+    codeService: text("code_service").$type<"twilio_verify">(),
+    /** Wrong codes typed so far; the claim stops taking codes at `CLAIM_CODE_ATTEMPTS`. */
+    codeAttempts: integer("code_attempts").notNull().default(0),
     decidedBy: text("decided_by"),
     decisionNote: text("decision_note"),
     decidedAt: ts("decided_at"),

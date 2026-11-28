@@ -135,9 +135,13 @@ function EditDetails({ d }: { d: SalonDetail }) {
       confirm="Save"
       run={async () => {
         const body = changed();
-        // Claim links go to the business email, so a new one is confirmed with a passkey.
+        // Claim codes go to the business email and phone, so a new one is confirmed with a passkey.
         const confirmation =
-          "email" in body ? await confirmWithPasskey("salon.change_email", d.salon.id) : undefined;
+          "email" in body
+            ? await confirmWithPasskey("salon.change_email", d.salon.id)
+            : "phone" in body
+              ? await confirmWithPasskey("salon.change_phone", d.salon.id)
+              : undefined;
         return unwrap(
           await api.PATCH("/admin/v1/salons/{id}", {
             params: { path: { id: d.salon.id } },

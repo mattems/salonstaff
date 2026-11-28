@@ -3,10 +3,13 @@ import type { MiddlewareHandler } from "hono";
 import type { AppEnv } from "../env";
 import { authFor, emailSenderFromEnv } from "../lib/auth-config";
 import { smsSenderFromEnv } from "../lib/sms";
+import { type PhoneVerify, phoneVerifyFromEnv } from "../lib/verify";
 
 export interface AuthOptions {
   /** Replaces the real email provider. Used by tests to read what would have been sent. */
   emailSender?: import("@salonstaff/email").EmailSender;
+  /** Replaces Twilio Verify. Used by tests. */
+  phoneVerify?: PhoneVerify;
 }
 
 /** Makes the email and SMS senders, Better Auth and the current session available, lazily. */
@@ -18,6 +21,7 @@ export function authContext(options: AuthOptions = {}): MiddlewareHandler<AppEnv
       return email;
     });
     c.set("sms", () => smsSenderFromEnv(c.env, c.get("email")));
+    c.set("phoneVerify", () => options.phoneVerify ?? phoneVerifyFromEnv(c.env));
     let auth: ReturnType<typeof authFor> | undefined;
     c.set("auth", () => {
       auth ??= authFor(c);

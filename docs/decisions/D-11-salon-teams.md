@@ -1,6 +1,7 @@
 # D-11 Several salons per account, and salon teams
 
-**Status:** Accepted (2026-11-25)
+**Status:** Accepted (2026-11-25). The website's per-salon area with a switcher is replaced by one
+salon area for all your salons (D-20); teams, roles and per-salon billing stay as here.
 
 **Decision.** An account can manage any number of salons (a group's locations, or several claimed
 listings), and a salon can have several people: **owners** and **managers**.

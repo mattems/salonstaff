@@ -11,6 +11,8 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { restoreAppearance } from '@/lib/appearance';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { BiometricLockProvider } from '@/lib/biometric-lock';
+import { ModeProvider, useMode } from '@/lib/mode';
 
 SplashScreen.preventAutoHideAsync();
 // Light or dark as chosen in Settings, while the splash screen is still up.
@@ -39,8 +41,12 @@ export default function RootLayout() {
   return (
     <ThemeProvider value={navigationTheme(dark)}>
       <AuthProvider>
-        <StatusBar style={dark ? 'light' : 'dark'} />
-        <RootNavigator />
+        <BiometricLockProvider>
+          <ModeProvider>
+            <StatusBar style={dark ? 'light' : 'dark'} />
+            <RootNavigator />
+          </ModeProvider>
+        </BiometricLockProvider>
       </AuthProvider>
     </ThemeProvider>
   );
@@ -48,6 +54,7 @@ export default function RootLayout() {
 
 function RootNavigator() {
   const { status } = useAuth();
+  const { mode } = useMode();
 
   useEffect(() => {
     if (status !== 'loading') SplashScreen.hide();
@@ -63,7 +70,8 @@ function RootNavigator() {
       <Stack.Protected guard={signedIn} redirectTo="/sign-in">
         <Stack.Screen name="(app)" />
       </Stack.Protected>
-      <Stack.Protected guard={!signedIn} redirectTo="/">
+      {/* Signed in: the first tab of the side you're on (the job seeker's would be hidden, D-20). */}
+      <Stack.Protected guard={!signedIn} redirectTo={mode === 'salon' ? '/hiring' : '/'}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>
     </Stack>

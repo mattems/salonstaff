@@ -40,6 +40,8 @@ import { Route as DevMockIdentityRouteImport } from './routes/dev.mock-identity'
 import { Route as EmployerIndexRouteImport } from './routes/employer.index'
 import { Route as EmployerSalonIdRouteImport } from './routes/employer.$salonId'
 import { Route as EmployerAccountRouteImport } from './routes/employer.account'
+import { Route as EmployerApplicantsRouteImport } from './routes/employer.applicants'
+import { Route as EmployerMessagesRouteImport } from './routes/employer.messages'
 import { Route as EmployerOnboardingRouteImport } from './routes/employer.onboarding'
 import { Route as EndorseTokenRouteImport } from './routes/endorse.$token'
 import { Route as JobsIndexRouteImport } from './routes/jobs.index'
@@ -57,6 +59,8 @@ import { Route as EmployerSalonIdBillingRouteImport } from './routes/employer.$s
 import { Route as EmployerSalonIdMessagesRouteImport } from './routes/employer.$salonId.messages'
 import { Route as EmployerSalonIdSettingsRouteImport } from './routes/employer.$salonId.settings'
 import { Route as EmployerSalonIdTeamRouteImport } from './routes/employer.$salonId.team'
+import { Route as EmployerJobsIndexRouteImport } from './routes/employer.jobs.index'
+import { Route as EmployerJobsNewRouteImport } from './routes/employer.jobs.new'
 import { Route as EmployerSalonIdApplicationsIdRouteImport } from './routes/employer.$salonId.applications.$id'
 import { Route as EmployerSalonIdCandidatesIdRouteImport } from './routes/employer.$salonId.candidates.$id'
 import { Route as EmployerSalonIdJobsNewRouteImport } from './routes/employer.$salonId.jobs.new'
@@ -217,6 +221,16 @@ const EmployerAccountRoute = EmployerAccountRouteImport.update({
   path: '/account',
   getParentRoute: () => EmployerRoute,
 } as any)
+const EmployerApplicantsRoute = EmployerApplicantsRouteImport.update({
+  id: '/applicants',
+  path: '/applicants',
+  getParentRoute: () => EmployerRoute,
+} as any)
+const EmployerMessagesRoute = EmployerMessagesRouteImport.update({
+  id: '/messages',
+  path: '/messages',
+  getParentRoute: () => EmployerRoute,
+} as any)
 const EmployerOnboardingRoute = EmployerOnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -303,6 +317,16 @@ const EmployerSalonIdTeamRoute = EmployerSalonIdTeamRouteImport.update({
   path: '/team',
   getParentRoute: () => EmployerSalonIdRoute,
 } as any)
+const EmployerJobsIndexRoute = EmployerJobsIndexRouteImport.update({
+  id: '/jobs/',
+  path: '/jobs/',
+  getParentRoute: () => EmployerRoute,
+} as any)
+const EmployerJobsNewRoute = EmployerJobsNewRouteImport.update({
+  id: '/jobs/new',
+  path: '/jobs/new',
+  getParentRoute: () => EmployerRoute,
+} as any)
 const EmployerSalonIdApplicationsIdRoute =
   EmployerSalonIdApplicationsIdRouteImport.update({
     id: '/applications/$id',
@@ -362,6 +386,8 @@ export interface FileRoutesByFullPath {
   '/dev/mock-identity': typeof DevMockIdentityRoute
   '/employer/$salonId': typeof EmployerSalonIdRouteWithChildren
   '/employer/account': typeof EmployerAccountRoute
+  '/employer/applicants': typeof EmployerApplicantsRoute
+  '/employer/messages': typeof EmployerMessagesRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
   '/endorse/$token': typeof EndorseTokenRoute
   '/jobs/$': typeof JobsSplatRoute
@@ -379,8 +405,10 @@ export interface FileRoutesByFullPath {
   '/employer/$salonId/messages': typeof EmployerSalonIdMessagesRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/employer/jobs/new': typeof EmployerJobsNewRoute
   '/applications/': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
+  '/employer/jobs/': typeof EmployerJobsIndexRoute
   '/employer/$salonId/applications/$id': typeof EmployerSalonIdApplicationsIdRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
@@ -412,6 +440,8 @@ export interface FileRoutesByTo {
   '/dev/mock-checkout': typeof DevMockCheckoutRoute
   '/dev/mock-identity': typeof DevMockIdentityRoute
   '/employer/account': typeof EmployerAccountRoute
+  '/employer/applicants': typeof EmployerApplicantsRoute
+  '/employer/messages': typeof EmployerMessagesRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
   '/endorse/$token': typeof EndorseTokenRoute
   '/jobs/$': typeof JobsSplatRoute
@@ -429,8 +459,10 @@ export interface FileRoutesByTo {
   '/employer/$salonId/messages': typeof EmployerSalonIdMessagesRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/employer/jobs/new': typeof EmployerJobsNewRoute
   '/applications': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId': typeof EmployerSalonIdIndexRoute
+  '/employer/jobs': typeof EmployerJobsIndexRoute
   '/employer/$salonId/applications/$id': typeof EmployerSalonIdApplicationsIdRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
@@ -468,6 +500,8 @@ export interface FileRoutesById {
   '/dev/mock-identity': typeof DevMockIdentityRoute
   '/employer/$salonId': typeof EmployerSalonIdRouteWithChildren
   '/employer/account': typeof EmployerAccountRoute
+  '/employer/applicants': typeof EmployerApplicantsRoute
+  '/employer/messages': typeof EmployerMessagesRoute
   '/employer/onboarding': typeof EmployerOnboardingRoute
   '/endorse/$token': typeof EndorseTokenRoute
   '/jobs/$': typeof JobsSplatRoute
@@ -485,8 +519,10 @@ export interface FileRoutesById {
   '/employer/$salonId/messages': typeof EmployerSalonIdMessagesRoute
   '/employer/$salonId/settings': typeof EmployerSalonIdSettingsRoute
   '/employer/$salonId/team': typeof EmployerSalonIdTeamRoute
+  '/employer/jobs/new': typeof EmployerJobsNewRoute
   '/_seeker/applications/': typeof SeekerApplicationsIndexRoute
   '/employer/$salonId/': typeof EmployerSalonIdIndexRoute
+  '/employer/jobs/': typeof EmployerJobsIndexRoute
   '/employer/$salonId/applications/$id': typeof EmployerSalonIdApplicationsIdRoute
   '/employer/$salonId/candidates/$id': typeof EmployerSalonIdCandidatesIdRoute
   '/employer/$salonId/jobs/new': typeof EmployerSalonIdJobsNewRoute
@@ -524,6 +560,8 @@ export interface FileRouteTypes {
     | '/dev/mock-identity'
     | '/employer/$salonId'
     | '/employer/account'
+    | '/employer/applicants'
+    | '/employer/messages'
     | '/employer/onboarding'
     | '/endorse/$token'
     | '/jobs/$'
@@ -541,8 +579,10 @@ export interface FileRouteTypes {
     | '/employer/$salonId/messages'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
+    | '/employer/jobs/new'
     | '/applications/'
     | '/employer/$salonId/'
+    | '/employer/jobs/'
     | '/employer/$salonId/applications/$id'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
@@ -574,6 +614,8 @@ export interface FileRouteTypes {
     | '/dev/mock-checkout'
     | '/dev/mock-identity'
     | '/employer/account'
+    | '/employer/applicants'
+    | '/employer/messages'
     | '/employer/onboarding'
     | '/endorse/$token'
     | '/jobs/$'
@@ -591,8 +633,10 @@ export interface FileRouteTypes {
     | '/employer/$salonId/messages'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
+    | '/employer/jobs/new'
     | '/applications'
     | '/employer/$salonId'
+    | '/employer/jobs'
     | '/employer/$salonId/applications/$id'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
@@ -629,6 +673,8 @@ export interface FileRouteTypes {
     | '/dev/mock-identity'
     | '/employer/$salonId'
     | '/employer/account'
+    | '/employer/applicants'
+    | '/employer/messages'
     | '/employer/onboarding'
     | '/endorse/$token'
     | '/jobs/$'
@@ -646,8 +692,10 @@ export interface FileRouteTypes {
     | '/employer/$salonId/messages'
     | '/employer/$salonId/settings'
     | '/employer/$salonId/team'
+    | '/employer/jobs/new'
     | '/_seeker/applications/'
     | '/employer/$salonId/'
+    | '/employer/jobs/'
     | '/employer/$salonId/applications/$id'
     | '/employer/$salonId/candidates/$id'
     | '/employer/$salonId/jobs/new'
@@ -898,6 +946,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EmployerAccountRouteImport
       parentRoute: typeof EmployerRoute
     }
+    '/employer/applicants': {
+      id: '/employer/applicants'
+      path: '/applicants'
+      fullPath: '/employer/applicants'
+      preLoaderRoute: typeof EmployerApplicantsRouteImport
+      parentRoute: typeof EmployerRoute
+    }
+    '/employer/messages': {
+      id: '/employer/messages'
+      path: '/messages'
+      fullPath: '/employer/messages'
+      preLoaderRoute: typeof EmployerMessagesRouteImport
+      parentRoute: typeof EmployerRoute
+    }
     '/employer/onboarding': {
       id: '/employer/onboarding'
       path: '/onboarding'
@@ -1016,6 +1078,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/employer/$salonId/team'
       preLoaderRoute: typeof EmployerSalonIdTeamRouteImport
       parentRoute: typeof EmployerSalonIdRoute
+    }
+    '/employer/jobs/': {
+      id: '/employer/jobs/'
+      path: '/jobs'
+      fullPath: '/employer/jobs/'
+      preLoaderRoute: typeof EmployerJobsIndexRouteImport
+      parentRoute: typeof EmployerRoute
+    }
+    '/employer/jobs/new': {
+      id: '/employer/jobs/new'
+      path: '/jobs/new'
+      fullPath: '/employer/jobs/new'
+      preLoaderRoute: typeof EmployerJobsNewRouteImport
+      parentRoute: typeof EmployerRoute
     }
     '/employer/$salonId/applications/$id': {
       id: '/employer/$salonId/applications/$id'
@@ -1151,15 +1227,23 @@ const EmployerSalonIdRouteWithChildren = EmployerSalonIdRoute._addFileChildren(
 interface EmployerRouteChildren {
   EmployerSalonIdRoute: typeof EmployerSalonIdRouteWithChildren
   EmployerAccountRoute: typeof EmployerAccountRoute
+  EmployerApplicantsRoute: typeof EmployerApplicantsRoute
+  EmployerMessagesRoute: typeof EmployerMessagesRoute
   EmployerOnboardingRoute: typeof EmployerOnboardingRoute
   EmployerIndexRoute: typeof EmployerIndexRoute
+  EmployerJobsNewRoute: typeof EmployerJobsNewRoute
+  EmployerJobsIndexRoute: typeof EmployerJobsIndexRoute
 }
 
 const EmployerRouteChildren: EmployerRouteChildren = {
   EmployerSalonIdRoute: EmployerSalonIdRouteWithChildren,
   EmployerAccountRoute: EmployerAccountRoute,
+  EmployerApplicantsRoute: EmployerApplicantsRoute,
+  EmployerMessagesRoute: EmployerMessagesRoute,
   EmployerOnboardingRoute: EmployerOnboardingRoute,
   EmployerIndexRoute: EmployerIndexRoute,
+  EmployerJobsNewRoute: EmployerJobsNewRoute,
+  EmployerJobsIndexRoute: EmployerJobsIndexRoute,
 }
 
 const EmployerRouteWithChildren = EmployerRoute._addFileChildren(

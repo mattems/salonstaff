@@ -1,11 +1,12 @@
 import { useLastNotificationResponse } from 'expo-notifications';
 import { Stack, useRouter } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import { useFreshInbox } from '@/hooks/use-fresh-inbox';
 import { useTheme } from '@/hooks/use-theme';
 import { useAuth } from '@/lib/auth';
+import { useMode } from '@/lib/mode';
 import { destinationOf, registerForPush } from '@/lib/push-notifications';
 
 export const unstable_settings = { anchor: '(tabs)' };
@@ -13,20 +14,23 @@ export const unstable_settings = { anchor: '(tabs)' };
 export default function AppLayout() {
   const theme = useTheme();
   const { user, refresh } = useAuth();
+  const { mode, setMode, refreshSalons } = useMode();
   const router = useRouter();
   const nudged = useRef(false);
-  const needsProfile = !!user && !user.profile;
+  const salonSide = mode === 'salon';
+  const needsProfile = !!user && !user.profile && !salonSide;
 
-  // Onboarding nudge: new seekers set up their profile, then verification.
+  // Onboarding nudge: new seekers set up their profile, then verification. Not on the salon side
+  // (D-20): a salon's team needs no profile.
   useEffect(() => {
     if (nudged.current || !needsProfile) return;
     nudged.current = true;
     router.push({ pathname: '/edit-profile', params: { onboarding: '1' } });
   }, [needsProfile, router]);
 
-  // Push notifications (D-15): once there's a profile (not in the middle of onboarding), ask
-  // permission and send this phone's token; again on each launch, as tokens change.
-  const hasProfile = !!user?.profile;
+  // Push notifications (D-15): once there's a profile (not in the middle of onboarding), or on the
+  // salon side, ask permission and send this phone's token; again on each launch, as tokens change.
+  const hasProfile = !!user?.profile || salonSide;
   const [pushReachesPhone, setPushReachesPhone] = useState<boolean | null>(null);
   useEffect(() => {
     if (!hasProfile) return;
@@ -39,8 +43,12 @@ export default function AppLayout() {
       });
   }, [hasProfile]);
 
-  // Keep the Inbox badge current, without a socket.
-  useFreshInbox(refresh, pushReachesPhone);
+  // Keep the Inbox badge (or on the salon side, the Messages badge) current, without a socket.
+  const refreshBadges = useCallback(
+    () => (salonSide ? Promise.all([refresh(), refreshSalons()]) : refresh()),
+    [salonSide, refresh, refreshSalons],
+  );
+  useFreshInbox(refreshBadges, pushReachesPhone);
 
   // A tapped push opens its screen (also when it launched the app).
   const response = useLastNotificationResponse();
@@ -52,9 +60,12 @@ export default function AppLayout() {
     handled.current = id;
     const destination = destinationOf(response);
     if (!destination) return;
-    if ('screen' in destination) router.push(destination.screen);
-    else WebBrowser.openBrowserAsync(destination.web);
-  }, [response, user, router]);
+    if ('screen' in destination) {
+      // A salon's notice (a new applicant, a reply) shows on the salon side.
+      if (destination.side === 'salon' && !salonSide && user.salons.length) void setMode('salon');
+      router.push(destination.screen);
+    } else WebBrowser.openBrowserAsync(destination.web);
+  }, [response, user, router, salonSide, setMode]);
 
   // Signing out: render nothing while the auth guard redirects, so screens that
   // rely on `useUser()` never render without a user.
@@ -91,6 +102,10 @@ export default function AppLayout() {
       <Stack.Screen name="inbox/[id]" options={{ title: '' }} />
       <Stack.Screen name="applications/[id]" options={{ title: '' }} />
       <Stack.Screen name="settings" options={{ title: 'Settings' }} />
+      <Stack.Screen name="hire/job/[salonId]/[id]" options={{ title: '' }} />
+      <Stack.Screen name="hire/application/[salonId]/[id]" options={{ title: '' }} />
+      <Stack.Screen name="hire/candidate/[salonId]/[userId]" options={{ title: '' }} />
+      <Stack.Screen name="hire/conversation/[salonId]/[userId]" options={{ title: '' }} />
       <Stack.Screen name="verify-complete" options={{ headerShown: false }} />
     </Stack>
   );

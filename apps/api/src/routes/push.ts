@@ -92,12 +92,20 @@ const Channels = z.object({
   email: z.boolean().openapi({ description: "An email, or a text if your account has no email" }),
 });
 const NotificationPreferencesSchema = z
-  .object({ messages: Channels, applications: Channels, account: Channels })
+  .object({
+    messages: Channels,
+    applications: Channels,
+    account: Channels,
+    applicants: Channels,
+    replies: Channels,
+  })
   .openapi("NotificationPreferences", {
     example: {
       messages: { push: true, email: true },
       applications: { push: true, email: false },
       account: { push: false, email: true },
+      applicants: { push: true, email: true },
+      replies: { push: true, email: false },
     },
   });
 
@@ -106,7 +114,7 @@ pushRoutes.openapi(
     method: "get",
     path: "/v1/me/notifications",
     summary: "What you're told about",
-    description: `Push and email, on or off, for each topic: ${topics}. Everything is on until you switch it off. Sign-in and security notices, and notices about a salon you manage, always go.`,
+    description: `Push and email, on or off, for each topic: ${topics}. Everything is on until you switch it off. \`applicants\` and \`replies\` are for a salon's team (D-20). Sign-in and security notices, and notices about a salon itself (its team, a claim), always go.`,
     tags: TAGS,
     responses: {
       200: json(NotificationPreferencesSchema, "Your choices"),
@@ -125,7 +133,7 @@ pushRoutes.openapi(
     path: "/v1/me/notifications",
     summary: "Choose what you're told about",
     description:
-      "Every topic, with `push` and `email`. Email also covers a text when your account has no email.",
+      "Every topic, with `push` and `email`. Email also covers a text when your account has no email. The salon team's topics (`applicants`, `replies`, D-20) may be left out, and then stay as they were.",
     tags: TAGS,
     request: jsonBody(notificationPreferencesSchema),
     responses: {
@@ -137,11 +145,8 @@ pushRoutes.openapi(
   async (c) => {
     const { user } = await requireUser(c);
     const input = c.req.valid("json");
-    if (c.get("dryRun")) return c.json(input, 200);
-    const saved = await notificationSettings(await c.get("db")(), user.id).save(
-      input,
-      userActor(c, user.id),
-    );
-    return c.json(saved, 200);
+    const settings = notificationSettings(await c.get("db")(), user.id);
+    if (c.get("dryRun")) return c.json(await settings.preview(input), 200);
+    return c.json(await settings.save(input, userActor(c, user.id)), 200);
   },
 );

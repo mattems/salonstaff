@@ -1,6 +1,6 @@
 # Status
 
-_Last updated: 2026-11-27_
+_Last updated: 2026-11-28_
 
 ## Where things stand
 
@@ -138,6 +138,69 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   key, so that is how the badge updates on a phone or the simulator; with pushes it updates at once.
 - Admin: staff can edit a salon's details (name, place, contact details) from its page (`PATCH /admin/v1/salons/{id}`,
   `salons:moderate`); a new place redirects, as when an owner changes it.
+- One salon area for all your salons (D-20):
+  - **API:** `GET /v1/employer/jobs`, `/v1/employer/applicants` and `/v1/employer/conversations` across
+    every salon you're on (optional `salonId`), from the new `employerDesk` scope. Applicants and
+    conversations carry `salon {id, name}`. `GET /v1/employer/salons` has each salon's `unreadMessages`.
+  - **Website:** the `/employer` area is a shadcn sidebar layout (`components/salon-shell.tsx`), without the
+    site's header and footer. Hiring: Overview, Jobs, Applicants, Messages. Your salons: each with Overview,
+    Team, Billing and Salon details. Your account at the bottom.
+  - **Posting a job:** "Post a job" (`/employer/jobs/new`) starts by choosing the salon.
+  - **Old links:** `/employer/{salon}/applicants`, `/messages` and `/jobs/new` redirect to the new pages.
+    The reply email now links to `/employer/messages?salon=…&with=…`.
+- The app's salon side (D-20): someone on a salon's team starts on it. Switching is from Account (salon side)
+  or Profile (job seeker's), kept on the phone (`lib/mode.tsx`).
+  - **Tabs:** Jobs (live, drafts, ended), Applicants (by status, and by salon when there are several),
+    Messages (unread badge) and Account.
+  - **Screens:** a job (close or relist, its applicants), an application (status, message, show number), a
+    full profile, and the conversation (live, with quick replies).
+  - **Website only:** posting and editing jobs, and a salon's details, team and billing; the app links there.
+  - **Notices:** a salon's notices open the job or conversation and switch to the salon side.
+  - **Fixes:** salon owners are no longer sent to set up a job seeker profile when they sign in to the app.
+  - **Local:** a "Demo salon owner" sign-in, and the demo seed now makes owner1 an owner of owner2's salon
+    too (two salons to try).
+- The app's portfolio photo viewer (a profile's photos, on both sides) works like a phone's own: swipe
+  sideways between photos, swipe down to close (the photo follows the finger as the background fades),
+  pinch or double tap to zoom (double tap zooms in around the spot tapped, and out again; then drag
+  around the photo), and tap to show or hide the counter and caption
+  (`components/image-viewer.tsx`, with Gesture Handler 3 and Reanimated, already in the build).
+- Notification settings for salon teams (D-20): two topics, "New applicants" and "Replies from job
+  seekers" (`applicants`, `replies` in `NOTIFICATION_TOPICS`, each with a `side`). The new-applicant and
+  reply notices now go under them. The app's Settings shows the topics of the side it's on. Older apps
+  that send only the job seeker's topics leave the salon ones as they were. No website settings page yet,
+  on either side.
+- Face ID to open the app (D-21): with it on, the app asks for Face ID, Touch ID or a fingerprint (or the
+  phone's passcode) when it opens with a saved session and after five minutes away
+  (`lib/biometric-lock.tsx`, `expo-local-authentication`). It's offered once after a code sign-in and is
+  a switch in Settings. "Sign in another way" signs out. Signing out forgets it. A new native module:
+  rebuild the app (`bun run ios:device` on a phone, `npx expo run:ios` for the simulator).
+- Adding a salon (D-22, proposed; migrations 0014, 0015):
+  - **Wizard:** "Add a salon" (`/employer/onboarding`) asks for the name and postcode, offers listed salons
+    with a name like it nearby (`GET /v1/salons/matches`, `nameMatchScore`), then claims the one picked or
+    takes a new salon's details (an ABN that's already listed offers that listing's claim), then a cover
+    photo and logo. The listing's own claim page uses the same claim steps.
+  - **Claims by code:** the ABN is optional when a code proves it (checked if given; still needed
+    for a staff check; migration 0015). A six-digit code to the listing's own email (the link still works) or by SMS to
+    its own mobile (`GET /v1/salons/{id}/claim-options`, `POST /v1/claims/{id}/code`); 5 wrong codes, a
+    new one every 5 minutes at most, each start counts towards the day's 5; the claimant ticks that they
+    run it. A landline, or a mobile if asked, gets a call that reads out the code (Twilio Voice, 8am to 8pm the salon's time;
+    `TWILIO_VOICE_FROM`); locally the call's words go to Mailpit as `call+<number>@local.test`. The
+    admin claims queue shows the proof used.
+  - **Photos:** a cover photo (`salons.hero_key`) and logo (`/v1/employer/salons/{id}/hero`, `/logo`,
+    owners), on the wizard's last step and the Salon details page.
+  - **Salon page:** cover photo with the logo over its edge, place and badges, website and Instagram
+    buttons, about, jobs, and a contact card with icons. Directory cards show the logo.
+  - Tried locally in the browser: finding 101 Barbers, claiming it by SMS code (a wrong code, then the
+    right one), uploading both photos, the public page on desktop and phone widths, and starting a
+    claim by call on a landline listing (106 Hair Design). Calls not yet tried through Twilio.
+- Twilio Verify (D-23; migration 0016): when `TWILIO_VERIFY_SERVICE_SID` is set, sign-in and
+  mobile-change SMS codes and claim codes (SMS to a mobile, a call to a landline) are sent and checked
+  by Verify; codes last 10 minutes. Locally, real texts and calls only go to `TWILIO_LOCAL_ALLOW`
+  (yours); everything else still goes to Mailpit. Staff changing a listing's phone now confirm with a
+  passkey (`salon.change_phone`), as for its email. Setup in docs/runbooks/twilio.md. Not yet tried
+  against Twilio (needs Matt's subaccount and service).
+- Secret scanning: `.gitleaks.toml` allows the made-up test secret in `apps/api/test/hardening.test.ts`
+  (gitleaks flagged the committed line, so `bun run ci` stopped at its first step).
 
 ### Known issues
 - Security audit (2026-11-27): 34 findings in docs/security-audit.md. Most are fixed (its "Where it stands" lists them; migrations 0012 and 0013); what's left needs Matt's decision, a setting in Stripe, Twilio or R2, or is listed there as not done.
@@ -145,8 +208,12 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   page's preview card on Facebook, LinkedIn or WhatsApp (needs a deploy).
 - Not yet tried: a live conversation on a real iPhone through `bun run ios:device`'s forwarder, and a
   deployed one through the website's service binding (both tried locally in the browser and simulator).
-- Not yet tried in a browser: the multi-salon employer pages, switcher, Team page, invite page and
-  employer account page (API tests cover the flows).
+- Not yet tried in a browser: the Team page, invite page and employer account page (API tests cover the
+  flows). The salon area's Overview, Jobs, Post a job, Applicants and Messages were tried locally with two
+  salons, on desktop and phone widths.
+- The app's salon side was tried in the simulator (lists, a job, an application, the conversation, switching
+  sides, signing out and in). Not yet tried there: changing a status, sending a message, showing a number,
+  closing or relisting a job, or opening one from a push.
 - Not yet tried for real: connecting Google/Apple from the account page (needs keys; the API side is
   Better Auth's `link-social`).
 - Not yet tried for real: Google/Apple sign-in, Twilio SMS, Stripe, Stripe Identity, ABR lookup (all need keys),
@@ -154,6 +221,8 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
 - Not yet tried on PlanetScale: migration 0003 creates a PL/pgSQL trigger function (plain Postgres; should work).
 
 ### Decided, deferred (not built)
+- Passkeys (D-21): signing in with Face ID on a new phone or on the website. Needs Better Auth's passkey
+  plugin, the domain linked to the app and a native module. Best done once the site is deployed.
 - Applicant trust (D-08, docs/applicant-trust.md): Turnstile, application caps, a verified Australian mobile to apply,
   work rights matched per job, My VEVO emails, held applications and salon reports, the ID check becoming optional.
   Deferred until after the initial phase; needs more thought (Matt). Until then applying needs a passed ID check.

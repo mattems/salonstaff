@@ -1,4 +1,3 @@
-import { Badge } from "@salonstaff/ui/components/badge";
 import { Button } from "@salonstaff/ui/components/button";
 import {
   Card,
@@ -7,20 +6,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@salonstaff/ui/components/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@salonstaff/ui/components/table";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { AppLink } from "@/components/app-link";
 import { AbnBadge, EntitlementSummary, SalonStatusBanner } from "@/components/employer";
 import { EmptyState, PageHeader } from "@/components/page";
+import { JobsTable } from "@/components/salon-jobs";
 import { api, unwrap } from "@/lib/api";
-import { formatDate } from "@/lib/format";
 import { privatePage } from "@/lib/seo";
 
 export const Route = createFileRoute("/employer/$salonId/")({
@@ -33,13 +24,6 @@ export const Route = createFileRoute("/employer/$salonId/")({
   head: ({ loaderData }) => privatePage(loaderData?.salon.name ?? "Your salon"),
   component: Dashboard,
 });
-
-const JOB_STATUS = {
-  draft: "Draft",
-  published: "Live",
-  expired: "Expired",
-  closed: "Closed",
-} as const;
 
 function Dashboard() {
   const { salon, jobs } = Route.useLoaderData();
@@ -60,7 +44,7 @@ function Dashboard() {
         actions={
           salon.status === "active" && (
             <Button asChild>
-              <Link to="/employer/$salonId/jobs/new" params={{ salonId }}>
+              <Link to="/employer/jobs/new" search={{ salon: salonId }}>
                 Post a job
               </Link>
             </Button>
@@ -118,7 +102,7 @@ function Dashboard() {
           action={
             salon.status === "active" && (
               <Button asChild>
-                <Link to="/employer/$salonId/jobs/new" params={{ salonId }}>
+                <Link to="/employer/jobs/new" search={{ salon: salonId }}>
                   Post a job
                 </Link>
               </Button>
@@ -128,53 +112,15 @@ function Dashboard() {
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Your jobs</CardTitle>
+            <CardTitle>This salon's jobs</CardTitle>
+            <CardDescription>
+              <Link to="/employer/applicants" search={{ salon: salonId }} className="underline">
+                See its applicants
+              </Link>
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Job</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Applicants</TableHead>
-                  <TableHead>Live until</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {jobs.map((job) => (
-                  <TableRow key={job.id}>
-                    <TableCell>
-                      <Link
-                        to="/employer/$salonId/jobs/$id"
-                        params={{ salonId, id: job.id }}
-                        className="font-medium hover:underline"
-                      >
-                        {job.title}
-                      </Link>
-                      <span className="block text-muted-foreground text-xs">
-                        {job.suburb} {job.state}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={job.status === "published" ? "default" : "outline"}>
-                        {JOB_STATUS[job.status]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {job.applicants}
-                      {job.newApplicants > 0 && (
-                        <Badge variant="secondary" className="ml-2">
-                          {job.newApplicants} new
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {job.status === "published" ? formatDate(job.expiresAt) : "–"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <JobsTable jobs={jobs} showSalon={false} />
           </CardContent>
         </Card>
       )}

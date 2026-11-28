@@ -21,6 +21,7 @@ import type { Schemas } from "@/lib/api";
 import { ago, employmentLabel } from "@/lib/format";
 import { AppLink } from "./app-link";
 import { distanceText } from "./near-me";
+import { SalonLogo } from "./salon-brand";
 
 export type Crumb = { name: string; path: string };
 
@@ -95,17 +96,21 @@ export function JobList({ jobs }: { jobs: ListedJob[] }) {
 
 export function SalonCard({ salon }: { salon: Schemas["DirectorySalon"] }) {
   return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>
-          <AppLink href={salon.path} className="hover:underline">
-            {salon.name}
-          </AppLink>
-        </CardTitle>
-        <CardDescription>
-          {salon.suburb} {salon.state}
-          {distanceText(salon.distanceKm) && ` · ${distanceText(salon.distanceKm)}`}
-        </CardDescription>
+    <Card size="sm" className="relative transition-colors hover:bg-muted/40">
+      <CardHeader className="flex flex-row items-center gap-3">
+        <SalonLogo name={salon.name} logoUrl={salon.logoUrl} />
+        <div className="min-w-0 space-y-1">
+          <CardTitle className="truncate">
+            {/* The whole card is the link. */}
+            <AppLink href={salon.path} className="after:absolute after:inset-0">
+              {salon.name}
+            </AppLink>
+          </CardTitle>
+          <CardDescription>
+            {salon.suburb} {salon.state}
+            {distanceText(salon.distanceKm) && ` · ${distanceText(salon.distanceKm)}`}
+          </CardDescription>
+        </div>
       </CardHeader>
       {(salon.liveJobs > 0 || salon.verified) && (
         <CardContent className="flex flex-wrap items-center gap-2 text-sm">

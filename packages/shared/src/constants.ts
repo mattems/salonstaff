@@ -280,23 +280,45 @@ export const CONTACT_BY_VALUES = CONTACT_BY.map((v) => v.value) as [ContactBy, .
  * What a person can choose to hear about, by push and by email (D-15). Sign-in and security
  * notices, and salons' notices about their salon, always go.
  */
+/**
+ * What people can switch push and email on or off for (D-15), by `side`: a job seeker's, or a salon
+ * team's (D-20), each shown on its side of the app. Notices about a salon itself (team, claims) and
+ * sign-in and security always go.
+ */
 export const NOTIFICATION_TOPICS = [
   {
     value: "messages",
+    side: "seeker",
     label: "Messages from salons",
     description: "A salon writes to you.",
   },
   {
     value: "applications",
+    side: "seeker",
     label: "Your applications",
     description: "A salon moves one of your applications along.",
   },
   {
     value: "account",
+    side: "seeker",
     label: "Verification and endorsements",
     description: "A check is decided, or someone endorses you.",
   },
+  {
+    value: "applicants",
+    side: "salon",
+    label: "New applicants",
+    description:
+      "Someone applies for one of your salons' jobs (when the job tells you about applications).",
+  },
+  {
+    value: "replies",
+    side: "salon",
+    label: "Replies from job seekers",
+    description: "Someone writes back to one of your salons.",
+  },
 ] as const;
+export type NotificationSide = (typeof NOTIFICATION_TOPICS)[number]["side"];
 export type NotificationTopic = (typeof NOTIFICATION_TOPICS)[number]["value"];
 export const NOTIFICATION_TOPIC_VALUES = NOTIFICATION_TOPICS.map((t) => t.value) as [
   NotificationTopic,

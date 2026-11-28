@@ -16,12 +16,14 @@ import { useTheme } from '@/hooks/use-theme';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
 import { formatAuMobile } from '@/lib/format';
+import { useMode } from '@/lib/mode';
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const router = useRouter();
   const user = useUser();
   const { refresh, signOut } = useAuth();
+  const { canUseSalon, setMode } = useMode();
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const profile = user.profile;
@@ -83,6 +85,21 @@ export default function ProfileScreen() {
           colors={[theme.brand]}
         />
       }>
+      {/* On a salon's team: back to the salon side (D-20). */}
+      {canUseSalon ? (
+        <Card style={styles.menu}>
+          <ListRow
+            icon="swap"
+            title="Your salons"
+            subtitle="Jobs, applicants and messages"
+            onPress={async () => {
+              await setMode('salon');
+              router.replace('/hiring');
+            }}
+          />
+        </Card>
+      ) : null}
+
       <View style={styles.header}>
         <Pressable
           onPress={() => router.push(profile ? '/profile/photo' : '/edit-profile')}
@@ -172,6 +189,7 @@ export default function ProfileScreen() {
         </View>
       ))}
 
+
       <Card style={styles.menu}>
         <ListRow icon="signOut" title="Sign out" subtitle={signedInAs} onPress={confirmSignOut} />
         <View style={[styles.divider, { backgroundColor: theme.border }]} />
@@ -221,7 +239,7 @@ const MENU: { label: string; items: MenuItem[] }[] = [
     items: [
       { href: '/verification', title: 'Verification', subtitle: 'Identity, right to work, qualifications', icon: 'shield' },
       { href: '/profile/security', title: 'Sign-in and security', subtitle: 'Email, mobile, Google, Apple, devices', icon: 'lock' },
-      { href: '/settings', title: 'Settings', subtitle: 'Notifications, appearance, about the app', icon: 'settings' },
+      { href: '/settings', title: 'Settings', subtitle: 'Notifications, Face ID, appearance, about the app', icon: 'settings' },
     ],
   },
 ];

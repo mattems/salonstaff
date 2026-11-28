@@ -59,7 +59,7 @@ describe("claiming a directory listing", () => {
     expect(started.body.status).toBe("pending_email");
     expect(started.body.sentTo).toMatch(/^he•+@listed\.test$/);
     const message = app.sent.find((m) => m.to === email);
-    expect(message?.subject).toContain("Confirm you manage");
+    expect(message?.subject).toContain("is the code to manage");
     const token = new URL(message?.text.match(/https?:\/\/\S+/)?.[0] as string).searchParams.get(
       "token",
     ) as string;

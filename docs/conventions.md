@@ -11,7 +11,9 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 - IDs: `encodeId` on the way out, `decodeId` on the way in (null → `not_found`).
 - Who's calling: `await c.get("session")()`. Wrong role → `forbidden`; nobody → `unauthenticated`.
 - Salon routes are `/v1/employer/salons/{salonId}/…` and start with `requireSalon(c, salonId, "manager" | "owner")`:
-  not on the team → `not_found`, a manager doing an owner's job → `forbidden` (D-11).
+  not on the team → `not_found`, a manager doing an owner's job → `forbidden` (D-11). Lists across all your
+  salons (`/v1/employer/jobs`, `/applicants`, `/conversations`, D-20) only read; anything they show is acted
+  on through its own salon's route, so the role is always checked there.
 - Every change: `recordAudit` in the same transaction. Honour `c.get("dryRun")`. `Idempotency-Key` works on any `POST`.
 - Notifications never fail a request: log and carry on. People without an email get an SMS.
 - After changing a route: `bun run api:types`.
@@ -19,7 +21,8 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 ## Data (`packages/db`)
 - No table imports outside `packages/db`. Scopes: `publicSite`, `publicProfiles` (share links and
   referees' links), `seeker(db, userId)`, `signIns(db, userId)`, `salonScope(db, salonId)`,
-  `salonTeam(db, salonId)`, `invites`, `claims`, `checks`, `backOffice` (behind `requireStaff` only),
+  `salonTeam(db, salonId)`, `employerDesk(db, userId)` (lists across the salons someone is on, D-20),
+  `invites`, `claims`, `checks`, `backOffice` (behind `requireStaff` only),
   `housekeeping` (the cron only).
 - Who manages a salon is `salon_members` (D-11); `salons.owner_id` is deprecated, never read or written.
   Claimed means `isClaimed`/`claimed()` (made by its owner, or `claimed_at` set).
@@ -41,6 +44,9 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 
 ## Website (`apps/web`)
 - No design yet: plain shadcn, default theme. Matt designs it later.
+- The salon area (`/employer`, D-20) has its own frame, `components/salon-shell.tsx`: shadcn's sidebar
+  (Radix, like every component in `packages/ui`) instead of the site's header and footer. New salon pages
+  go in its sidebar: across all salons under Hiring, or one salon's under its name.
 - Public pages are server-rendered with canonical tags, titles, descriptions and JSON-LD (D-07).
 - Links to public pages come from `packages/shared/src/urls.ts`.
 
@@ -58,6 +64,11 @@ Short rules per area. `CLAUDE.md` has the ones that apply everywhere.
 
 ## Files
 - Uploads are judged by their bytes (`storeUpload`), get unguessable names, and are never overwritten.
+- A salon's pictures are `logo_key` and `hero_key`; anything that deletes a salon deletes both files.
+
+## Claims (D-04, D-22)
+- Codes and links only ever go to the email, mobile or landline already on the listing, never to details the
+  claimant gives, and are shown masked. How a listing can be claimed is `claimMethods` in `rules.ts`.
 
 ## Tests
 - Real Postgres, parallel, shared database: create your own rows with unique values; never change others'.

@@ -1,6 +1,7 @@
 import { createRoute, z } from "@hono/zod-openapi";
 import {
   type AbnCheck,
+  employerDesk,
   type Job,
   roomOf,
   type Salon,
@@ -43,6 +44,8 @@ import {
   ApplicationStatusSchema,
   CandidateSchema,
   errors,
+  FileField,
+  formBody,
   json,
   jsonBody,
   MySalonSchema,
@@ -51,6 +54,7 @@ import {
   SalonParams,
 } from "../lib/schemas";
 import { idFrom, requireSalon, requireUser } from "../lib/session";
+import { deleteUploads, inspectUpload, requireUploadAllowance, storeUpload } from "../lib/storage";
 import { applicantJson, candidateJson, messageJson, mySalonJson, salonJobJson } from "../lib/views";
 
 /**
@@ -58,6 +62,12 @@ import { applicantJson, candidateJson, messageJson, mySalonJson, salonJobJson } 
  * candidates. Managers handle jobs and applicants; owners also change the salon's details.
  */
 export const employerRoutes = createRouter();
+
+const MySalonWithInboxSchema = MySalonSchema.extend({
+  unreadMessages: z.number().int().openapi({
+    description: "Conversations with messages the salon's team hasn't read (D-19).",
+  }),
+}).openapi("MySalonWithInbox");
 
 const TAGS = ["Salon"];
 const NIL_UUID = "00000000-0000-0000-0000-000000000000";
@@ -128,6 +138,7 @@ function previewSalon(input: SalonInput): Salon {
     postcode: input.postcode,
     about: input.about ?? null,
     logoKey: null,
+    heroKey: null,
     founding: false,
     freeUntil: new Date(now.getTime() + PRICING.freePeriodDays * DAY_MS),
     listingCredits: 0,
@@ -190,17 +201,29 @@ employerRoutes.openapi(
     path: "/v1/employer/salons",
     summary: "Your salons",
     description:
-      "Every salon you're on the team of, with your role there, in the order you joined.",
+      "Every salon you're on the team of, with your role there and how many conversations have messages its team hasn't read, in the order you joined.",
     tags: TAGS,
     responses: {
-      200: json(z.object({ items: z.array(MySalonSchema) }).openapi("MySalons"), "Your salons"),
+      200: json(
+        z.object({ items: z.array(MySalonWithInboxSchema) }).openapi("MySalons"),
+        "Your salons",
+      ),
       401: errors[401],
     },
   }),
   async (c) => {
     const session = await requireUser(c);
-    const mine = await salonsFor(await c.get("db")()).ofUser(session.user.id);
-    return c.json({ items: mine.map(({ salon, role }) => mySalonJson(c.env, salon, role)) }, 200);
+    const desk = await employerDesk(await c.get("db")(), session.user.id);
+    const unread = await desk.unreadBySalon();
+    return c.json(
+      {
+        items: desk.salons.map(({ salon, role }) => ({
+          ...mySalonJson(c.env, salon, role),
+          unreadMessages: unread.get(salon.id) ?? 0,
+        })),
+      },
+      200,
+    );
   },
 );
 
@@ -214,14 +237,7 @@ employerRoutes.openapi(
     tags: TAGS,
     request: { params: SalonParams },
     responses: {
-      200: json(
-        MySalonSchema.extend({
-          unreadMessages: z.number().int().openapi({
-            description: "Applications with replies your team hasn't read (D-17).",
-          }),
-        }).openapi("MySalonWithInbox"),
-        "Your salon",
-      ),
+      200: json(MySalonWithInboxSchema, "Your salon"),
       401: errors[401],
       404: problemResponse("Not one of your salons"),
     },
@@ -288,6 +304,101 @@ employerRoutes.openapi(
     return c.json(mySalonJson(c.env, updated, role), 200);
   },
 );
+
+// ---------------------------------------------------------------------------
+// The salon's pictures (D-22)
+// ---------------------------------------------------------------------------
+
+const PICTURES = {
+  logo: {
+    summary: "Set the salon's logo",
+    description:
+      "Shown on its page, its jobs and in the directory. Square works best (at least 400×400). A JPG, PNG, WebP or HEIC image of 8MB or less, as the `file` field of a multipart form. Replaces (and deletes) the earlier one. Owners only.",
+  },
+  hero: {
+    summary: "Set the picture across the top of the salon's page",
+    description:
+      "A wide photo of the salon (at least 1600×600 works best; it's cropped to fit). A JPG, PNG, WebP or HEIC image of 8MB or less, as the `file` field of a multipart form. Replaces (and deletes) the earlier one. Owners only.",
+  },
+} as const;
+
+for (const kind of ["logo", "hero"] as const) {
+  employerRoutes.openapi(
+    createRoute({
+      method: "post",
+      path: `/v1/employer/salons/{salonId}/${kind}`,
+      summary: PICTURES[kind].summary,
+      description: PICTURES[kind].description,
+      tags: TAGS,
+      request: { params: SalonParams, ...formBody(z.object({ file: FileField })) },
+      responses: {
+        200: json(MySalonSchema, "Your salon"),
+        400: errors[400],
+        401: errors[401],
+        403: problemResponse("Only owners change a salon's pictures"),
+        404: problemResponse("Not one of your salons"),
+        413: problemResponse("Too large"),
+        415: problemResponse("Not an image"),
+      },
+    }),
+    async (c) => {
+      const { salon, scope, actor, role, session } = await requireSalon(
+        c,
+        c.req.valid("param").salonId,
+        "owner",
+      );
+      const { file } = c.req.valid("form");
+      // Before the dry run too: it reads the whole file like the real thing.
+      await requireUploadAllowance(c.env, session.user.id);
+      if (c.get("dryRun")) {
+        await inspectUpload(file, ["image"]);
+        return c.json(mySalonJson(c.env, salon, role), 200);
+      }
+      const { key } = await storeUpload(c.env, file, { bucket: "public", allow: ["image"] });
+      try {
+        const { salon: updated, previousKey } = await scope.setPicture(kind, key, actor);
+        await deleteUploads(c.env, "public", [previousKey]);
+        return c.json(mySalonJson(c.env, updated, role), 200);
+      } catch (error) {
+        await deleteUploads(c.env, "public", [key]);
+        throw error;
+      }
+    },
+  );
+
+  employerRoutes.openapi(
+    createRoute({
+      method: "delete",
+      path: `/v1/employer/salons/{salonId}/${kind}`,
+      summary: kind === "logo" ? "Remove the salon's logo" : "Remove the salon's top picture",
+      description: "Owners only. The file is deleted.",
+      tags: TAGS,
+      request: { params: SalonParams },
+      responses: {
+        200: json(MySalonSchema, "Your salon"),
+        401: errors[401],
+        403: problemResponse("Only owners change a salon's pictures"),
+        404: problemResponse("Not one of your salons"),
+      },
+    }),
+    async (c) => {
+      const { salon, scope, actor, role } = await requireSalon(
+        c,
+        c.req.valid("param").salonId,
+        "owner",
+      );
+      if (c.get("dryRun")) {
+        return c.json(
+          mySalonJson(c.env, { ...salon, [kind === "logo" ? "logoKey" : "heroKey"]: null }, role),
+          200,
+        );
+      }
+      const { salon: updated, previousKey } = await scope.setPicture(kind, null, actor);
+      await deleteUploads(c.env, "public", [previousKey]);
+      return c.json(mySalonJson(c.env, updated, role), 200);
+    },
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Jobs

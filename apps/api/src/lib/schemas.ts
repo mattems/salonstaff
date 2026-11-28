@@ -509,6 +509,9 @@ export const MySalonSchema = z
     postcode: z.string(),
     about: z.string().nullable(),
     logoUrl: z.string().nullable(),
+    heroUrl: z.string().nullable().openapi({
+      description: "The wide picture across the top of the salon's page.",
+    }),
     status: z.enum(["active", "suspended", "removed"]),
     statusReason: z.string().nullable(),
     source: z.enum(["owner", "directory"]),
@@ -598,8 +601,17 @@ export const ApplicantSchema = z
   })
   .openapi("Applicant");
 
+/** Which of your salons something belongs to, in lists across all of them (D-20). */
+export const SalonRefSchema = z
+  .object({
+    id: z.string().openapi({ example: "sln_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+    name: z.string(),
+  })
+  .openapi("SalonRef");
+
 /** An applicant as the salon's team sees them in its list, with the job and the conversation. */
 export const SalonApplicantSchema = ApplicantSchema.extend({
+  salon: SalonRefSchema,
   job: z.object({
     id: z.string(),
     title: z.string(),
@@ -628,6 +640,7 @@ export const SalonApplicantsSchema = z
 
 export const SalonConversationSummarySchema = z
   .object({
+    salon: SalonRefSchema,
     candidateId: z.string().openapi({ example: "usr_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
     name: z.string(),
     lastMessage: orNull(MessageSchema),
@@ -726,6 +739,9 @@ export const SharedProfileSchema = z
 export const DirectorySalonSchema = SalonSummarySchema.extend({
   suburbSlug: z.string(),
   about: z.string().nullable(),
+  heroUrl: z.string().nullable().openapi({
+    description: "The wide picture across the top of the salon's page.",
+  }),
   liveJobs: z.number().int(),
   distanceKm: z.number().nullable().openapi({
     description: "Kilometres from the point searched near (between suburb centres), or null.",
@@ -738,11 +754,22 @@ export const ClaimSchema = z
   .object({
     id: z.string().openapi({ example: "clm_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
     salonId: z.string(),
-    status: z.enum(["pending_email", "pending_review", "approved", "rejected"]),
-    sentTo: z
-      .string()
-      .nullable()
-      .openapi({ description: "Where the confirmation link went, masked (`he•••@salon.com`)." }),
+    status: z.enum(["pending_email", "pending_review", "approved", "rejected"]).openapi({
+      description:
+        "`pending_email`: waiting for the code (or link) sent to the listing's own email or mobile (`via`). `pending_review`: staff are checking it.",
+    }),
+    via: z.enum(["email", "phone", "call"]).nullable().openapi({
+      description:
+        "Where the code went while `pending_email`: the listing's email, its mobile (SMS), or its landline or mobile (a call).",
+    }),
+    sentTo: z.string().nullable().openapi({
+      description:
+        "Where the code went, masked (`he•••@salon.com`, `04•• ••• 678`), while `pending_email`.",
+    }),
+    codeExpiresAt: Timestamp.nullable().openapi({
+      description:
+        "When the code stops working, while `pending_email`: 48 hours for ours, 10 minutes for Twilio Verify's.",
+    }),
     decisionNote: z.string().nullable(),
     createdAt: Timestamp,
     decidedAt: Timestamp.nullable(),

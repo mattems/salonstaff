@@ -1,7 +1,7 @@
 import { type AuthConfig, appleClientSecret, createAuth } from "@salonstaff/auth";
 import { type Db, recordAudit } from "@salonstaff/db";
 import { createEmailSender, type EmailSender, signInCodeEmail } from "@salonstaff/email";
-import { BRAND, LIMITS } from "@salonstaff/shared";
+import { ApiError, BRAND, LIMITS } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv, Env } from "../env";
 
@@ -79,6 +79,7 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
       },
       { action, targetType: "user", targetId: userId, after },
     );
+  const verify = c.get("phoneVerify")();
   return {
     db,
     secret: env.AUTH_SECRET,
@@ -103,6 +104,8 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
         );
     },
     sendSmsCode: async ({ phoneNumber, code }) => {
+      // Twilio Verify makes and sends its own code (D-23).
+      if (verify) return verify.start(phoneNumber, "sms");
       await c
         .get("sms")()
         .send({
@@ -110,6 +113,17 @@ export async function authConfig(c: Context<AppEnv>, db: Db): Promise<AuthConfig
           body: `${code} is your ${BRAND.name} code. It expires in ${LIMITS.otpTtlMinutes} minutes.`,
         });
     },
+    checkSmsCode: verify
+      ? async ({ phoneNumber, code }) => {
+          try {
+            return await verify.check(phoneNumber, code);
+          } catch (error) {
+            // Expired or used up: just not the right code, as Better Auth sees it.
+            if (error instanceof ApiError && error.code === "link_expired") return false;
+            throw error;
+          }
+        }
+      : undefined,
     onSignUp: ({ userId }) => audit(userId, "auth.signed_up"),
     onSignIn: ({ userId }) => audit(userId, "auth.signed_in"),
     onLink: ({ userId, provider }) => audit(userId, "auth.provider_connected", { provider }),

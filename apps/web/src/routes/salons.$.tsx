@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { ClaimView } from "@/components/claim";
 import { type PageSearch, pageNumber } from "@/components/jobs-pages";
 import { loadClaimPage, loadSalonsPath, SalonsPage, salonsHead } from "@/components/salons-pages";
-import { api, orNull } from "@/lib/api";
 
 const CLAIM = "claim";
 
@@ -12,18 +11,11 @@ export const Route = createFileRoute("/salons/$")({
     page: pageNumber(search.page),
   }),
   loaderDeps: ({ search }) => ({ page: search.page }),
-  loader: async ({ params, deps, context }) => {
+  loader: async ({ params, deps }) => {
     const segments = (params._splat ?? "").split("/").filter(Boolean);
     if (segments.length === 4 && segments[3] === CLAIM) {
-      const data = await loadClaimPage(`/salons/${segments.slice(0, 3).join("/")}`);
-      const claim = context.me
-        ? orNull(
-            await api.GET("/v1/salons/{id}/claims/mine", {
-              params: { path: { id: data.page.salon.id } },
-            }),
-          )
-        : null;
-      return { ...data, claim };
+      // The claim itself (its options and where yours stands) is read by the page.
+      return loadClaimPage(`/salons/${segments.slice(0, 3).join("/")}`);
     }
     return loadSalonsPath(`/salons/${segments.join("/")}`, deps.page);
   },
@@ -34,12 +26,5 @@ export const Route = createFileRoute("/salons/$")({
 function SalonsSplat() {
   const data = Route.useLoaderData();
   const { me } = Route.useRouteContext();
-  return (
-    <SalonsPage
-      data={data}
-      claim={(page) => (
-        <ClaimView page={page} me={me} claim={"claim" in data ? (data.claim ?? null) : null} />
-      )}
-    />
-  );
+  return <SalonsPage data={data} claim={(page) => <ClaimView page={page} me={me} />} />;
 }

@@ -23,6 +23,9 @@ const abrLink = (abn: string) =>
   `https://abr.business.gov.au/ABN/View?abn=${abn.replace(/\s+/g, "")}`;
 
 function AbnGiven({ claim }: { claim: Claim }) {
+  if (!claim.abn_given) {
+    return <span className="text-muted-foreground">None given (proved by code)</span>;
+  }
   return (
     <span className="flex flex-wrap items-center gap-2">
       {formatAbn(claim.abn_given)}
@@ -84,7 +87,13 @@ function ClaimCard({ claim }: { claim: Claim }) {
             ["Listing phone", claim.salon.phone],
             [
               "Proof",
-              claim.method === "email" ? "Link sent to the listing's email" : "Staff review",
+              claim.method === "email"
+                ? "Code or link sent to the listing's email"
+                : claim.method === "phone"
+                  ? "Code texted to the listing's mobile"
+                  : claim.method === "call"
+                    ? "Code read out in a call to the listing's landline"
+                    : "Staff review",
             ],
             ["Sent", formatDate(claim.created_at)],
             ...(claim.decision_note

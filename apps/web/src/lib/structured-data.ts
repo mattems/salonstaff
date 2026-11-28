@@ -98,7 +98,8 @@ export function salonBusiness(salon: Schemas["PublicSalon"], jobs: Schemas["JobS
     name: salon.name,
     url: absolute(salon.path),
     ...(salon.about ? { description: salon.about } : {}),
-    ...(salon.logoUrl ? { logo: salon.logoUrl, image: salon.logoUrl } : {}),
+    ...(salon.logoUrl ? { logo: salon.logoUrl } : {}),
+    ...(salon.heroUrl || salon.logoUrl ? { image: salon.heroUrl ?? salon.logoUrl } : {}),
     ...(sameAs.length ? { sameAs } : {}),
     address: {
       "@type": "PostalAddress",
