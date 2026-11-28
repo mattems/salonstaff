@@ -13,8 +13,25 @@ export const APPEARANCE_CHOICES: { value: AppearanceChoice; label: string; descr
 
 const KEY = 'salonstaff.appearance';
 
+/**
+ * The choice as the app's own colours see it (`useColorScheme`). They follow this straight away,
+ * in the same moment iOS repaints its parts (headers, tab bar), rather than waiting for React
+ * Native to hear about the change, which left the app a beat behind.
+ */
+let current: AppearanceChoice = 'system';
+const listeners = new Set<() => void>();
+export const appearanceStore = {
+  get: () => current,
+  subscribe(listener: () => void) {
+    listeners.add(listener);
+    return () => listeners.delete(listener);
+  },
+};
+
 function apply(choice: AppearanceChoice) {
   Appearance.setColorScheme(choice === 'system' ? 'auto' : choice);
+  current = choice;
+  for (const listener of listeners) listener();
 }
 
 export async function savedAppearance(): Promise<AppearanceChoice> {

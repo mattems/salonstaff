@@ -268,6 +268,31 @@ meRoutes.openapi(
   },
 );
 
+meRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/me/profile/current",
+    summary: "Say your profile is still current",
+    description:
+      "Marks your profile as checked today without changing it, so its `updatedAt` moves to now (D-24). The app asks after 90 days without a change. Changing any part of your profile does the same. Needs a profile first.",
+    tags: TAGS,
+    responses: {
+      200: json(MyProfileSchema, "Your profile"),
+      401: errors[401],
+      403: errors[403],
+      409: problemResponse("No profile yet"),
+    },
+  }),
+  async (c) => {
+    const session = await requireSeeker(c);
+    const db = await c.get("db")();
+    const scope = seeker(db, session.user.id);
+    if (c.get("dryRun")) await scope.requireProfile();
+    else await scope.confirmCurrent(userActor(c, session.user.id));
+    return c.json(await fullProfile(c, db, session.user.id), 200);
+  },
+);
+
 // ---------- Photo and portfolio ----------
 
 const PhotoSchema = z.object({ photoUrl: z.string().nullable() }).openapi("ProfilePhoto");

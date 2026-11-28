@@ -8,6 +8,7 @@ import { Icon } from '@/components/icon';
 import { ErrorBanner } from '@/components/state-views';
 import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
+import { ProfileNudge } from '@/components/profile-strength';
 import { VerificationBadge } from '@/components/verification-badge';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -85,6 +86,7 @@ export default function ApplyScreen() {
           </Text>
           <VerificationBadge level={user.verification.level} compact />
         </View>
+        <ProfileNudge where="apply" />
 
         <TextField
           label="Cover note (optional)"

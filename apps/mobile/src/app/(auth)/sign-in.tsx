@@ -1,13 +1,23 @@
 import { requestCodeSchema } from '@salonstaff/shared';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/button';
 import { Icon } from '@/components/icon';
-import { SegmentedControl } from '@/components/segmented-control';
+import { PhoneField } from '@/components/phone-field';
 import { SocialButton } from '@/components/social-button';
 import { ErrorBanner } from '@/components/state-views';
 import { Text } from '@/components/text';
@@ -16,6 +26,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useIsDark, useTheme } from '@/hooks/use-theme';
 import { errorMessage, type OAuthProvider } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { siteUrl } from '@/lib/config';
 import {
   isAppleAvailable,
   isGoogleConfigured,
@@ -24,33 +35,35 @@ import {
   signInWithGoogle,
 } from '@/lib/social-auth';
 
-type Mode = 'email' | 'phone';
-
-const MODES = [
-  { value: 'email', label: 'Email' },
-  { value: 'phone', label: 'Mobile' },
-] as const;
-
+/**
+ * Signing up and signing in (D-24), both by a code texted to an Australian mobile: the number is
+ * the whole screen. "I'm looking for work" opens it to sign up; "Sign in" opens it to sign in, where
+ * email, Apple and Google are under "Other ways to sign in" for accounts that already use them.
+ * The code screen is the same for both: an existing number signs in, a new one gets an account.
+ */
 export default function SignInScreen() {
   const theme = useTheme();
   const dark = useIsDark();
   const router = useRouter();
   const { sendCode, signInWithOAuth, devLogin } = useAuth();
+  const { intent } = useLocalSearchParams<{ intent?: 'signup' | 'signin' }>();
+  const signingUp = intent === 'signup';
 
-  const [mode, setMode] = useState<Mode>('email');
+  const [digits, setDigits] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [fieldError, setFieldError] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [submitting, setSubmitting] = useState(false);
-  const [busyProvider, setBusyProvider] = useState<
-    OAuthProvider | 'dev' | 'dev-salon' | null
-  >(null);
+  const [sending, setSending] = useState<'phone' | 'email' | null>(null);
+  const [busyProvider, setBusyProvider] = useState<OAuthProvider | 'dev' | 'dev-salon' | null>(
+    null,
+  );
+  const [otherWays, setOtherWays] = useState(false);
   const [appleNative, setAppleNative] = useState(false);
 
   useEffect(() => {
     let alive = true;
-    isAppleAvailable().then((ok) => {
+    void isAppleAvailable().then((ok) => {
       if (alive) setAppleNative(ok);
     });
     return () => {
@@ -62,39 +75,56 @@ export default function SignInScreen() {
   const showApple = appleNative;
   const showGoogle = isGoogleConfigured();
 
-  async function finishOAuth(provider: OAuthProvider, idToken: string, name?: string) {
+  async function textCode() {
     setError(null);
-    try {
-      // On success the auth guard swaps to the signed-in app.
-      await signInWithOAuth(provider, idToken, name);
-    } catch (err) {
-      setError(errorMessage(err));
+    const parsed = requestCodeSchema.safeParse({ phone: `+61${digits}`, role: 'seeker' });
+    const phone = parsed.success ? parsed.data.phone : undefined;
+    if (!phone) {
+      setPhoneError('Enter your Australian mobile number, like 412 345 678');
+      return;
     }
-  }
-
-  async function onApple() {
-    setError(null);
-    setBusyProvider('apple');
+    setPhoneError(null);
+    setSending('phone');
     try {
-      const credential = await signInWithApple();
-      if (credential) await finishOAuth('apple', credential.idToken, credential.name);
+      await sendCode({ phone });
+      router.push({ pathname: '/verify-code', params: { phone } });
     } catch (err) {
       setError(errorMessage(err));
     } finally {
-      setBusyProvider(null);
+      setSending(null);
     }
   }
 
-  async function onGoogle() {
+  async function emailCode() {
     setError(null);
-    setBusyProvider('google');
+    // The keyboard often leaves a space at the end; the shared rule checks before it trims.
+    const parsed = requestCodeSchema.safeParse({ email: email.trim(), role: 'seeker' });
+    const address = parsed.success ? parsed.data.email : undefined;
+    if (!address) {
+      setEmailError('Enter a valid email');
+      return;
+    }
+    setEmailError(null);
+    setSending('email');
     try {
-      const credential = await signInWithGoogle();
-      if (credential) await finishOAuth('google', credential.idToken, credential.name);
+      await sendCode({ email: address });
+      router.push({ pathname: '/verify-code', params: { email: address } });
     } catch (err) {
-      setError(
-        err instanceof ProviderUnavailableError ? err.message : errorMessage(err),
-      );
+      setError(errorMessage(err));
+    } finally {
+      setSending(null);
+    }
+  }
+
+  async function withProvider(provider: OAuthProvider) {
+    setError(null);
+    setBusyProvider(provider);
+    try {
+      const credential = provider === 'apple' ? await signInWithApple() : await signInWithGoogle();
+      // On success the auth guard swaps to the signed-in app.
+      if (credential) await signInWithOAuth(provider, credential.idToken, credential.name);
+    } catch (err) {
+      setError(err instanceof ProviderUnavailableError ? err.message : errorMessage(err));
     } finally {
       setBusyProvider(null);
     }
@@ -112,36 +142,11 @@ export default function SignInScreen() {
     }
   }
 
-  async function submitCode() {
+  function switchTo(next: 'signup' | 'signin') {
     setError(null);
-    const parsed = requestCodeSchema.safeParse(
-      mode === 'email' ? { email, role: 'seeker' } : { phone, role: 'seeker' },
-    );
-    const target = parsed.success
-      ? mode === 'email'
-        ? parsed.data.email
-        : parsed.data.phone
-      : undefined;
-    if (!parsed.success || !target) {
-      const fallback = mode === 'email' ? 'Enter a valid email' : 'Enter an Australian mobile number';
-      setFieldError(parsed.error?.issues[0]?.message ?? fallback);
-      return;
-    }
-    setFieldError(null);
-    setSubmitting(true);
-    try {
-      if (mode === 'email') {
-        await sendCode({ email: target });
-        router.push({ pathname: '/verify-code', params: { email: target } });
-      } else {
-        await sendCode({ phone: target });
-        router.push({ pathname: '/verify-code', params: { phone: target } });
-      }
-    } catch (err) {
-      setError(errorMessage(err));
-    } finally {
-      setSubmitting(false);
-    }
+    setPhoneError(null);
+    setOtherWays(false);
+    router.setParams({ intent: next });
   }
 
   return (
@@ -150,118 +155,131 @@ export default function SignInScreen() {
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-          <View style={styles.hero}>
-            <View style={[styles.logo, { backgroundColor: theme.brand }]}>
-              <Text variant="title" style={{ color: theme.onBrand }}>
-                S
+          <View style={styles.intro}>
+            <Text variant="title" accessibilityRole="header">
+              {signingUp ? 'What’s your mobile number?' : 'Welcome back'}
+            </Text>
+            <Text color="textSecondary">
+              {signingUp
+                ? 'We’ll text you a code to set up your account. No password needed.'
+                : 'Sign in with your mobile number. We’ll text you a code.'}
+            </Text>
+          </View>
+
+          <PhoneField
+            digits={digits}
+            onChangeDigits={(d) => {
+              setDigits(d);
+              if (phoneError) setPhoneError(null);
+            }}
+            autoFocus
+            returnKeyType="go"
+            onSubmitEditing={textCode}
+            error={phoneError}
+            hint="Australian mobiles only. Standard SMS rates may apply."
+          />
+          <ErrorBanner message={error} />
+          <Button title="Text me a code" onPress={textCode} loading={sending === 'phone'} />
+
+          {signingUp ? (
+            <View style={styles.footer}>
+              <Text variant="small" color="textSecondary" style={styles.center}>
+                Already have an account?{' '}
+                <Text variant="smallStrong" color="brand" onPress={() => switchTo('signin')}>
+                  Sign in
+                </Text>
+              </Text>
+              <Text variant="caption" color="textMuted" style={styles.center}>
+                How we look after your details:{' '}
+                <Text
+                  variant="caption"
+                  color="brand"
+                  onPress={() => void WebBrowser.openBrowserAsync(siteUrl('/privacy'))}>
+                  Privacy policy
+                </Text>
               </Text>
             </View>
-            <Text variant="overline" color="brand">
-              Salon Staff
-            </Text>
-            <Text variant="display">Hair & beauty jobs for real, verified people.</Text>
-            <Text variant="body" color="textSecondary">
-              Every job seeker is identity-verified, so salons know they’re hearing from real people —
-              not bots.
-            </Text>
-          </View>
+          ) : (
+            <View style={styles.footer}>
+              <Pressable
+                onPress={() => {
+                  // Out of the way, so the other ways show.
+                  Keyboard.dismiss();
+                  LayoutAnimation.easeInEaseOut();
+                  setOtherWays((on) => !on);
+                }}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: otherWays }}
+                style={styles.otherToggle}>
+                <Text variant="smallStrong" color="brand">
+                  Other ways to sign in
+                </Text>
+                <Icon
+                  name="chevronDown"
+                  size={12}
+                  color={theme.brand}
+                  style={otherWays ? styles.flipped : undefined}
+                />
+              </Pressable>
 
-          <View style={styles.providers}>
-            {showApple ? (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                buttonStyle={
-                  dark
-                    ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                    : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-                }
-                cornerRadius={25}
-                style={styles.appleButton}
-                onPress={onApple}
-              />
-            ) : null}
-            {showGoogle ? (
-              <SocialButton
-                provider="google"
-                label="Continue with Google"
-                onPress={onGoogle}
-                loading={busyProvider === 'google'}
-                disabled={busyProvider === 'apple'}
-              />
-            ) : null}
-          </View>
+              {otherWays ? (
+                <View style={styles.other}>
+                  {showApple ? (
+                    <AppleAuthentication.AppleAuthenticationButton
+                      buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+                      buttonStyle={
+                        dark
+                          ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                          : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+                      }
+                      cornerRadius={25}
+                      style={styles.appleButton}
+                      onPress={() => void withProvider('apple')}
+                    />
+                  ) : null}
+                  {showGoogle ? (
+                    <SocialButton
+                      provider="google"
+                      label="Sign in with Google"
+                      onPress={() => void withProvider('google')}
+                      loading={busyProvider === 'google'}
+                      disabled={busyProvider === 'apple'}
+                    />
+                  ) : null}
+                  <TextField
+                    label="Email"
+                    value={email}
+                    onChangeText={(t) => {
+                      setEmail(t);
+                      if (emailError) setEmailError(null);
+                    }}
+                    placeholder="you@example.com"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete="email"
+                    keyboardType="email-address"
+                    textContentType="emailAddress"
+                    returnKeyType="go"
+                    onSubmitEditing={emailCode}
+                    error={emailError}
+                  />
+                  <Button
+                    title="Email me a code"
+                    variant="outline"
+                    onPress={emailCode}
+                    loading={sending === 'email'}
+                  />
+                </View>
+              ) : null}
 
-          {showApple || showGoogle ? (
-            <View style={styles.dividerRow}>
-              <View style={[styles.divider, { backgroundColor: theme.border }]} />
-              <Text variant="caption" color="textMuted">
-                or get a code
+              <Text variant="small" color="textSecondary" style={styles.center}>
+                New to Salon Staff?{' '}
+                <Text variant="smallStrong" color="brand" onPress={() => switchTo('signup')}>
+                  Create an account
+                </Text>
               </Text>
-              <View style={[styles.divider, { backgroundColor: theme.border }]} />
             </View>
-          ) : null}
-
-          <View style={styles.form}>
-            <SegmentedControl
-              segments={MODES}
-              value={mode}
-              onChange={(m) => {
-                setMode(m);
-                setFieldError(null);
-              }}
-            />
-            {mode === 'email' ? (
-              <TextField
-                key="email"
-                label="Email"
-                value={email}
-                onChangeText={(t) => {
-                  setEmail(t);
-                  if (fieldError) setFieldError(null);
-                }}
-                placeholder="you@example.com"
-                autoCapitalize="none"
-                autoCorrect={false}
-                autoComplete="email"
-                keyboardType="email-address"
-                textContentType="emailAddress"
-                returnKeyType="go"
-                onSubmitEditing={submitCode}
-                error={fieldError}
-              />
-            ) : (
-              <TextField
-                key="phone"
-                label="Mobile number"
-                value={phone}
-                onChangeText={(t) => {
-                  setPhone(t);
-                  if (fieldError) setFieldError(null);
-                }}
-                placeholder="0412 345 678"
-                autoComplete="tel"
-                keyboardType="phone-pad"
-                textContentType="telephoneNumber"
-                returnKeyType="go"
-                onSubmitEditing={submitCode}
-                hint="Australian mobiles only. Standard SMS rates may apply."
-                error={fieldError}
-              />
-            )}
-            <ErrorBanner message={error} />
-            <Button
-              title={mode === 'email' ? 'Email me a code' : 'Text me a code'}
-              onPress={submitCode}
-              loading={submitting}
-            />
-          </View>
-
-          <View style={[styles.trust, { backgroundColor: theme.brandSoft }]}>
-            <Icon name="shield" size={18} color={theme.brand} />
-            <Text variant="small" color="brand" style={styles.flex}>
-              No password needed. New here? We’ll create your account as you sign in.
-            </Text>
-          </View>
+          )}
 
           {__DEV__ ? (
             <View style={[styles.dev, { borderColor: theme.border }]}>
@@ -286,40 +304,33 @@ export default function SignInScreen() {
           ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
-
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { flexGrow: 1, padding: Spacing.five, gap: Spacing.five, justifyContent: 'center' },
-  hero: { gap: Spacing.three },
-  logo: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.lg,
+  // Room at the top for the Back button (it's reached from the welcome screen).
+  content: { flexGrow: 1, padding: Spacing.five, paddingTop: Spacing.five + 56, gap: Spacing.four },
+  intro: { gap: Spacing.two, marginBottom: Spacing.two },
+  footer: { gap: Spacing.four, marginTop: Spacing.three },
+  center: { textAlign: 'center' },
+  otherToggle: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: Spacing.two,
+    gap: Spacing.one,
+    paddingVertical: Spacing.one,
   },
-  providers: { gap: Spacing.three },
+  flipped: { transform: [{ rotate: '180deg' }] },
+  other: { gap: Spacing.three },
   appleButton: { height: 50, width: '100%' },
-  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  divider: { flex: 1, height: StyleSheet.hairlineWidth },
-  form: { gap: Spacing.four },
   dev: {
     gap: Spacing.two,
     padding: Spacing.three,
     borderRadius: Radius.md,
     borderWidth: 1,
     borderStyle: 'dashed',
-  },
-  trust: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-    padding: Spacing.three,
-    borderRadius: Radius.md,
+    marginTop: Spacing.four,
   },
 });

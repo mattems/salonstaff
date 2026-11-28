@@ -22,10 +22,20 @@ export function formatDate(iso: string): string {
   return d.toLocaleDateString('en-AU', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+/** Where someone is on the two checks that make them work-ready: their ID, then their right to work. */
 export const VERIFICATION_LEVELS = {
-  0: { label: 'Not verified', description: 'Verify your ID so salons know you’re real.' },
-  1: { label: 'ID verified', description: 'Add right to work to become work-ready.' },
-  2: { label: 'Work-ready', description: 'Identity and right to work confirmed.' },
+  0: {
+    label: 'Not verified yet',
+    description: 'Two quick checks make you work-ready: your ID, then your right to work.',
+  },
+  1: {
+    label: 'ID verified',
+    description: 'One more: have your right to work checked to be work-ready.',
+  },
+  2: {
+    label: 'Work-ready',
+    description: 'Your ID and right to work are both checked. Salons see this when you apply.',
+  },
 } as const;
 
 export const VERIFICATION_STATUS_LABELS: Record<VerificationStatus, string> = {

@@ -216,6 +216,12 @@
           "payPeriod": {
             "type": "string",
             "enum": ["hour", "week", "year"]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+            "example": "2026-11-25T03:00:00.000Z"
           }
         },
         "required": [
@@ -240,7 +246,8 @@
           "availableFrom",
           "travelKm",
           "payMin",
-          "payPeriod"
+          "payPeriod",
+          "updatedAt"
         ]
       },
       "Verification": {
@@ -2335,6 +2342,151 @@
           {
             "type": "object",
             "properties": {
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "headline": {
+                    "type": ["string", "null"]
+                  },
+                  "about": {
+                    "type": ["string", "null"]
+                  },
+                  "suburb": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                    "example": "NSW"
+                  },
+                  "postcode": {
+                    "type": "string"
+                  },
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "senior_stylist",
+                        "stylist",
+                        "junior_stylist",
+                        "apprentice_hair",
+                        "colourist",
+                        "barber",
+                        "beauty_therapist",
+                        "nail_technician",
+                        "lash_brow",
+                        "makeup_artist",
+                        "skin_therapist",
+                        "massage_spa",
+                        "apprentice_beauty",
+                        "salon_manager",
+                        "receptionist",
+                        "educator"
+                      ],
+                      "example": "colourist"
+                    }
+                  },
+                  "yearsExperience": {
+                    "type": "integer"
+                  },
+                  "instagram": {
+                    "type": ["string", "null"]
+                  },
+                  "tiktok": {
+                    "type": ["string", "null"]
+                  },
+                  "rightToWork": {
+                    "type": "string",
+                    "enum": [
+                      "citizen",
+                      "permanent_resident",
+                      "visa_full",
+                      "visa_limited",
+                      "needs_sponsorship"
+                    ]
+                  },
+                  "openToWork": {
+                    "type": "boolean"
+                  },
+                  "photoUrl": {
+                    "type": ["string", "null"]
+                  },
+                  "specialties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "brands": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "availableDays": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "employmentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "casual",
+                        "contract",
+                        "apprenticeship",
+                        "chair_rental"
+                      ]
+                    }
+                  },
+                  "availableFrom": {
+                    "type": ["string", "null"]
+                  },
+                  "travelKm": {
+                    "type": ["integer", "null"]
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+                    "example": "2026-11-25T03:00:00.000Z"
+                  }
+                },
+                "required": [
+                  "firstName",
+                  "lastName",
+                  "headline",
+                  "about",
+                  "suburb",
+                  "state",
+                  "postcode",
+                  "roles",
+                  "yearsExperience",
+                  "instagram",
+                  "tiktok",
+                  "rightToWork",
+                  "openToWork",
+                  "photoUrl",
+                  "specialties",
+                  "brands",
+                  "availableDays",
+                  "employmentTypes",
+                  "availableFrom",
+                  "travelKm",
+                  "updatedAt"
+                ]
+              },
               "id": {
                 "type": "string",
                 "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
@@ -3224,7 +3376,7 @@
           "via": {
             "type": ["string", "null"],
             "enum": ["email", "phone", "call", null],
-            "description": "Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call)."
+            "description": "Where the code went while `pending_email`: the listing's email, its mobile (SMS), or its landline or mobile (a call)."
           },
           "sentTo": {
             "type": ["string", "null"],
@@ -3283,7 +3435,7 @@
             "type": "string",
             "enum": ["email", "phone", "call", "review"],
             "default": "email",
-            "description": "`email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options."
+            "description": "`email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline or mobile that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options."
           }
         },
         "required": ["contactName", "phone"]
@@ -3309,6 +3461,35 @@
           }
         },
         "required": ["code"]
+      },
+      "PostcodePlaces": {
+        "type": "object",
+        "properties": {
+          "postcode": {
+            "type": "string",
+            "example": "3065"
+          },
+          "suburbs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "suburb": {
+                  "type": "string",
+                  "example": "Fitzroy"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                  "example": "NSW"
+                }
+              },
+              "required": ["suburb", "state"]
+            },
+            "description": "By name. One for most postcodes; some cover dozens."
+          }
+        },
+        "required": ["postcode", "suburbs"]
       },
       "SharedProfile": {
         "type": "object",
@@ -3414,6 +3595,12 @@
               },
               "travelKm": {
                 "type": ["integer", "null"]
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+                "example": "2026-11-25T03:00:00.000Z"
               }
             },
             "required": [
@@ -3433,7 +3620,8 @@
               "availableDays",
               "employmentTypes",
               "availableFrom",
-              "travelKm"
+              "travelKm",
+              "updatedAt"
             ]
           },
           "experience": {
@@ -4182,6 +4370,55 @@
               "application/problem+json": {
                 "schema": {
                   "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Not signed in",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not allowed for this account",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "No profile yet",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/me/profile/current": {
+      "post": {
+        "summary": "Say your profile is still current",
+        "description": "Marks your profile as checked today without changing it, so its `updatedAt` moves to now (D-24). The app asks after 90 days without a change. Changing any part of your profile does the same. Needs a profile first.",
+        "tags": ["Me"],
+        "responses": {
+          "200": {
+            "description": "Your profile",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MyProfile"
                 }
               }
             }
@@ -10199,7 +10436,7 @@
     "/v1/salons/{id}/claims": {
       "post": {
         "summary": "Claim a directory listing",
-        "description": "An ABN is optional when a code proves the claim, and needed for a staff check; when given, it must match the listing's (or, when it has none, be active on the Australian Business Register). Prove you run the business (D-22): with `method: email` we send a six-digit code and a link to the listing's own email; with `method: phone`, a code by SMS to the listing's own mobile; with `method: call`, a phone call to its own landline that reads out the code (8am to 8pm, the salon's time). Type the code with POST /v1/claims/{id}/code (or open the emailed link) while signed in as you; it lasts 48 hours and takes 5 wrong tries. `sentTo` shows where it went, masked. Without a listing email, or with `method: review`, staff check it. Starting again sends a new code (not within 5 minutes) and counts towards the day's claims. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.",
+        "description": "An ABN is optional when a code proves the claim, and needed for a staff check; when given, it must match the listing's (or, when it has none, be active on the Australian Business Register). Prove you run the business (D-22): with `method: email` we send a six-digit code and a link to the listing's own email; with `method: phone`, a code by SMS to the listing's own mobile; with `method: call`, a phone call to its own landline or mobile that reads out the code (8am to 8pm, the salon's time). Type the code with POST /v1/claims/{id}/code (or open the emailed link) while signed in as you; it lasts 48 hours and takes 5 wrong tries. `sentTo` shows where it went, masked. Without a listing email, or with `method: review`, staff check it. Starting again sends a new code (not within 5 minutes) and counts towards the day's claims. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.",
         "tags": ["Directory"],
         "parameters": [
           {
@@ -10535,6 +10772,57 @@
           },
           "404": {
             "description": "No claim, or no such salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places/{postcode}": {
+      "get": {
+        "summary": "The suburbs in a postcode",
+        "description": "The suburbs and localities a four-digit postcode covers, each with its state (a postcode can cross a state line). The app asks for a postcode only and offers these to pick from (D-24). From the ABS's localities (D-10); a postcode with none (a PO box, say) is a 404.",
+        "tags": ["Places"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}$",
+              "example": "3065"
+            },
+            "required": true,
+            "name": "postcode",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Its suburbs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostcodePlaces"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No suburbs for that postcode",
             "content": {
               "application/problem+json": {
                 "schema": {

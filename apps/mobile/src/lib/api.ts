@@ -295,10 +295,16 @@ export const api = {
     unwrap(await client.GET('/v1/me/applications/{id}', { params: path(id) })),
   mySaved: async () => unwrap(await client.GET('/v1/me/saved')),
 
+  /** The suburbs in a postcode, each with its state (D-24). A 404 for a postcode with none. */
+  suburbsIn: async (postcode: string) =>
+    unwrap(await client.GET('/v1/places/{postcode}', { params: { path: { postcode } } })),
+
   // Profile
   profile: async () => unwrap(await client.GET('/v1/me/profile')),
   saveProfile: async (body: ProfileInput) => unwrap(await client.PUT('/v1/me/profile', { body })),
   /** Skills, availability and pay are saved together: send the others' current values. */
+  /** "Yes, it's still current" (D-24): moves the profile's `updatedAt` to now without changing it. */
+  confirmProfileCurrent: async () => unwrap(await client.POST('/v1/me/profile/current')),
   saveDetails: async (body: DetailsInput) =>
     unwrap(await client.PUT('/v1/me/profile/details', { body })),
   uploadPhoto: (file: UploadFile) => {

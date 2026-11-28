@@ -455,6 +455,40 @@ admin.openapi(
 
 admin.openapi(
   createRoute({
+    method: "post",
+    path: `${LIST}/{id}/reset-verifications`,
+    summary: "Reset a person's verifications",
+    description:
+      "Clears every check they have (identity, work rights, qualifications), so they're not verified and can verify again. Verification IDs go with them, and any certificate still waiting for a decision is deleted. Audited, with the reason.",
+    tags: ["Admin"],
+    request: {
+      params: IdParams,
+      body: body(z.object({ reason: z.string().trim().max(500).optional() })),
+    },
+    responses: {
+      200: ok(z.object({ checks_removed: z.number().int() }), "How many checks were cleared"),
+      ...errors,
+      ...notFound,
+    },
+  }),
+  async (c) => {
+    const { data, actor } = await requireStaff(c, "checks:review");
+    const user = await findUser(c, data);
+    const { reason } = c.req.valid("json");
+    if (c.get("dryRun")) {
+      return c.json(
+        { checks_removed: (await data.users.detail(user.id))?.checks.length ?? 0 },
+        200,
+      );
+    }
+    const { removed, evidenceKeys } = await data.users.resetVerifications(user, actor, reason);
+    await deleteFiles(c, { media: [], private: evidenceKeys });
+    return c.json({ checks_removed: removed }, 200);
+  },
+);
+
+admin.openapi(
+  createRoute({
     method: "patch",
     path: `${LIST}/{id}`,
     summary: "Change a person's role",

@@ -6,8 +6,10 @@
 
 - **What's pushed:** the same notices the API already emails: a salon's message, an update on an
   application, a verification decided, an endorsement written, and the salon notices (a new applicant, a
-  claim decided). Email (or SMS) still goes too; a push is extra, never the only copy. `notify()` sends both;
-  a salon's message pushes even to someone with no email.
+  claim decided). Email still goes too. `notify()` sends both; a salon's message pushes even to someone
+  with no email. An account with no email (made with a mobile) gets a topic's notices by push only, and
+  its email switches are off in the app (D-24); only notices that always go (a salon's team, a claim)
+  come by text instead.
 - **Delivery:** the API sends to Apple's push service (APNs) itself, with an APNs key and a JWT (as for Sign in
   with Apple). No Expo push service or Firebase: like the builds (D-14), nothing else in the chain.
   Locally, without a key, pushes go to Mailpit as `push+<userId>@local.test`.

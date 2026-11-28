@@ -12,6 +12,7 @@ import { ActivityIndicator, FlatList, RefreshControl, ScrollView, StyleSheet, Vi
 
 import { Chip } from '@/components/chip';
 import { JobCard } from '@/components/job-card';
+import { ProfileNudge } from '@/components/profile-strength';
 import { SearchField } from '@/components/search-field';
 import { SelectSheet } from '@/components/select-sheet';
 import { EmptyView, ErrorBanner, ErrorView, LoadingView } from '@/components/state-views';
@@ -168,12 +169,16 @@ export default function JobsScreen() {
             />
           }
           ListHeaderComponent={
-            items.length > 0 ? (
-              <Text variant="small" color="textMuted" style={styles.count}>
-                {total.toLocaleString('en-AU')} {total === 1 ? 'job' : 'jobs'}
-                {loading === 'initial' ? ' · updating…' : ''}
-              </Text>
-            ) : undefined
+            <View style={styles.header}>
+              {/* Finishing their profile comes first (D-24). */}
+              <ProfileNudge where="jobs" />
+              {items.length > 0 ? (
+                <Text variant="small" color="textMuted" style={styles.count}>
+                  {total.toLocaleString('en-AU')} {total === 1 ? 'job' : 'jobs'}
+                  {loading === 'initial' ? ' · updating…' : ''}
+                </Text>
+              ) : null}
+            </View>
           }
           ListEmptyComponent={
             <EmptyView
@@ -243,6 +248,7 @@ function Separator() {
 }
 
 const styles = StyleSheet.create({
+  header: { gap: Spacing.three },
   flex: { flex: 1 },
   top: {
     paddingHorizontal: Spacing.four,

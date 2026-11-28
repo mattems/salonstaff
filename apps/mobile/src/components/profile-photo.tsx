@@ -36,7 +36,14 @@ export function ProfilePhoto({
   }
   return (
     <View style={[shape, styles.fallback, { backgroundColor: theme.brand }]}>
-      <Text style={{ color: theme.onBrand, fontSize: size * 0.36, fontWeight: '700' }}>
+      {/* Its own line height: the body text's fixed one clips large initials. */}
+      <Text
+        style={{
+          color: theme.onBrand,
+          fontSize: size * 0.36,
+          lineHeight: size * 0.44,
+          fontWeight: '700',
+        }}>
         {initials(firstName, lastName, fallback ?? '?')}
       </Text>
     </View>

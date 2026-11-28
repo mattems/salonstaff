@@ -3,12 +3,13 @@ import * as Application from 'expo-application';
 import Constants, { ExecutionEnvironment } from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { useFocusEffect } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Linking, Platform, Share, StyleSheet, Switch, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { Icon } from '@/components/icon';
 import { RadioList } from '@/components/radio-list';
 import { Screen } from '@/components/screen';
 import { ErrorView, LoadingView } from '@/components/state-views';
@@ -34,9 +35,11 @@ import { pushAvailable, registerForPush } from '@/lib/push-notifications';
  * development).
  */
 export default function SettingsScreen() {
+  const push = usePushPermission();
   return (
     <Screen>
-      <NotificationsCard />
+      <PushWarning {...push} />
+      <NotificationsCard permission={push.permission} />
       <LockCard />
       <AppearanceCard />
       <AboutCard />
@@ -67,14 +70,59 @@ function usePushPermission() {
   return { permission, check };
 }
 
+/**
+ * Above the notification settings when this phone won't show the app's pushes: turned off in iOS
+ * Settings (open them), or never asked (ask now). Without it the push switches do nothing.
+ */
+function PushWarning({ permission, check }: ReturnType<typeof usePushPermission>) {
+  const theme = useTheme();
+  const { mode } = useMode();
+  if (permission !== 'denied' && permission !== 'undetermined') return null;
+
+  async function turnOn() {
+    try {
+      await registerForPush();
+    } finally {
+      await check();
+    }
+  }
+
+  return (
+    <View
+      accessibilityRole="alert"
+      style={[styles.warning, { backgroundColor: theme.warningSoft }]}>
+      <View style={styles.warningHead}>
+        <Icon name="bell" size={18} color={theme.warning} />
+        <Text variant="bodyStrong" style={[styles.flex, { color: theme.warning }]}>
+          Notifications are off
+        </Text>
+      </View>
+      <Text variant="small" color="textSecondary">
+        {permission === 'denied'
+          ? 'Salon Staff can’t send you pushes: they’re turned off for it in your iPhone’s Settings.'
+          : mode === 'salon'
+            ? 'Turn them on to hear the moment someone applies or writes back to your salon.'
+            : 'Turn them on to hear the moment a salon writes to you or moves your application along.'}
+      </Text>
+      {permission === 'denied' ? (
+        <Button title="Open iPhone Settings" size="sm" onPress={() => Linking.openSettings()} />
+      ) : (
+        <Button title="Turn on notifications" size="sm" icon="bell" onPress={turnOn} />
+      )}
+    </View>
+  );
+}
+
 /** The topics of the side of the app that's showing (D-20): a job seeker's, or a salon team's. */
-function NotificationsCard() {
+function NotificationsCard({ permission }: { permission: Permission }) {
   const theme = useTheme();
   const { mode } = useMode();
   const topics = NOTIFICATION_TOPICS.filter((topic) => topic.side === mode);
   const { data, error, loading, reload, setData } = useRequest(api.notificationPreferences);
-  const { permission, check } = usePushPermission();
   const [saving, setSaving] = useState(false);
+  const router = useRouter();
+  // An account made with a mobile has no email: nothing for the email switches to send to (D-24).
+  const hasEmail = !!useUser().email;
 
   async function change(topic: NotificationTopic, channel: 'push' | 'email', on: boolean) {
     if (!data) return;
@@ -93,39 +141,10 @@ function NotificationsCard() {
     }
   }
 
-  async function turnOn() {
-    try {
-      await registerForPush();
-    } finally {
-      await check();
-    }
-  }
-
   return (
     <Card>
       <Text variant="subheading">Notifications</Text>
-      {permission === 'denied' ? (
-        <View style={styles.notice}>
-          <Text variant="small" color="textSecondary">
-            Notifications are turned off for Salon Staff on this phone, so pushes can’t show.
-          </Text>
-          <Button
-            title="Open iPhone Settings"
-            size="sm"
-            variant="outline"
-            onPress={() => Linking.openSettings()}
-          />
-        </View>
-      ) : permission === 'undetermined' ? (
-        <View style={styles.notice}>
-          <Text variant="small" color="textSecondary">
-            {mode === 'salon'
-              ? 'Get a push the moment someone applies or writes back to your salon.'
-              : 'Get a push the moment a salon writes to you.'}
-          </Text>
-          <Button title="Turn on notifications" size="sm" variant="outline" onPress={turnOn} />
-        </View>
-      ) : permission === 'unavailable' ? (
+      {permission === 'unavailable' ? (
         <Text variant="small" color="textSecondary">
           Pushes need the installed app: Expo Go can’t receive them. Emails still come.
         </Text>
@@ -150,17 +169,31 @@ function NotificationsCard() {
             />
             <Toggle
               label="Email"
-              value={data[topic.value].email}
-              disabled={saving}
+              value={hasEmail && data[topic.value].email}
+              disabled={saving || !hasEmail}
               onChange={(on) => change(topic.value, 'email', on)}
             />
           </View>
         ))
       ) : null}
+      {data && !hasEmail ? (
+        <View style={styles.notice}>
+          <Text variant="small" color="textSecondary">
+            There’s no email on your account, so these come by push only. Add one to get them by
+            email too.
+          </Text>
+          <Button
+            title="Add an email"
+            size="sm"
+            variant="outline"
+            onPress={() => router.push('/profile/security')}
+          />
+        </View>
+      ) : null}
       <Text variant="caption" color="textMuted">
         {mode === 'salon'
-          ? 'Notices about a salon itself (its team, a claim), sign-in codes and security emails always come. New applicants come only for jobs that tell you about applications, as chosen on the website. Email means a text if your account has no email.'
-          : 'Sign-in codes and security emails always come. Email means a text if your account has no email.'}
+          ? 'Notices about a salon itself (its team, a claim), sign-in codes and security emails always come. New applicants come only for jobs that tell you about applications, as chosen on the website.'
+          : 'Sign-in codes and security emails always come.'}
       </Text>
     </Card>
   );
@@ -313,6 +346,8 @@ function Detail({ label, value }: { label: string; value: string }) {
 }
 
 const styles = StyleSheet.create({
+  warning: { gap: Spacing.two, padding: Spacing.four, borderRadius: 16 },
+  warningHead: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two },
   flex: { flex: 1 },
   section: { gap: Spacing.two },
   notice: { gap: Spacing.two },

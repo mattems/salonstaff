@@ -33,6 +33,7 @@ import { jobsRoutes } from "./routes/jobs";
 import { meRoutes } from "./routes/me";
 import { mediaRoutes } from "./routes/media";
 import { myProfileRoutes } from "./routes/my-profile";
+import { placesRoutes } from "./routes/places";
 import { profileRoutes } from "./routes/profiles";
 import { pushRoutes } from "./routes/push";
 import { root } from "./routes/root";
@@ -158,6 +159,7 @@ export function createApp(options: AppOptions = {}) {
   app.route("/", deskRoutes);
   app.route("/", teamRoutes);
   app.route("/", directoryRoutes);
+  app.route("/", placesRoutes);
   app.route("/", profileRoutes);
   app.route("/", billingRoutes);
   app.route("/", siteRoutes);

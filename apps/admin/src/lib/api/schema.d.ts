@@ -1489,6 +1489,73 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/admin/v1/users/{id}/reset-verifications": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reset a person's verifications
+     * @description Clears every check they have (identity, work rights, qualifications), so they're not verified and can verify again. Verification IDs go with them, and any certificate still waiting for a decision is deleted. Audited, with the reason.
+     */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          id: string;
+        };
+        cookie?: never;
+      };
+      requestBody: {
+        content: {
+          "application/json": {
+            reason?: string;
+          };
+        };
+      };
+      responses: {
+        /** @description How many checks were cleared */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/json": {
+              checks_removed: number;
+            };
+          };
+        };
+        /** @description Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`) */
+        403: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+        /** @description Nothing with that ID */
+        404: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            "application/problem+json": components["schemas"]["Problem"];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/admin/v1/salons": {
     parameters: {
       query?: never;
@@ -3105,6 +3172,12 @@ export interface components {
       payMin: number | null;
       /** @enum {string} */
       payPeriod: "hour" | "week" | "year";
+      /**
+       * Format: date-time
+       * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      updatedAt: string;
     };
     Verification: {
       /** @enum {string} */
@@ -4002,6 +4075,68 @@ export interface components {
       status: "submitted" | "viewed" | "shortlisted" | "interview" | "hired" | "declined";
     };
     Candidate: components["schemas"]["FullProfile"] & {
+      profile?: {
+        firstName: string;
+        lastName: string;
+        headline: string | null;
+        about: string | null;
+        suburb: string;
+        /**
+         * @example NSW
+         * @enum {string}
+         */
+        state: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+        postcode: string;
+        roles: (
+          | "senior_stylist"
+          | "stylist"
+          | "junior_stylist"
+          | "apprentice_hair"
+          | "colourist"
+          | "barber"
+          | "beauty_therapist"
+          | "nail_technician"
+          | "lash_brow"
+          | "makeup_artist"
+          | "skin_therapist"
+          | "massage_spa"
+          | "apprentice_beauty"
+          | "salon_manager"
+          | "receptionist"
+          | "educator"
+        )[];
+        yearsExperience: number;
+        instagram: string | null;
+        tiktok: string | null;
+        /** @enum {string} */
+        rightToWork:
+          | "citizen"
+          | "permanent_resident"
+          | "visa_full"
+          | "visa_limited"
+          | "needs_sponsorship";
+        openToWork: boolean;
+        photoUrl: string | null;
+        specialties: string[];
+        brands: string[];
+        availableDays: string[];
+        employmentTypes: (
+          | "full_time"
+          | "part_time"
+          | "casual"
+          | "contract"
+          | "apprenticeship"
+          | "chair_rental"
+        )[];
+        availableFrom: string | null;
+        travelKm: number | null;
+        /**
+         * Format: date-time
+         * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+         * @example 2026-11-25T03:00:00.000Z
+         */
+        updatedAt: string;
+      };
       /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
       id: string;
       contact: components["schemas"]["ContactOptions"];
@@ -4334,7 +4469,7 @@ export interface components {
        */
       status: "pending_email" | "pending_review" | "approved" | "rejected";
       /**
-       * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call).
+       * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS), or its landline or mobile (a call).
        * @enum {string|null}
        */
       via: "email" | "phone" | "call" | null;
@@ -4364,7 +4499,7 @@ export interface components {
       contactName: string;
       phone: string;
       /**
-       * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
+       * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline or mobile that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
        * @default email
        * @enum {string}
        */
@@ -4376,6 +4511,20 @@ export interface components {
     };
     ClaimCode: {
       code: string;
+    };
+    PostcodePlaces: {
+      /** @example 3065 */
+      postcode: string;
+      /** @description By name. One for most postcodes; some cover dozens. */
+      suburbs: {
+        /** @example Fitzroy */
+        suburb: string;
+        /**
+         * @example NSW
+         * @enum {string}
+         */
+        state: "NSW" | "VIC" | "QLD" | "WA" | "SA" | "TAS" | "ACT" | "NT";
+      }[];
     };
     SharedProfile: {
       /** @example Jess D. */
@@ -4426,6 +4575,12 @@ export interface components {
         )[];
         availableFrom: string | null;
         travelKm: number | null;
+        /**
+         * Format: date-time
+         * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+         * @example 2026-11-25T03:00:00.000Z
+         */
+        updatedAt: string;
       };
       experience: components["schemas"]["Experience"][];
       education: components["schemas"]["Education"][];

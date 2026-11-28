@@ -174,6 +174,58 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   (`lib/biometric-lock.tsx`, `expo-local-authentication`). It's offered once after a code sign-in and is
   a switch in Settings. "Sign in another way" signs out. Signing out forgets it. A new native module:
   rebuild the app (`bun run ios:device` on a phone, `npx expo run:ios` for the simulator).
+- The app's first launch (D-24, in steps): signed out, it opens on a welcome screen. A muted looping
+  video plays behind three swipeable lines, with "Get started" and "Sign in". "Get started" asks who you
+  are. Looking for work goes to sign-up; hiring for a salon points to the website, or to sign-in for
+  people already on a salon's team. Signing up and signing in are one screen led by the mobile number
+  (+61 already there); email, Apple and Google are under "Other ways to sign in". The video
+  (`apps/mobile/assets/video/welcome.mp4`) is for now Matt's watermarked Envato preview, cropped to
+  portrait: swap in the licensed file before release. `expo-video` is a new native module: rebuild the
+  app.
+- Setting up a new job seeker in the app (D-24): after their first code, one question per screen with
+  progress bars, in `app/(app)/setup/`:
+  1. name;
+  2. roles and years;
+  3. postcode only: the suburb and state come from it (`GET /v1/places/{postcode}`, which asks
+     which suburb when there are several), then travel distance;
+  4. work rights, which saves the profile;
+  5. photo;
+  6. notifications;
+  7. Face ID.
+
+  Then "You're in", which points them at finishing their profile. It replaces the Edit profile
+  form's onboarding mode. The notification prompt and the Face ID pop-up wait for their own steps.
+  Tried in the simulator with a new local account (`setup-test@salonstaff.test`).
+- Profile strength and keeping it current (D-24). The score (`profileStrength` in `rules.ts`) is now
+  shared by the website's meter and the app.
+  - **App:** Profile opens with the score, the next thing to add and what's missing. Jobs shows a bar
+    while the score is under 70%, and applying says what the salon will see missing.
+  - **Last updated:** profiles have `updatedAt`, which moves with any change, portfolio and
+    experience included.
+  - **90-day check:** after 90 days, Profile asks "Still looking?". "Yes, it's current" calls
+    `POST /v1/me/profile/current`.
+  - **Not tried:** the apply screen's note (the test account can't apply without an ID check).
+    Reminders by push or email: later.
+- Profile editing in the app (D-24):
+  - **Dates:** "Can start from" (default today) and experience dates (Started, and Finished unless "I
+    still work here") use the phone's own date picker (`DateField`, on `@expo/ui`).
+  - **Years:** set with − and + on Edit profile too.
+  - **Theme:** the app's colours follow the appearance setting at once, so they change together with
+    iOS's.
+  - **No email, no email notices:** on an account with no email the app's email switches are off
+    and can't be turned on, with "Add an email". A topic's notices (messages, applications…) no
+    longer come by text instead; only notices that always go do (`notify`).
+  - **Push warning:** when the phone won't show the app's pushes (never asked, or turned off in iOS
+    Settings), Settings opens with a "Notifications are off" warning above the notification
+    switches, with "Turn on notifications" or "Open iPhone Settings".
+  - **Verification badge:** "Level n of 2" is gone. It shows the two checks it counts (your ID, then
+    right to work) as ticks, and what to do next.
+  - **Pay:** the least someone would take is no longer shown to salons. The candidate view leaves it
+    out (`candidateJson`); it's kept for matching. There's no salon search for people yet to match
+    it in.
+- Locally with `TWILIO_VERIFY_SERVICE_SID` set, the app can't text a code to a number outside
+  `TWILIO_LOCAL_ALLOW` (it says so); use your own number, an email code under "Other ways to sign in",
+  or the demo buttons.
 - Adding a salon (D-22, proposed; migrations 0014, 0015):
   - **Wizard:** "Add a salon" (`/employer/onboarding`) asks for the name and postcode, offers listed salons
     with a name like it nearby (`GET /v1/salons/matches`, `nameMatchScore`), then claims the one picked or
@@ -201,6 +253,10 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   against Twilio (needs Matt's subaccount and service).
 - Secret scanning: `.gitleaks.toml` allows the made-up test secret in `apps/api/test/hardening.test.ts`
   (gitleaks flagged the committed line, so `bun run ci` stopped at its first step).
+- Admin: a person's page has "Reset verifications" (`checks:review`, so support and owners). It clears
+  all their checks (identity, work rights, qualifications) and their verification IDs, deletes any
+  certificate still waiting, and is audited (`user.verifications_reset`, with the reason). Route:
+  `POST /admin/v1/users/{id}/reset-verifications`.
 - No Dependabot and no GitHub secret scanning: `.github/dependabot.yml` is gone (it only sent weekly
   bumps for the Actions and the app's npm packages; its alerts and security updates were already off),
   and GitHub's secret scanning and push protection are off in the repo's settings (2026-11-28). Secrets

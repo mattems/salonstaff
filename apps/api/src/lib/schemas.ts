@@ -163,6 +163,11 @@ export const SeekerProfileSchema = z
       .nullable()
       .openapi({ description: "The least they'd take, per `payPeriod`. Null: not saying." }),
     payPeriod: PayPeriodSchema,
+    updatedAt: z.string().datetime().openapi({
+      description:
+        "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+      example: "2026-11-25T03:00:00.000Z",
+    }),
   })
   .openapi("SeekerProfile");
 
@@ -678,6 +683,8 @@ export const ContactOptionsSchema = z
 
 export const CandidateSchema = FullProfileSchema.extend({
   id: z.string().openapi({ example: "usr_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
+  /** No pay: the least they'd take is for matching, never shown to salons (D-24). */
+  profile: SeekerProfileSchema.omit({ payMin: true, payPeriod: true }),
   contact: ContactOptionsSchema,
   applications: z.array(
     z.object({

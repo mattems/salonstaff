@@ -1,10 +1,11 @@
 import { educationSchema, experienceSchema, PROFILE_LIMITS } from '@salonstaff/shared';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Switch, View } from 'react-native';
 
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
+import { DateField, monthFromDate } from '@/components/date-field';
 import { ExperienceTimeline } from '@/components/experience-timeline';
 import { Icon } from '@/components/icon';
 import { profileSection } from '@/components/needs-profile';
@@ -61,14 +62,6 @@ function RemoveButton({ label, onPress }: { label: string; onPress: () => void }
   );
 }
 
-/** "03/2021" → "2021-03"; blank → undefined; anything else is passed on for the schema to refuse. */
-function toMonth(input: string): string | undefined {
-  const value = input.trim();
-  if (!value) return undefined;
-  const m = value.match(/^(\d{1,2})\/(\d{4})$/);
-  return m ? `${m[2]}-${m[1]?.padStart(2, '0')}` : value;
-}
-
 type Errors = Record<string, string | undefined>;
 
 function issuesOf(issues: { path: PropertyKey[]; message: string }[]): Errors {
@@ -84,7 +77,13 @@ function issuesOf(issues: { path: PropertyKey[]; message: string }[]): Errors {
 
 function ExperienceCard({ full, onChange }: { full: MyProfile; onChange: (p: MyProfile) => void }) {
   const [adding, setAdding] = useState(full.experience.length === 0);
-  const [form, setForm] = useState({ title: '', salonName: '', location: '', start: '', end: '', description: '' });
+  const theme = useTheme();
+  const blank = () => ({ title: '', salonName: '', location: '', description: '' });
+  const [form, setForm] = useState(blank);
+  // Picked with the phone's date picker; only the month is kept.
+  const [start, setStart] = useState(() => new Date());
+  const [end, setEnd] = useState(() => new Date());
+  const [stillThere, setStillThere] = useState(true);
   const [errors, setErrors] = useState<Errors>({});
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -98,20 +97,21 @@ function ExperienceCard({ full, onChange }: { full: MyProfile; onChange: (p: MyP
       title: form.title,
       salonName: form.salonName,
       location: form.location,
-      startMonth: toMonth(form.start),
-      endMonth: toMonth(form.end) ?? '',
+      startMonth: monthFromDate(start),
+      endMonth: stillThere ? '' : monthFromDate(end),
       description: form.description,
     });
     if (!parsed.success) {
       const found = issuesOf(parsed.error.issues);
-      setErrors({ ...found, startMonth: found.startMonth && 'Use MM/YYYY', endMonth: found.endMonth });
+      setErrors(found);
       return;
     }
     setErrors({});
     setSaving(true);
     try {
       onChange(await api.addExperience(parsed.data));
-      setForm({ title: '', salonName: '', location: '', start: '', end: '', description: '' });
+      setForm(blank());
+      setStillThere(true);
       setAdding(false);
     } catch (err) {
       if (err instanceof ApiProblem) setErrors(Object.fromEntries(err.errors.map((e) => [e.path, e.message])));
@@ -142,29 +142,32 @@ function ExperienceCard({ full, onChange }: { full: MyProfile; onChange: (p: MyP
           <TextField label="Job title" value={form.title} onChangeText={set('title')} error={errors.title} />
           <TextField label="Salon" value={form.salonName} onChangeText={set('salonName')} error={errors.salonName} />
           <TextField label="Where (optional)" value={form.location} onChangeText={set('location')} error={errors.location} />
-          <View style={styles.row}>
-            <View style={styles.flex}>
-              <TextField
-                label="Started"
-                value={form.start}
-                onChangeText={set('start')}
-                placeholder="MM/YYYY"
-                keyboardType="numbers-and-punctuation"
-                error={errors.startMonth}
-              />
-            </View>
-            <View style={styles.flex}>
-              <TextField
-                label="Finished"
-                value={form.end}
-                onChangeText={set('end')}
-                placeholder="MM/YYYY"
-                keyboardType="numbers-and-punctuation"
-                hint="Blank if you’re still there."
-                error={errors.endMonth}
-              />
-            </View>
+          <DateField
+            label="Started"
+            value={start}
+            onChange={setStart}
+            maximumDate={new Date()}
+            error={errors.startMonth}
+          />
+          <View style={styles.switchRow}>
+            <Text style={styles.flex}>I still work here</Text>
+            <Switch
+              value={stillThere}
+              onValueChange={setStillThere}
+              trackColor={{ true: theme.brand, false: theme.border }}
+              thumbColor={Platform.OS === 'android' ? theme.surface : undefined}
+            />
           </View>
+          {stillThere ? null : (
+            <DateField
+              label="Finished"
+              value={end}
+              onChange={setEnd}
+              minimumDate={start}
+              maximumDate={new Date()}
+              error={errors.endMonth}
+            />
+          )}
           <TextField
             label="What you did (optional)"
             value={form.description}
@@ -306,6 +309,7 @@ function EducationCard({ full, onChange }: { full: MyProfile; onChange: (p: MyPr
 }
 
 const styles = StyleSheet.create({
+  switchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
   flex: { flex: 1 },
   grow2: { flex: 2 },
   form: { gap: Spacing.three },

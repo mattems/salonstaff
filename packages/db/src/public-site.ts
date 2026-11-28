@@ -17,7 +17,7 @@ import {
 import { and, asc, between, count, desc, eq, ilike, max, ne, or, type SQL, sql } from "drizzle-orm";
 import type { Db } from "./index";
 import { contains } from "./like";
-import { jobs, postcodes, salons, slugRedirects } from "./schema";
+import { jobs, localities, postcodes, salons, slugRedirects } from "./schema";
 import {
   isClaimed as isClaimedSalon,
   isLive,
@@ -250,6 +250,19 @@ export function publicSite(db: Db) {
         .from(postcodes)
         .where(eq(postcodes.postcode, postcode));
       return row ?? null;
+    },
+
+    /**
+     * The suburbs in a postcode's area (ABS localities, D-10), by name. A postcode can cross a
+     * state line (2620 is ACT and NSW), so each carries its own state. Empty for a postcode we
+     * don't know.
+     */
+    async suburbsIn(postcode: string): Promise<{ suburb: string; state: AuState }[]> {
+      return db
+        .select({ suburb: localities.suburb, state: localities.state })
+        .from(localities)
+        .where(sql`${localities.postcodes} @> array[${postcode}]::text[]`)
+        .orderBy(asc(localities.suburb));
     },
 
     /** Where an old address now lives (for a 301), or null. */

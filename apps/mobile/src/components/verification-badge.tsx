@@ -23,7 +23,7 @@ export function VerificationBadge({ level: raw, compact = false }: { level: numb
   if (compact) {
     return (
       <View style={[styles.compact, { backgroundColor: palette.bg }]}>
-        <Icon name={level === 0 ? 'mail' : 'verified'} size={13} color={palette.fg} />
+        <Icon name={level === 0 ? 'shield' : 'verified'} size={13} color={palette.fg} />
         <Text variant="caption" style={{ color: palette.fg, fontWeight: '700' }}>
           {info.label}
         </Text>
@@ -34,24 +34,43 @@ export function VerificationBadge({ level: raw, compact = false }: { level: numb
   return (
     <View style={[styles.badge, { backgroundColor: palette.bg }]}>
       <View style={[styles.iconWrap, { backgroundColor: palette.fg }]}>
-        <Icon name={level === 0 ? 'mail' : 'verified'} size={22} color={palette.bg} />
+        <Icon name={level === 0 ? 'shield' : 'verified'} size={22} color={palette.bg} />
       </View>
       <View style={styles.textWrap}>
-        <Text variant="overline" style={{ color: palette.fg }}>
-          Level {level} of 2
-        </Text>
         <Text variant="heading" style={{ color: palette.fg }}>
           {info.label}
         </Text>
         <Text variant="small" color="textSecondary">
           {info.description}
         </Text>
+        {/* The two checks behind the level, rather than a "level n of 2" to decode. */}
+        <View style={styles.checks}>
+          <CheckMark done={level >= 1} label="Your ID" color={palette.fg} />
+          <CheckMark done={level >= 2} label="Right to work" color={palette.fg} />
+        </View>
       </View>
     </View>
   );
 }
 
+function CheckMark({ done, label, color }: { done: boolean; label: string; color: string }) {
+  const theme = useTheme();
+  return (
+    <View
+      style={styles.check}
+      accessible
+      accessibilityLabel={`${label}: ${done ? 'checked' : 'not checked yet'}`}>
+      <Icon name={done ? 'done' : 'circle'} size={16} color={done ? color : theme.textMuted} />
+      <Text variant="smallStrong" color={done ? 'text' : 'textMuted'}>
+        {label}
+      </Text>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
+  checks: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.four, marginTop: Spacing.one },
+  check: { flexDirection: 'row', alignItems: 'center', gap: Spacing.one },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -216,6 +216,12 @@
           "payPeriod": {
             "type": "string",
             "enum": ["hour", "week", "year"]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+            "example": "2026-11-25T03:00:00.000Z"
           }
         },
         "required": [
@@ -240,7 +246,8 @@
           "availableFrom",
           "travelKm",
           "payMin",
-          "payPeriod"
+          "payPeriod",
+          "updatedAt"
         ]
       },
       "Verification": {
@@ -2335,6 +2342,151 @@
           {
             "type": "object",
             "properties": {
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "headline": {
+                    "type": ["string", "null"]
+                  },
+                  "about": {
+                    "type": ["string", "null"]
+                  },
+                  "suburb": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                    "example": "NSW"
+                  },
+                  "postcode": {
+                    "type": "string"
+                  },
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "senior_stylist",
+                        "stylist",
+                        "junior_stylist",
+                        "apprentice_hair",
+                        "colourist",
+                        "barber",
+                        "beauty_therapist",
+                        "nail_technician",
+                        "lash_brow",
+                        "makeup_artist",
+                        "skin_therapist",
+                        "massage_spa",
+                        "apprentice_beauty",
+                        "salon_manager",
+                        "receptionist",
+                        "educator"
+                      ],
+                      "example": "colourist"
+                    }
+                  },
+                  "yearsExperience": {
+                    "type": "integer"
+                  },
+                  "instagram": {
+                    "type": ["string", "null"]
+                  },
+                  "tiktok": {
+                    "type": ["string", "null"]
+                  },
+                  "rightToWork": {
+                    "type": "string",
+                    "enum": [
+                      "citizen",
+                      "permanent_resident",
+                      "visa_full",
+                      "visa_limited",
+                      "needs_sponsorship"
+                    ]
+                  },
+                  "openToWork": {
+                    "type": "boolean"
+                  },
+                  "photoUrl": {
+                    "type": ["string", "null"]
+                  },
+                  "specialties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "brands": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "availableDays": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "employmentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "casual",
+                        "contract",
+                        "apprenticeship",
+                        "chair_rental"
+                      ]
+                    }
+                  },
+                  "availableFrom": {
+                    "type": ["string", "null"]
+                  },
+                  "travelKm": {
+                    "type": ["integer", "null"]
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+                    "example": "2026-11-25T03:00:00.000Z"
+                  }
+                },
+                "required": [
+                  "firstName",
+                  "lastName",
+                  "headline",
+                  "about",
+                  "suburb",
+                  "state",
+                  "postcode",
+                  "roles",
+                  "yearsExperience",
+                  "instagram",
+                  "tiktok",
+                  "rightToWork",
+                  "openToWork",
+                  "photoUrl",
+                  "specialties",
+                  "brands",
+                  "availableDays",
+                  "employmentTypes",
+                  "availableFrom",
+                  "travelKm",
+                  "updatedAt"
+                ]
+              },
               "id": {
                 "type": "string",
                 "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
@@ -3224,7 +3376,7 @@
           "via": {
             "type": ["string", "null"],
             "enum": ["email", "phone", "call", null],
-            "description": "Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call)."
+            "description": "Where the code went while `pending_email`: the listing's email, its mobile (SMS), or its landline or mobile (a call)."
           },
           "sentTo": {
             "type": ["string", "null"],
@@ -3283,7 +3435,7 @@
             "type": "string",
             "enum": ["email", "phone", "call", "review"],
             "default": "email",
-            "description": "`email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options."
+            "description": "`email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline or mobile that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options."
           }
         },
         "required": ["contactName", "phone"]
@@ -3309,6 +3461,35 @@
           }
         },
         "required": ["code"]
+      },
+      "PostcodePlaces": {
+        "type": "object",
+        "properties": {
+          "postcode": {
+            "type": "string",
+            "example": "3065"
+          },
+          "suburbs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "suburb": {
+                  "type": "string",
+                  "example": "Fitzroy"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                  "example": "NSW"
+                }
+              },
+              "required": ["suburb", "state"]
+            },
+            "description": "By name. One for most postcodes; some cover dozens."
+          }
+        },
+        "required": ["postcode", "suburbs"]
       },
       "SharedProfile": {
         "type": "object",
@@ -3414,6 +3595,12 @@
               },
               "travelKm": {
                 "type": ["integer", "null"]
+              },
+              "updatedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+                "example": "2026-11-25T03:00:00.000Z"
               }
             },
             "required": [
@@ -3433,7 +3620,8 @@
               "availableDays",
               "employmentTypes",
               "availableFrom",
-              "travelKm"
+              "travelKm",
+              "updatedAt"
             ]
           },
           "experience": {
@@ -6707,6 +6895,77 @@
                     }
                   },
                   "required": ["sessions_ended"]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Not through Cloudflare Access, not staff, the staff role does not allow this, or it needs confirming with a passkey (`confirmation_required`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Nothing with that ID",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/admin/v1/users/{id}/reset-verifications": {
+      "post": {
+        "summary": "Reset a person's verifications",
+        "description": "Clears every check they have (identity, work rights, qualifications), so they're not verified and can verify again. Verification IDs go with them, and any certificate still waiting for a decision is deleted. Audited, with the reason.",
+        "tags": ["Admin"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string"
+            },
+            "required": true,
+            "name": "id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "reason": {
+                    "type": "string",
+                    "maxLength": 500
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "How many checks were cleared",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "checks_removed": {
+                      "type": "integer"
+                    }
+                  },
+                  "required": ["checks_removed"]
                 }
               }
             }

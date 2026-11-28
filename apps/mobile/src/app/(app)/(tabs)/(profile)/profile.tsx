@@ -9,9 +9,11 @@ import type { IconName } from '@/components/icon';
 import { ListRow } from '@/components/list-row';
 import { Pill } from '@/components/pill';
 import { ProfilePhoto } from '@/components/profile-photo';
+import { ProfileStrengthCard, StaleProfileCard } from '@/components/profile-strength';
 import { Text } from '@/components/text';
 import { VerificationBadge } from '@/components/verification-badge';
 import { Spacing } from '@/constants/theme';
+import { useMyProfile } from '@/hooks/use-my-profile';
 import { useTheme } from '@/hooks/use-theme';
 import { api, errorMessage } from '@/lib/api';
 import { useAuth, useUser } from '@/lib/auth';
@@ -27,6 +29,9 @@ export default function ProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const profile = user.profile;
+  // The whole profile (portfolio, experience…), for how complete and current it is (D-24).
+  const full = useMyProfile();
+  const fullProfile = profile ? full.data : null;
   const signedInAs = user.email ?? (user.phoneNumber ? formatAuMobile(user.phoneNumber) : '');
 
   useFocusEffect(
@@ -37,7 +42,7 @@ export default function ProfileScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await refresh();
+    await Promise.all([refresh(), profile ? full.reload() : null]);
     setRefreshing(false);
   }
 
@@ -122,6 +127,13 @@ export default function ProfileScreen() {
           </Text>
         </View>
       </View>
+
+      {fullProfile ? (
+        <>
+          <StaleProfileCard full={fullProfile} onConfirmed={(fresh) => full.setData(() => fresh)} />
+          <ProfileStrengthCard full={fullProfile} />
+        </>
+      ) : null}
 
       <VerificationBadge level={user.verification.level} />
       {user.verification.level < 2 ? (

@@ -67,7 +67,7 @@ function RootNavigator() {
   const signedIn = status === 'signedIn';
   return (
     <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Protected guard={signedIn} redirectTo="/sign-in">
+      <Stack.Protected guard={signedIn} redirectTo="/welcome">
         <Stack.Screen name="(app)" />
       </Stack.Protected>
       {/* Signed in: the first tab of the side you're on (the job seeker's would be hidden, D-20). */}
