@@ -201,6 +201,9 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   against Twilio (needs Matt's subaccount and service).
 - Secret scanning: `.gitleaks.toml` allows the made-up test secret in `apps/api/test/hardening.test.ts`
   (gitleaks flagged the committed line, so `bun run ci` stopped at its first step).
+- No Dependabot: `.github/dependabot.yml` is gone (it only sent weekly bumps for the Actions and the
+  app's npm packages; its alerts and security updates were already off). Secrets are checked by
+  gitleaks in `bun run ci`; dependencies are updated by hand.
 
 ### Known issues
 - Security audit (2026-11-27): 34 findings in docs/security-audit.md. Most are fixed (its "Where it stands" lists them; migrations 0012 and 0013); what's left needs Matt's decision, a setting in Stripe, Twilio or R2, or is listed there as not done.

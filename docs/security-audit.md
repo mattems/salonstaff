@@ -73,7 +73,7 @@ Done in the last pass (was "not done"):
 - **S-27:** each Apple or Google ID token from the app is accepted once, so a captured one can't be replayed. No nonce and no app change needed.
 - **S-28:** traced: providers trusted by name were linked to an existing account even when the provider hadn't verified the email. Google and Apple are no longer trusted by name, so linking needs a verified email.
 - **S-29:** `migrate.ts` and `staff.ts` refuse a database that isn't on this machine without `ALLOW_REMOTE_DATABASE=1`; `bun run deploy` deploys only a clean, pushed `main` after the tests (`--any-tree`, `--skip-tests` to override).
-- **S-30 (in part):** stale gitleaks allowlist entries removed; Dependabot covers the mobile app's npm packages.
+- **S-30 (in part):** stale gitleaks allowlist entries removed. Dependabot was added for the mobile app's npm packages, then turned off at Matt's request (2026-11-28): gitleaks runs locally in `bun run ci` and dependencies are updated by hand.
 - **S-33:** subscription events fetch the current state from Stripe; starting a plan checkout closes any unfinished one.
 - **Tests added:** the caps on salons and invites, one free period per ABN, links kept out of email subjects, and the unpaid-checkout path.
 
@@ -84,7 +84,7 @@ Review and browser pass (2026-11-28):
 
 Left as it is, on purpose:
 - **S-11:** a banned person's open conversation closes on the next message rather than at the ban. Nothing readable reaches them in between (only "is typing").
-- **S-30:** CI still runs only by hand. `ci.yml` says that's deliberate while the project is developed locally; add `pull_request:` under `on:` to change it. Dependabot still can't read `bun.lock`.
+- **S-30:** CI still runs only by hand. `ci.yml` says that's deliberate while the project is developed locally; add `pull_request:` under `on:` to change it. There's no Dependabot (Matt's choice).
 
 Not verified, so try before relying on it:
 - **HEIC blanking and the stored-photo clean-up** are tested with files built in the tests, not real phone photos or a real R2 bucket. Upload a HEIC from an iPhone and open it after the first deploy.
