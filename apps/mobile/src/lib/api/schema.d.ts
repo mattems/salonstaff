@@ -410,6 +410,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/me/profile/current": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Say your profile is still current
+         * @description Marks your profile as checked today without changing it, so its `updatedAt` moves to now (D-24). The app asks after 90 days without a change. Changing any part of your profile does the same. Needs a profile first.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Your profile */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MyProfile"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not allowed for this account */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description No profile yet */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/me/photo": {
         parameters: {
             query?: never;
@@ -6222,7 +6288,7 @@ export interface paths {
         put?: never;
         /**
          * Claim a directory listing
-         * @description An ABN is optional when a code proves the claim, and needed for a staff check; when given, it must match the listing's (or, when it has none, be active on the Australian Business Register). Prove you run the business (D-22): with `method: email` we send a six-digit code and a link to the listing's own email; with `method: phone`, a code by SMS to the listing's own mobile; with `method: call`, a phone call to its own landline that reads out the code (8am to 8pm, the salon's time). Type the code with POST /v1/claims/{id}/code (or open the emailed link) while signed in as you; it lasts 48 hours and takes 5 wrong tries. `sentTo` shows where it went, masked. Without a listing email, or with `method: review`, staff check it. Starting again sends a new code (not within 5 minutes) and counts towards the day's claims. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.
+         * @description An ABN is optional when a code proves the claim, and needed for a staff check; when given, it must match the listing's (or, when it has none, be active on the Australian Business Register). Prove you run the business (D-22): with `method: email` we send a six-digit code and a link to the listing's own email; with `method: phone`, a code by SMS to the listing's own mobile; with `method: call`, a phone call to its own landline or mobile that reads out the code (8am to 8pm, the salon's time). Type the code with POST /v1/claims/{id}/code (or open the emailed link) while signed in as you; it lasts 48 hours and takes 5 wrong tries. `sentTo` shows where it went, masked. Without a listing email, or with `method: review`, staff check it. Starting again sends a new code (not within 5 minutes) and counts towards the day's claims. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.
          */
         post: {
             parameters: {
@@ -7253,6 +7319,12 @@ export interface components {
             payMin: number | null;
             /** @enum {string} */
             payPeriod: "hour" | "week" | "year";
+            /**
+             * Format: date-time
+             * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+             * @example 2026-11-25T03:00:00.000Z
+             */
+            updatedAt: string;
         };
         Verification: {
             /** @enum {string} */
@@ -8341,7 +8413,7 @@ export interface components {
              */
             status: "pending_email" | "pending_review" | "approved" | "rejected";
             /**
-             * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call).
+             * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS), or its landline or mobile (a call).
              * @enum {string|null}
              */
             via: "email" | "phone" | "call" | null;
@@ -8371,7 +8443,7 @@ export interface components {
             contactName: string;
             phone: string;
             /**
-             * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
+             * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline or mobile that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
              * @default email
              * @enum {string}
              */
@@ -8409,6 +8481,12 @@ export interface components {
                 employmentTypes: ("full_time" | "part_time" | "casual" | "contract" | "apprenticeship" | "chair_rental")[];
                 availableFrom: string | null;
                 travelKm: number | null;
+                /**
+                 * Format: date-time
+                 * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+                 * @example 2026-11-25T03:00:00.000Z
+                 */
+                updatedAt: string;
             };
             experience: components["schemas"]["Experience"][];
             education: components["schemas"]["Education"][];

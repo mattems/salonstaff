@@ -174,6 +174,40 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   (`lib/biometric-lock.tsx`, `expo-local-authentication`). It's offered once after a code sign-in and is
   a switch in Settings. "Sign in another way" signs out. Signing out forgets it. A new native module:
   rebuild the app (`bun run ios:device` on a phone, `npx expo run:ios` for the simulator).
+- The app's first launch (D-24, in steps): signed out, it opens on a welcome screen. A muted looping
+  video plays behind three swipeable lines, with "Get started" and "Sign in". "Get started" asks who you
+  are. Looking for work goes to sign-up; hiring for a salon points to the website, or to sign-in for
+  people already on a salon's team. Signing up and signing in are one screen led by the mobile number
+  (+61 already there); email, Apple and Google are under "Other ways to sign in". The video
+  (`apps/mobile/assets/video/welcome.mp4`) is for now Matt's watermarked Envato preview, cropped to
+  portrait: swap in the licensed file before release. `expo-video` is a new native module: rebuild the
+  app.
+- Setting up a new job seeker in the app (D-24): after their first code, one question per screen with
+  progress bars, in `app/(app)/setup/`:
+  1. name;
+  2. roles and years;
+  3. suburb, postcode (the state follows it, `stateOfPostcode` in `rules.ts`) and travel distance;
+  4. work rights, which saves the profile;
+  5. photo;
+  6. notifications;
+  7. Face ID.
+
+  Then "You're in", which points them at finishing their profile. It replaces the Edit profile
+  form's onboarding mode. The notification prompt and the Face ID pop-up wait for their own steps.
+  Tried in the simulator with a new local account (`setup-test@salonstaff.test`).
+- Profile strength and keeping it current (D-24). The score (`profileStrength` in `rules.ts`) is now
+  shared by the website's meter and the app.
+  - **App:** Profile opens with the score, the next thing to add and what's missing. Jobs shows a bar
+    while the score is under 70%, and applying says what the salon will see missing.
+  - **Last updated:** profiles have `updatedAt`, which moves with any change, portfolio and
+    experience included.
+  - **90-day check:** after 90 days, Profile asks "Still looking?". "Yes, it's current" calls
+    `POST /v1/me/profile/current`.
+  - **Not tried:** the apply screen's note (the test account can't apply without an ID check).
+    Reminders by push or email: later.
+- Locally with `TWILIO_VERIFY_SERVICE_SID` set, the app can't text a code to a number outside
+  `TWILIO_LOCAL_ALLOW` (it says so); use your own number, an email code under "Other ways to sign in",
+  or the demo buttons.
 - Adding a salon (D-22, proposed; migrations 0014, 0015):
   - **Wizard:** "Add a salon" (`/employer/onboarding`) asks for the name and postcode, offers listed salons
     with a name like it nearby (`GET /v1/salons/matches`, `nameMatchScore`), then claims the one picked or

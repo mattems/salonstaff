@@ -259,3 +259,49 @@ describe("deleting an account", () => {
     expect(salons).toHaveLength(0);
   });
 });
+
+describe("keeping a profile current (D-24)", () => {
+  const setBack = (email: string) =>
+    query(
+      sql`update seeker_profiles set updated_at = now() - interval '100 days' where user_id = (select id from users where email = ${email})`,
+    );
+  const updatedAt = async (me: Awaited<ReturnType<typeof seekerWithProfile>>) => {
+    const res = await me.api<{ profile: { updatedAt: string } }>("GET", "/v1/me/profile");
+    return new Date(res.body.profile.updatedAt).getTime();
+  };
+  const recent = (t: number) => Date.now() - t < 60_000;
+
+  it("moves when a part changes, or when they say it's still current", async () => {
+    const app = createTestApp();
+    const me = await seekerWithProfile(app, "Current");
+    expect(recent(await updatedAt(me))).toBe(true);
+
+    await setBack(me.email);
+    expect(recent(await updatedAt(me))).toBe(false);
+    const added = await me.api("POST", "/v1/me/experience", {
+      salonName: "Salon",
+      title: "Stylist",
+      startMonth: "2021-01",
+    });
+    expect(added.status).toBe(201);
+    expect(recent(await updatedAt(me))).toBe(true);
+
+    await setBack(me.email);
+    const confirmed = await me.api<{ profile: { updatedAt: string } }>(
+      "POST",
+      "/v1/me/profile/current",
+    );
+    expect(confirmed.status).toBe(200);
+    expect(recent(new Date(confirmed.body.profile.updatedAt).getTime())).toBe(true);
+    const audit = await query(
+      sql`select 1 from audit_log where action = 'profile.confirmed_current' and target_id = (select id::text from users where email = ${me.email})`,
+    );
+    expect(audit).toHaveLength(1);
+  });
+
+  it("needs a profile first", async () => {
+    const app = createTestApp();
+    const me = await app.person("No profile yet");
+    expect((await me.api("POST", "/v1/me/profile/current")).status).toBe(409);
+  });
+});

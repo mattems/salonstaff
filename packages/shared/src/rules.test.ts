@@ -22,12 +22,15 @@ import {
   nameMatches,
   nameMatchScore,
   plainLine,
+  profileIsStale,
+  profileStrength,
   publicName,
   roughCoordinate,
   salonAbnStatus,
   salonAccessTo,
   shareLinkWorks,
   spokenCode,
+  stateOfPostcode,
   verificationLevel,
   withinCallingHours,
 } from "./rules";
@@ -435,5 +438,98 @@ describe("webAddress", () => {
     ["", null],
   ])("%j → %j", (input, expected) => {
     expect(webAddress(input)).toBe(expected);
+  });
+});
+
+describe("stateOfPostcode", () => {
+  it.each([
+    ["2000", "NSW"],
+    ["2600", "ACT"],
+    ["2618", "ACT"],
+    ["2619", "NSW"],
+    ["2905", "ACT"],
+    ["2921", "NSW"],
+    ["0200", "ACT"],
+    ["0800", "NT"],
+    ["3065", "VIC"],
+    ["4000", "QLD"],
+    ["5000", "SA"],
+    ["6000", "WA"],
+    ["7000", "TAS"],
+    ["0100", null],
+    ["200", null],
+    ["20000", null],
+    ["abcd", null],
+    ["", null],
+  ])("%j → %j", (input, expected) => {
+    expect(stateOfPostcode(input)).toBe(expected);
+  });
+});
+
+describe("profileStrength", () => {
+  const empty = {
+    photoUrl: null,
+    headline: null,
+    about: null,
+    specialties: [],
+    availableDays: [],
+    employmentTypes: [],
+    payMin: null,
+    portfolio: 0,
+    experience: 0,
+    endorsements: 0,
+    identityVerified: false,
+  };
+  const full = {
+    photoUrl: "https://media/x.jpg",
+    headline: "Colourist",
+    about: "Ten years of blondes",
+    specialties: ["Balayage"],
+    availableDays: ["mon"],
+    employmentTypes: [],
+    payMin: 35,
+    portfolio: 3,
+    experience: 1,
+    endorsements: 1,
+    identityVerified: true,
+  };
+
+  it("counts only the basics for a new profile, and suggests the portfolio first", () => {
+    const { score, missing } = profileStrength(empty);
+    expect(score).toBe(20);
+    expect(missing[0]?.part).toBe("portfolio");
+    expect(missing).toHaveLength(9);
+  });
+
+  it("is 100 with everything, with nothing missing", () => {
+    expect(profileStrength(full)).toEqual({ score: 100, missing: [] });
+  });
+
+  it.each([
+    ["two portfolio photos aren't enough", { portfolio: 2 }, "portfolio", 85],
+    ["a headline without an about isn't enough", { about: "  " }, "about", 90],
+    [
+      "either days or kinds of work count as availability",
+      { availableDays: [], employmentTypes: ["casual"] },
+      null,
+      100,
+    ],
+    ["pay of 0 isn't possible, null is not saying", { payMin: null }, "pay", 95],
+  ] as const)("%s", (_, change, missingPart, score) => {
+    const result = profileStrength({ ...full, ...change });
+    expect(result.score).toBe(score);
+    expect(result.missing.map((m) => m.part)).toEqual(missingPart ? [missingPart] : []);
+  });
+});
+
+describe("profileIsStale", () => {
+  const now = new Date("2026-11-28T00:00:00Z");
+  it.each([
+    ["2026-11-27T00:00:00Z", false],
+    ["2026-08-30T00:00:00Z", false],
+    ["2026-08-29T23:00:00Z", true],
+    ["2025-01-01T00:00:00Z", true],
+  ])("updated %s → %s", (updatedAt, stale) => {
+    expect(profileIsStale(updatedAt, now)).toBe(stale);
   });
 });

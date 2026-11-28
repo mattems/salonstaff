@@ -26,7 +26,8 @@ npm install
 npx expo start --ios          # installs Expo Go on the simulator and opens the app
 ```
 
-Locally the sign-in screen has a **Demo job seeker** button (the API's dev login, local only).
+Signed out, the app opens on the welcome screen (D-24); **Sign in** leads to the sign-in screen, which
+locally has **Demo job seeker** and **Demo salon owner** buttons (the API's dev login, local only).
 Email codes land in Mailpit (linked from the springboard, http://localhost:4100); SMS codes too.
 
 ### On your phone
@@ -125,8 +126,10 @@ src/
   app/                    Expo Router routes
     _layout.tsx           theme, AuthProvider, Stack.Protected guards
     +native-intent.tsx    handles salonstaff://verify-complete
-    (auth)/               sign-in (email) → verify-code (6 digits)
-    (app)/                signed-in stack (onboarding nudge, pushes, Inbox badge refresh in _layout)
+    (auth)/               welcome (video, slides) → who (job seeker or salon; for-salons) →
+                          sign-in (sign up or sign in: mobile, or other ways) → verify-code (6 digits)
+    (app)/                signed-in stack (sends new job seekers to setup, pushes, Inbox badge refresh in _layout)
+      setup/              setting up a new job seeker, one question per screen (D-24)
       (tabs)/             native tab bar, each tab a group with its own stack for the title bar:
                           job seeker: (jobs) · (saved) · (applications) · (inbox) · (profile);
                           salon side: (hiring) · (applicants) · (messages) · (salon), the other

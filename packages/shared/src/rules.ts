@@ -241,6 +241,70 @@ export function contactLimitReached(
   return null;
 }
 
+// ---------- How complete and current a profile is (D-24) ----------
+
+/** The parts of a profile that make it strong, and what each is worth (they add up to 100). */
+export const PROFILE_PARTS = [
+  { part: "basics", label: "Your basics", points: 20 },
+  { part: "portfolio", label: "At least 3 portfolio photos", points: 15 },
+  { part: "photo", label: "A profile photo", points: 10 },
+  { part: "about", label: "A headline and a few words about you", points: 10 },
+  { part: "skills", label: "Your specialties", points: 10 },
+  { part: "experience", label: "Your experience", points: 10 },
+  { part: "identity", label: "A verified identity", points: 10 },
+  { part: "availability", label: "When you can work", points: 5 },
+  { part: "pay", label: "Your pay", points: 5 },
+  { part: "endorsement", label: "An endorsement", points: 5 },
+] as const;
+export type ProfilePart = (typeof PROFILE_PARTS)[number]["part"];
+
+export interface ProfileStrengthInput {
+  photoUrl: string | null;
+  headline: string | null;
+  about: string | null;
+  specialties: readonly string[];
+  availableDays: readonly string[];
+  employmentTypes: readonly string[];
+  payMin: number | null;
+  portfolio: number;
+  experience: number;
+  endorsements: number;
+  identityVerified: boolean;
+}
+
+/**
+ * How complete a profile is, out of 100, and what's still missing, most valuable first (so the
+ * first is the one to suggest next). Having a profile at all means the basics are done.
+ */
+export function profileStrength(p: ProfileStrengthInput): {
+  score: number;
+  missing: { part: ProfilePart; label: string; points: number }[];
+} {
+  const done: Record<ProfilePart, boolean> = {
+    basics: true,
+    portfolio: p.portfolio >= 3,
+    photo: Boolean(p.photoUrl),
+    about: Boolean(p.headline?.trim() && p.about?.trim()),
+    skills: p.specialties.length > 0,
+    experience: p.experience > 0,
+    identity: p.identityVerified,
+    availability: p.availableDays.length > 0 || p.employmentTypes.length > 0,
+    pay: p.payMin !== null,
+    endorsement: p.endorsements > 0,
+  };
+  const score = PROFILE_PARTS.reduce((sum, x) => sum + (done[x.part] ? x.points : 0), 0);
+  return { score, missing: PROFILE_PARTS.filter((x) => !done[x.part]).map((x) => ({ ...x })) };
+}
+
+/** Days without a change before the app asks whether a profile is still current. */
+export const PROFILE_STALE_DAYS = 90;
+
+/** Whether to ask "Still looking? Check your profile is up to date". */
+export function profileIsStale(updatedAt: Date | string, now = new Date()): boolean {
+  const then = typeof updatedAt === "string" ? new Date(updatedAt) : updatedAt;
+  return now.getTime() - then.getTime() > PROFILE_STALE_DAYS * 24 * 60 * 60 * 1000;
+}
+
 // ---------- A salon's ABN ----------
 
 const ABN_NAME_NOISE = new Set([
@@ -465,6 +529,31 @@ export function nameMatchScore(typed: string, listed: string): number {
 }
 
 export const NAME_MATCH_MIN = 0.3;
+
+// ---------- Postcodes ----------
+
+/** Australia Post's postcode ranges for each state, the ACT's inside NSW's listed first. */
+const POSTCODE_STATES: [from: number, to: number, state: AuState][] = [
+  [200, 299, "ACT"],
+  [2600, 2618, "ACT"],
+  [2900, 2920, "ACT"],
+  [800, 999, "NT"],
+  [1000, 2999, "NSW"],
+  [3000, 3999, "VIC"],
+  [8000, 8999, "VIC"],
+  [4000, 4999, "QLD"],
+  [9000, 9999, "QLD"],
+  [5000, 5999, "SA"],
+  [6000, 6999, "WA"],
+  [7000, 7999, "TAS"],
+];
+
+/** The state a four-digit postcode is in, or null when it isn't one (so the person picks it). */
+export function stateOfPostcode(postcode: string): AuState | null {
+  if (!/^\d{4}$/.test(postcode)) return null;
+  const n = Number(postcode);
+  return POSTCODE_STATES.find(([from, to]) => n >= from && n <= to)?.[2] ?? null;
+}
 
 // ---------- Near me (D-10) ----------
 

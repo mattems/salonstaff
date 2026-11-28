@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 
 import { api } from '@/lib/api';
 import { SITE_URL } from '@/lib/config';
+import { tokenStore } from '@/lib/token-store';
 
 /**
  * Pushes come straight from Apple to this app (D-15), so they need a development or release build:
@@ -13,6 +14,9 @@ import { SITE_URL } from '@/lib/config';
  */
 export const pushAvailable =
   Platform.OS === 'ios' && Constants.executionEnvironment !== ExecutionEnvironment.StoreClient;
+
+/** Set when they say "Not now" to notifications while setting up (D-24). */
+const LATER_KEY = 'salonstaff.push-later';
 
 if (pushAvailable) {
   // Show a push that arrives while the app is open, too.
@@ -34,11 +38,12 @@ if (pushAvailable) {
  * Returns whether pushes will reach this phone: allowed here, and the API can send them (locally,
  * without an APNs key, it can't).
  */
-export async function registerForPush(): Promise<boolean> {
+export async function registerForPush({ ask = true }: { ask?: boolean } = {}): Promise<boolean> {
   if (!pushAvailable) return false;
   let permission = await Notifications.getPermissionsAsync();
-  if (!permission.granted && permission.canAskAgain) {
+  if (!permission.granted && permission.canAskAgain && ask) {
     permission = await Notifications.requestPermissionsAsync();
+    await tokenStore.remove(LATER_KEY).catch(() => {});
   }
   if (!permission.granted) return false;
   const { data: token } = await Notifications.getDevicePushTokenAsync();
@@ -52,6 +57,16 @@ export async function registerForPush(): Promise<boolean> {
     sandbox: environment !== 'production',
   });
   return delivered;
+}
+
+/** "Not now" to notifications while setting up (D-24): the app won't ask by itself again. */
+export async function askForPushLater(): Promise<void> {
+  await tokenStore.set(LATER_KEY, 'yes').catch(() => {});
+}
+
+/** They said "Not now": ask only when they turn notifications on in Settings. */
+export async function pushWanted(): Promise<boolean> {
+  return !(await tokenStore.get(LATER_KEY).catch(() => null));
 }
 
 /** Whether this phone still allows notifications (someone can turn them off in iOS Settings). */

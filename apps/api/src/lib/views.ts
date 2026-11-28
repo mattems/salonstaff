@@ -102,6 +102,7 @@ export function profileJson(env: Env, row: SeekerProfile) {
     travelKm: row.travelKm,
     payMin: row.payMin,
     payPeriod: row.payPeriod,
+    updatedAt: row.updatedAt.toISOString(),
   };
 }
 

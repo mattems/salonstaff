@@ -9,7 +9,7 @@ import {
   type JobRole,
   type RightToWork,
 } from '@salonstaff/shared';
-import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   Alert,
@@ -85,8 +85,6 @@ export default function EditProfileScreen() {
   const router = useRouter();
   const user = useUser();
   const { refresh } = useAuth();
-  const { onboarding } = useLocalSearchParams<{ onboarding?: string }>();
-  const isOnboarding = onboarding === '1';
 
   const [form, setForm] = useState<Form>(() => initialForm(user.profile));
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -150,7 +148,7 @@ export default function EditProfileScreen() {
     try {
       await api.saveProfile(input);
       await refresh();
-      if (isOnboarding || expiresId) router.replace('/verification');
+      if (expiresId) router.replace('/verification');
       else router.back();
     } catch (err) {
       if (err instanceof ApiProblem && err.errors.length) {
@@ -172,22 +170,10 @@ export default function EditProfileScreen() {
       style={styles.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}>
-      <Stack.Screen options={{ title: isOnboarding ? 'Set up your profile' : 'Edit profile' }} />
       <ScrollView
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
         contentInsetAdjustmentBehavior="automatic">
-        {isOnboarding ? (
-          <View style={[styles.welcome, { backgroundColor: theme.brandSoft }]}>
-            <Text variant="subheading" color="brand">
-              Welcome to Salon Staff
-            </Text>
-            <Text variant="small" color="textSecondary">
-              Tell salons a little about you. Next, you’ll verify your identity so they know you’re
-              a real person.
-            </Text>
-          </View>
-        ) : null}
 
         <Section title="About you">
           <View style={styles.row}>
@@ -374,10 +360,7 @@ export default function EditProfileScreen() {
         </Card>
 
         <ErrorBanner message={formError} />
-        <Button title={isOnboarding ? 'Save and continue' : 'Save profile'} onPress={save} loading={saving} />
-        {isOnboarding ? (
-          <Button title="Skip for now" variant="ghost" onPress={() => router.back()} disabled={saving} />
-        ) : null}
+        <Button title="Save profile" onPress={save} loading={saving} />
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -417,7 +400,6 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   grow2: { flex: 2 },
   content: { padding: Spacing.four, gap: Spacing.five, paddingBottom: Spacing.seven },
-  welcome: { padding: Spacing.four, borderRadius: 16, gap: Spacing.one },
   section: { gap: Spacing.three },
   row: { flexDirection: 'row', gap: Spacing.three },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.two },

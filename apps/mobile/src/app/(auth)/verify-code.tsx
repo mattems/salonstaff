@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState, type ComponentRef } from 'react';
 import {
   KeyboardAvoidingView,
@@ -21,9 +21,9 @@ import { formatAuMobile } from '@/lib/format';
 
 const RESEND_SECONDS = 30;
 
-
 export default function VerifyCodeScreen() {
   const theme = useTheme();
+  const router = useRouter();
   const { email, phone } = useLocalSearchParams<{ email?: string; phone?: string }>();
   const target: CodeTarget = phone ? { phone } : { email: email ?? '' };
   const destination = phone ? formatAuMobile(phone) : (email ?? '');
@@ -130,6 +130,12 @@ export default function VerifyCodeScreen() {
             disabled={cooldown > 0}
             onPress={resend}
           />
+          <Button
+            title={phone ? 'Wrong number? Change it' : 'Wrong email? Change it'}
+            variant="ghost"
+            size="sm"
+            onPress={() => router.back()}
+          />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -138,7 +144,8 @@ export default function VerifyCodeScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  content: { flexGrow: 1, padding: Spacing.five, paddingTop: Spacing.seven, gap: Spacing.four },
+  // Room at the top for the Back button.
+  content: { flexGrow: 1, padding: Spacing.five, paddingTop: Spacing.five + 56, gap: Spacing.four },
   header: { gap: Spacing.two, marginBottom: Spacing.three },
   codeInput: {
     height: 64,

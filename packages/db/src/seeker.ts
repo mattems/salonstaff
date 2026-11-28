@@ -183,6 +183,15 @@ export function seeker(db: Db, userId: string) {
     if (!row) throw noProfile();
     return row;
   };
+  /**
+   * The profile was changed or checked: its `updated_at` is when it was last known to be current
+   * (D-24), so adding or removing portfolio photos, experience or qualifications counts too.
+   */
+  const touch = (tx: Executor) =>
+    tx
+      .update(seekerProfiles)
+      .set({ updatedAt: new Date() })
+      .where(eq(seekerProfiles.userId, userId));
 
   return {
     async account(): Promise<Account | null> {
@@ -309,6 +318,24 @@ export function seeker(db: Db, userId: string) {
      * Who sees the profile and how salons may contact them (D-13). Going public makes a share
      * code the first time.
      */
+    /** "Yes, it's still current" (D-24): marks the profile as checked now, without changing it. */
+    async confirmCurrent(actor: Actor): Promise<SeekerProfile> {
+      return db.transaction(async (tx) => {
+        await requireProfile(tx);
+        const [row] = await tx
+          .update(seekerProfiles)
+          .set({ updatedAt: new Date() })
+          .where(eq(seekerProfiles.userId, userId))
+          .returning();
+        await recordAudit(tx, actor, {
+          action: "profile.confirmed_current",
+          targetType: "user",
+          targetId: userId,
+        });
+        return row as SeekerProfile;
+      });
+    },
+
     async saveSettings(input: ProfileSettingsInput, actor: Actor): Promise<SeekerProfile> {
       return db.transaction(async (tx) => {
         const before = await requireProfile(tx);
@@ -612,6 +639,7 @@ export function seeker(db: Db, userId: string) {
           })
           .returning();
         const item = row as PortfolioItem;
+        await touch(tx);
         await recordAudit(tx, actor, {
           action: "profile.portfolio_added",
           targetType: "portfolio_item",
@@ -629,6 +657,7 @@ export function seeker(db: Db, userId: string) {
           .where(and(eq(portfolioItems.id, id), eq(portfolioItems.userId, userId)))
           .returning();
         if (!row) return null;
+        await touch(tx);
         await recordAudit(tx, actor, {
           action: "profile.portfolio_removed",
           targetType: "portfolio_item",
@@ -664,6 +693,7 @@ export function seeker(db: Db, userId: string) {
           })
           .returning();
         const item = row as Experience;
+        await touch(tx);
         await recordAudit(tx, actor, {
           action: "profile.experience_added",
           targetType: "experience",
@@ -680,6 +710,7 @@ export function seeker(db: Db, userId: string) {
           .where(and(eq(seekerExperience.id, id), eq(seekerExperience.userId, userId)))
           .returning({ id: seekerExperience.id });
         if (row) {
+          await touch(tx);
           await recordAudit(tx, actor, {
             action: "profile.experience_removed",
             targetType: "experience",
@@ -713,6 +744,7 @@ export function seeker(db: Db, userId: string) {
           })
           .returning();
         const item = row as Education;
+        await touch(tx);
         await recordAudit(tx, actor, {
           action: "profile.education_added",
           targetType: "education",
@@ -729,6 +761,7 @@ export function seeker(db: Db, userId: string) {
           .where(and(eq(seekerEducation.id, id), eq(seekerEducation.userId, userId)))
           .returning({ id: seekerEducation.id });
         if (row) {
+          await touch(tx);
           await recordAudit(tx, actor, {
             action: "profile.education_removed",
             targetType: "education",

@@ -3105,6 +3105,12 @@ export interface components {
       payMin: number | null;
       /** @enum {string} */
       payPeriod: "hour" | "week" | "year";
+      /**
+       * Format: date-time
+       * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+       * @example 2026-11-25T03:00:00.000Z
+       */
+      updatedAt: string;
     };
     Verification: {
       /** @enum {string} */
@@ -4334,7 +4340,7 @@ export interface components {
        */
       status: "pending_email" | "pending_review" | "approved" | "rejected";
       /**
-       * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call).
+       * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS), or its landline or mobile (a call).
        * @enum {string|null}
        */
       via: "email" | "phone" | "call" | null;
@@ -4364,7 +4370,7 @@ export interface components {
       contactName: string;
       phone: string;
       /**
-       * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
+       * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline or mobile that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
        * @default email
        * @enum {string}
        */
@@ -4426,6 +4432,12 @@ export interface components {
         )[];
         availableFrom: string | null;
         travelKm: number | null;
+        /**
+         * Format: date-time
+         * @description When the profile was last changed (any part of it) or its owner said it's still current (D-24).
+         * @example 2026-11-25T03:00:00.000Z
+         */
+        updatedAt: string;
       };
       experience: components["schemas"]["Experience"][];
       education: components["schemas"]["Education"][];

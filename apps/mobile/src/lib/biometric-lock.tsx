@@ -79,7 +79,9 @@ export function useBiometricLock(): LockContextValue {
 }
 
 export function BiometricLockProvider({ children }: PropsWithChildren) {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
+  // A new job seeker is offered it as the last step of setting up (D-24), not by a pop-up here.
+  const settingUp = !!user && !user.profile && user.salons.length === 0;
   const [kind, setKind] = useState<BiometricKind>(null);
   const [enabled, setEnabledState] = useState<boolean | undefined>(undefined);
   const [locked, setLocked] = useState(false);
@@ -123,7 +125,7 @@ export function BiometricLockProvider({ children }: PropsWithChildren) {
       void tokenStore.remove(OFFERED_KEY).catch(() => {});
       return;
     }
-    if (status !== 'signedIn' || before !== 'signedOut' || !kind || enabled) return;
+    if (status !== 'signedIn' || before !== 'signedOut' || !kind || enabled || settingUp) return;
     void tokenStore.get(OFFERED_KEY).then((offered) => {
       if (offered) return;
       void tokenStore.set(OFFERED_KEY, 'yes').catch(() => {});
@@ -136,7 +138,7 @@ export function BiometricLockProvider({ children }: PropsWithChildren) {
         ],
       );
     });
-  }, [status, kind, enabled, setEnabled]);
+  }, [status, kind, enabled, setEnabled, settingUp]);
 
   // Away for a while: locked again when they come back.
   useEffect(() => {

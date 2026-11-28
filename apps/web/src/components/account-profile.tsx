@@ -2,6 +2,7 @@
  * What the job seeker's account sections share: their profile (loaded once by the /account
  * layout), refreshing after a change, a section's card, and the profile strength meter.
  */
+import { profileStrength } from "@salonstaff/shared";
 import { Button } from "@salonstaff/ui/components/button";
 import {
   Card,
@@ -77,22 +78,17 @@ export function NeedsProfile() {
   );
 }
 
+/** The profile strength meter's numbers, from the shared rule (D-24) the app uses too. */
 export function strengthOf(full: MyProfile) {
   const { profile: p } = full;
-  const parts: [string, number, boolean][] = [
-    ["Your basics", 20, true],
-    ["A profile photo", 10, Boolean(p.photoUrl)],
-    ["A headline and a few words about you", 10, Boolean(p.headline && p.about)],
-    ["Your specialties", 10, p.specialties.length > 0],
-    ["When you can work", 5, p.availableDays.length > 0 || p.employmentTypes.length > 0],
-    ["Your pay", 5, p.payMin !== null],
-    ["At least 3 portfolio photos", 15, full.portfolio.length >= 3],
-    ["Your experience", 10, full.experience.length > 0],
-    ["An endorsement", 5, full.endorsements.length > 0],
-    ["A verified identity", 10, full.verification.identity === "verified"],
-  ];
-  const score = parts.reduce((sum, [, points, done]) => sum + (done ? points : 0), 0);
-  return { score, missing: parts.filter(([, , done]) => !done).map(([label]) => label) };
+  const { score, missing } = profileStrength({
+    ...p,
+    portfolio: full.portfolio.length,
+    experience: full.experience.length,
+    endorsements: full.endorsements.length,
+    identityVerified: full.verification.identity === "verified",
+  });
+  return { score, missing: missing.map((m) => m.label) };
 }
 
 export function Strength({ full }: { full: MyProfile }) {
