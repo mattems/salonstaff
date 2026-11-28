@@ -186,7 +186,8 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   progress bars, in `app/(app)/setup/`:
   1. name;
   2. roles and years;
-  3. suburb, postcode (the state follows it, `stateOfPostcode` in `rules.ts`) and travel distance;
+  3. postcode only: the suburb and state come from it (`GET /v1/places/{postcode}`, which asks
+     which suburb when there are several), then travel distance;
   4. work rights, which saves the profile;
   5. photo;
   6. notifications;
@@ -205,6 +206,23 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
     `POST /v1/me/profile/current`.
   - **Not tried:** the apply screen's note (the test account can't apply without an ID check).
     Reminders by push or email: later.
+- Profile editing in the app (D-24):
+  - **Dates:** "Can start from" (default today) and experience dates (Started, and Finished unless "I
+    still work here") use the phone's own date picker (`DateField`, on `@expo/ui`).
+  - **Years:** set with − and + on Edit profile too.
+  - **Theme:** the app's colours follow the appearance setting at once, so they change together with
+    iOS's.
+  - **No email, no email notices:** on an account with no email the app's email switches are off
+    and can't be turned on, with "Add an email". A topic's notices (messages, applications…) no
+    longer come by text instead; only notices that always go do (`notify`).
+  - **Push warning:** when the phone won't show the app's pushes (never asked, or turned off in iOS
+    Settings), Settings opens with a "Notifications are off" warning above the notification
+    switches, with "Turn on notifications" or "Open iPhone Settings".
+  - **Verification badge:** "Level n of 2" is gone. It shows the two checks it counts (your ID, then
+    right to work) as ticks, and what to do next.
+  - **Pay:** the least someone would take is no longer shown to salons. The candidate view leaves it
+    out (`candidateJson`); it's kept for matching. There's no salon search for people yet to match
+    it in.
 - Locally with `TWILIO_VERIFY_SERVICE_SID` set, the app can't text a code to a number outside
   `TWILIO_LOCAL_ALLOW` (it says so); use your own number, an email code under "Other ways to sign in",
   or the demo buttons.
@@ -235,6 +253,10 @@ The earlier Next.js version was replaced; its behaviour is being carried over.
   against Twilio (needs Matt's subaccount and service).
 - Secret scanning: `.gitleaks.toml` allows the made-up test secret in `apps/api/test/hardening.test.ts`
   (gitleaks flagged the committed line, so `bun run ci` stopped at its first step).
+- Admin: a person's page has "Reset verifications" (`checks:review`, so support and owners). It clears
+  all their checks (identity, work rights, qualifications) and their verification IDs, deletes any
+  certificate still waiting, and is audited (`user.verifications_reset`, with the reason). Route:
+  `POST /admin/v1/users/{id}/reset-verifications`.
 - No Dependabot and no GitHub secret scanning: `.github/dependabot.yml` is gone (it only sent weekly
   bumps for the Actions and the app's npm packages; its alerts and security updates were already off),
   and GitHub's secret scanning and push protection are off in the repo's settings (2026-11-28). Secrets

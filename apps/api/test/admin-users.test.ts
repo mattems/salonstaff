@@ -208,6 +208,27 @@ describe("banning", () => {
     expect(await sessionOf(bea.cookie)).toBeNull();
   });
 
+  it("resets their verifications, so they can verify again (D-24)", async () => {
+    const support = await staffMember("support");
+    const readonly = await staffMember("readonly");
+    const bea = await someone();
+    await seedCheck(bea.uuid, { kind: "identity", status: "verified", provider: "mock" });
+    await seedCheck(bea.uuid);
+    expect((await admin(readonly, "POST", `/users/${bea.id}/reset-verifications`, {})).status).toBe(
+      403,
+    );
+
+    const done = await admin<Body>(support, "POST", `/users/${bea.id}/reset-verifications`, {
+      reason: "Testing verification again",
+    });
+    expect(done.status).toBe(200);
+    expect(done.body.checks_removed).toBe(2);
+    const page = await admin<{ checks: Body[] }>(support, "GET", `/users/${bea.id}`);
+    expect(page.body.checks).toEqual([]);
+    const [audit] = await auditFor(bea.uuid, "user.verifications_reset");
+    expect(audit?.reason).toBe("Testing verification again");
+  });
+
   it("changes a person's role", async () => {
     const support = await staffMember("support");
     const bea = await someone();

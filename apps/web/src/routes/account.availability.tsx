@@ -105,7 +105,8 @@ function Availability() {
             />
           </div>
           <p className="text-muted-foreground text-xs">
-            Only salons see this, never your share page. Leave it blank if you'd rather not say.
+            Salons never see this. It's only used to match you with jobs that pay enough. Leave it
+            blank if you'd rather not say.
           </p>
         </fieldset>
         <FormMessage message={action.message} />

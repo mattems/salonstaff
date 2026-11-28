@@ -2342,6 +2342,151 @@
           {
             "type": "object",
             "properties": {
+              "profile": {
+                "type": "object",
+                "properties": {
+                  "firstName": {
+                    "type": "string"
+                  },
+                  "lastName": {
+                    "type": "string"
+                  },
+                  "headline": {
+                    "type": ["string", "null"]
+                  },
+                  "about": {
+                    "type": ["string", "null"]
+                  },
+                  "suburb": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                    "example": "NSW"
+                  },
+                  "postcode": {
+                    "type": "string"
+                  },
+                  "roles": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "senior_stylist",
+                        "stylist",
+                        "junior_stylist",
+                        "apprentice_hair",
+                        "colourist",
+                        "barber",
+                        "beauty_therapist",
+                        "nail_technician",
+                        "lash_brow",
+                        "makeup_artist",
+                        "skin_therapist",
+                        "massage_spa",
+                        "apprentice_beauty",
+                        "salon_manager",
+                        "receptionist",
+                        "educator"
+                      ],
+                      "example": "colourist"
+                    }
+                  },
+                  "yearsExperience": {
+                    "type": "integer"
+                  },
+                  "instagram": {
+                    "type": ["string", "null"]
+                  },
+                  "tiktok": {
+                    "type": ["string", "null"]
+                  },
+                  "rightToWork": {
+                    "type": "string",
+                    "enum": [
+                      "citizen",
+                      "permanent_resident",
+                      "visa_full",
+                      "visa_limited",
+                      "needs_sponsorship"
+                    ]
+                  },
+                  "openToWork": {
+                    "type": "boolean"
+                  },
+                  "photoUrl": {
+                    "type": ["string", "null"]
+                  },
+                  "specialties": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "brands": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "availableDays": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "employmentTypes": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "enum": [
+                        "full_time",
+                        "part_time",
+                        "casual",
+                        "contract",
+                        "apprenticeship",
+                        "chair_rental"
+                      ]
+                    }
+                  },
+                  "availableFrom": {
+                    "type": ["string", "null"]
+                  },
+                  "travelKm": {
+                    "type": ["integer", "null"]
+                  },
+                  "updatedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "When the profile was last changed (any part of it) or its owner said it's still current (D-24).",
+                    "example": "2026-11-25T03:00:00.000Z"
+                  }
+                },
+                "required": [
+                  "firstName",
+                  "lastName",
+                  "headline",
+                  "about",
+                  "suburb",
+                  "state",
+                  "postcode",
+                  "roles",
+                  "yearsExperience",
+                  "instagram",
+                  "tiktok",
+                  "rightToWork",
+                  "openToWork",
+                  "photoUrl",
+                  "specialties",
+                  "brands",
+                  "availableDays",
+                  "employmentTypes",
+                  "availableFrom",
+                  "travelKm",
+                  "updatedAt"
+                ]
+              },
               "id": {
                 "type": "string",
                 "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
@@ -3316,6 +3461,35 @@
           }
         },
         "required": ["code"]
+      },
+      "PostcodePlaces": {
+        "type": "object",
+        "properties": {
+          "postcode": {
+            "type": "string",
+            "example": "3065"
+          },
+          "suburbs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "suburb": {
+                  "type": "string",
+                  "example": "Fitzroy"
+                },
+                "state": {
+                  "type": "string",
+                  "enum": ["NSW", "VIC", "QLD", "WA", "SA", "TAS", "ACT", "NT"],
+                  "example": "NSW"
+                }
+              },
+              "required": ["suburb", "state"]
+            },
+            "description": "By name. One for most postcodes; some cover dozens."
+          }
+        },
+        "required": ["postcode", "suburbs"]
       },
       "SharedProfile": {
         "type": "object",
@@ -10598,6 +10772,57 @@
           },
           "404": {
             "description": "No claim, or no such salon",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/places/{postcode}": {
+      "get": {
+        "summary": "The suburbs in a postcode",
+        "description": "The suburbs and localities a four-digit postcode covers, each with its state (a postcode can cross a state line). The app asks for a postcode only and offers these to pick from (D-24). From the ABS's localities (D-10); a postcode with none (a PO box, say) is a 404.",
+        "tags": ["Places"],
+        "parameters": [
+          {
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{4}$",
+              "example": "3065"
+            },
+            "required": true,
+            "name": "postcode",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Its suburbs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostcodePlaces"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The request is not valid",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No suburbs for that postcode",
             "content": {
               "application/problem+json": {
                 "schema": {

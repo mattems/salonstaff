@@ -629,6 +629,35 @@ export function backOffice(db: Db) {
         });
       },
 
+      /**
+       * Clears every verification check they have (identity, work rights, qualifications), so they
+       * start again from not verified. Returns the PRIVATE bucket keys of any certificate still
+       * waiting for a decision, for the caller to delete.
+       */
+      async resetVerifications(
+        user: AdminUser,
+        actor: Actor,
+        reason?: string,
+      ): Promise<{ removed: number; evidenceKeys: string[] }> {
+        return db.transaction(async (tx) => {
+          const removed = await tx
+            .delete(seekerChecks)
+            .where(eq(seekerChecks.userId, user.id))
+            .returning({ kind: seekerChecks.kind, documentKey: seekerChecks.documentKey });
+          await recordAudit(tx, actor, {
+            action: "user.verifications_reset",
+            targetType: "user",
+            targetId: user.id,
+            after: { checks_removed: removed.length, kinds: removed.map((r) => r.kind) },
+            ...(reason ? { reason } : {}),
+          });
+          return {
+            removed: removed.length,
+            evidenceKeys: removed.flatMap((r) => (r.documentKey ? [r.documentKey] : [])),
+          };
+        });
+      },
+
       async setRole(user: AdminUser, role: UserRole, actor: Actor): Promise<AdminUser> {
         if (user.role === role) return user;
         return db.transaction(async (tx) => {

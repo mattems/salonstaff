@@ -205,7 +205,29 @@ function Actions({ detail }: { detail: UserDetail }) {
             onDone={() => navigate({ to: "/users" })}
           />
         ) : null}
-        {!can(me, "users:ban") && !can(me, "users:delete") ? (
+        {can(me, "checks:review") ? (
+          <ActionDialog
+            label="Reset verifications"
+            destructive
+            title="Reset their verifications"
+            description={`Clears all ${detail.checks.length} of their checks (identity, work rights, qualifications), so they're not verified and can verify again. Their verification IDs go too. Recorded in the audit log.`}
+            reason={{
+              label: "Reason (optional)",
+              placeholder: "e.g. verified the wrong person, testing",
+              required: false,
+            }}
+            run={async (reason) =>
+              unwrap(
+                await api.POST("/admin/v1/users/{id}/reset-verifications", {
+                  ...userPath,
+                  body: reason ? { reason } : {},
+                }),
+              )
+            }
+            done="Verifications reset"
+          />
+        ) : null}
+        {!can(me, "users:ban") && !can(me, "users:delete") && !can(me, "checks:review") ? (
           <p className="text-sm text-muted-foreground">Your staff role can't change people.</p>
         ) : null}
       </div>

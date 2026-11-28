@@ -35,7 +35,6 @@ export default function CandidateScreen() {
   if (error && !data) return <ErrorView message={error} onRetry={reload} />;
   if (!data) return null;
   const { profile: p, verification: v } = data;
-  const pay = p.payMin ? `From $${p.payMin} per ${p.payPeriod}` : null;
 
   return (
     <Screen refreshing={refreshing} onRefresh={refresh}>
@@ -110,11 +109,6 @@ export default function CandidateScreen() {
         {p.availableDays.length ? (
           <Text variant="small" color="textSecondary">
             Days: {p.availableDays.join(', ')}
-          </Text>
-        ) : null}
-        {pay ? (
-          <Text variant="small" color="textSecondary">
-            {pay}
           </Text>
         ) : null}
       </Card>

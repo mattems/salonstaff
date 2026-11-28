@@ -92,7 +92,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.four,
     fontSize: 20,
     fontWeight: '600',
-    letterSpacing: 0.5,
-    fontVariant: ['tabular-nums'],
+    // No letter spacing or tabular figures: iOS doesn't give them to the placeholder.
   },
 });

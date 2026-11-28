@@ -31,8 +31,9 @@ salon side's own sign-up comes later.
 - **Setting up after the code** (new accounts only), one question per screen with progress bars:
   1. name;
   2. roles (up to 6, grouped hair, beauty and salon) and years of experience;
-  3. suburb and postcode (the state follows the postcode, `stateOfPostcode`), and how far they'd
-     travel (optional);
+  3. their postcode, the only thing they type. Its suburb and state come from the ABS localities
+     (`GET /v1/places/{postcode}`); a postcode covering several suburbs asks which. Then how far
+     they'd travel (optional);
   4. work rights;
   5. photo (can be skipped);
   6. notifications;
@@ -65,6 +66,9 @@ salon side's own sign-up comes later.
   - **Last updated.** The profile's `updatedAt` (in the API) moves when any part of it changes,
     portfolio, experience and qualifications included, or when they say it's still current
     (`POST /v1/me/profile/current`, audited as `profile.confirmed_current`).
+  - **Pay is private.** The least someone would take is never shown to salons: not on the candidate
+    view, the share page or anywhere else. It's for matching them with jobs that pay enough (a salon
+    search for people, when there is one).
   - **The 90-day check.** After 90 days without a change (`profileIsStale`), Profile asks "Still
     looking?", with "Yes, it's current" and "Update it". Reminders by push or email may come later.
 

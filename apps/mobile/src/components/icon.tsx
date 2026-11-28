@@ -37,6 +37,7 @@ const ICONS = {
   mail: { ios: 'envelope', android: 'mail' },
   badge: { ios: 'rosette', android: 'workspace_premium' },
   done: { ios: 'checkmark.circle.fill', android: 'task_alt' },
+  circle: { ios: 'circle', android: 'radio_button_unchecked' },
   error: { ios: 'exclamationmark.circle', android: 'error' },
   camera: { ios: 'camera.fill', android: 'photo_camera' },
   sparkles: { ios: 'sparkles', android: 'auto_awesome' },

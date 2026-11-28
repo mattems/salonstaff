@@ -6,6 +6,7 @@ import { StyleSheet, View } from 'react-native';
 import { Button } from '@/components/button';
 import { Card } from '@/components/card';
 import { Chip } from '@/components/chip';
+import { DateField, dateFromIso, isoFromDate } from '@/components/date-field';
 import { profileSection } from '@/components/needs-profile';
 import { Screen } from '@/components/screen';
 import { ErrorBanner, ErrorView, LoadingView } from '@/components/state-views';
@@ -15,7 +16,6 @@ import { WeekStrip } from '@/components/week-strip';
 import { Spacing } from '@/constants/theme';
 import { useMyProfile } from '@/hooks/use-my-profile';
 import { ApiProblem, api, errorMessage, type DetailsInput, type SeekerProfile } from '@/lib/api';
-import { parseAuDate, toAuDate } from '@/lib/format';
 import { currentDetails } from '@/lib/profile-details';
 
 type Field = 'availableFrom' | 'travelKm' | 'payMin';
@@ -34,7 +34,8 @@ function AvailabilityForm({ profile }: { profile: SeekerProfile }) {
   const router = useRouter();
   const [days, setDays] = useState<string[]>(profile.availableDays);
   const [types, setTypes] = useState<EmploymentType[]>(profile.employmentTypes);
-  const [from, setFrom] = useState(toAuDate(profile.availableFrom));
+  // When they can start: today unless they've said (D-24).
+  const [from, setFrom] = useState(() => dateFromIso(profile.availableFrom) ?? new Date());
   const [travel, setTravel] = useState(profile.travelKm?.toString() ?? '');
   const [pay, setPay] = useState(profile.payMin?.toString() ?? '');
   const [period, setPeriod] = useState(profile.payPeriod);
@@ -48,8 +49,6 @@ function AvailabilityForm({ profile }: { profile: SeekerProfile }) {
   async function save() {
     setProblem(null);
     const next: Partial<Record<Field, string>> = {};
-    const availableFrom = from.trim() ? parseAuDate(from) : '';
-    if (availableFrom === null) next.availableFrom = 'Use DD/MM/YYYY';
     const travelKm = travel.trim() ? Number(travel) : null;
     if (travelKm !== null && (!Number.isInteger(travelKm) || travelKm < 0 || travelKm > 500))
       next.travelKm = 'A whole number of km, up to 500';
@@ -65,7 +64,7 @@ function AvailabilityForm({ profile }: { profile: SeekerProfile }) {
         ...currentDetails(profile),
         availableDays: days as DetailsInput['availableDays'],
         employmentTypes: types,
-        availableFrom: availableFrom ?? '',
+        availableFrom: isoFromDate(from),
         travelKm,
         payMin,
         payPeriod: period,
@@ -105,13 +104,10 @@ function AvailabilityForm({ profile }: { profile: SeekerProfile }) {
         </View>
       </Card>
       <Card>
-        <TextField
+        <DateField
           label="Can start from"
           value={from}
-          onChangeText={setFrom}
-          placeholder="DD/MM/YYYY"
-          keyboardType="numbers-and-punctuation"
-          hint="Leave blank for now."
+          onChange={setFrom}
           error={errors.availableFrom}
         />
         <TextField
@@ -144,7 +140,8 @@ function AvailabilityForm({ profile }: { profile: SeekerProfile }) {
           ))}
         </View>
         <Text variant="caption" color="textMuted">
-          Only salons see this, never your share page. Leave it blank if you’d rather not say.
+          Salons never see this. It’s only used to match you with jobs that pay enough. Leave it
+          blank if you’d rather not say.
         </Text>
       </Card>
       <ErrorBanner message={problem} />

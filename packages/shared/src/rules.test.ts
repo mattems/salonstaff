@@ -30,7 +30,6 @@ import {
   salonAccessTo,
   shareLinkWorks,
   spokenCode,
-  stateOfPostcode,
   verificationLevel,
   withinCallingHours,
 } from "./rules";
@@ -438,31 +437,6 @@ describe("webAddress", () => {
     ["", null],
   ])("%j → %j", (input, expected) => {
     expect(webAddress(input)).toBe(expected);
-  });
-});
-
-describe("stateOfPostcode", () => {
-  it.each([
-    ["2000", "NSW"],
-    ["2600", "ACT"],
-    ["2618", "ACT"],
-    ["2619", "NSW"],
-    ["2905", "ACT"],
-    ["2921", "NSW"],
-    ["0200", "ACT"],
-    ["0800", "NT"],
-    ["3065", "VIC"],
-    ["4000", "QLD"],
-    ["5000", "SA"],
-    ["6000", "WA"],
-    ["7000", "TAS"],
-    ["0100", null],
-    ["200", null],
-    ["20000", null],
-    ["abcd", null],
-    ["", null],
-  ])("%j → %j", (input, expected) => {
-    expect(stateOfPostcode(input)).toBe(expected);
   });
 });
 

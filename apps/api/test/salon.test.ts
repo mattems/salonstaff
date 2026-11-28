@@ -337,7 +337,7 @@ describe("applicants", () => {
     expect(mine.body.items[0]?.status).toBe("shortlisted");
   });
 
-  it("texts people who signed up with a mobile number", async () => {
+  it("doesn't text people who signed up with a mobile number about their applications (D-24)", async () => {
     const app = createTestApp();
     const { owner } = await salonOwner(app);
     const job = await postJob(owner);
@@ -353,9 +353,8 @@ describe("applicants", () => {
     await owner.api("PATCH", owner.at(`/applications/${list.body.items[0]?.id}`), {
       status: "interview",
     });
-    const texts = app.sent.filter((m) => m.to === mobile.smsTo);
-    expect(texts).toHaveLength(before + 1);
-    expect(texts.at(-1)?.text).toContain("/applications");
+    // No email to send it to, and a topic's notices don't come by text: push only.
+    expect(app.sent.filter((m) => m.to === mobile.smsTo)).toHaveLength(before);
     const me = await mobile.api<{ email: string | null; phoneNumber: string }>("GET", "/v1/me");
     expect(me.body).toMatchObject({ email: null, phoneNumber: mobile.phoneNumber });
   });

@@ -388,18 +388,26 @@ export function applicantJson(env: Env, row: Applicant) {
   };
 }
 
-export const candidateJson = (env: Env, userId: string, candidate: Candidate) => ({
-  id: encodeId("user", userId),
-  ...fullProfileJson(env, candidate, { refereeContacts: candidate.applications.length > 0 }),
-  contact: contactOptionsJson(candidate.access),
-  applications: candidate.applications.map((a) => ({
-    id: encodeId("application", a.id),
-    jobId: encodeId("job", a.jobId),
-    jobTitle: a.jobTitle,
-    status: a.status,
-    createdAt: a.createdAt.toISOString(),
-  })),
-});
+export function candidateJson(env: Env, userId: string, candidate: Candidate) {
+  const full = fullProfileJson(env, candidate, {
+    refereeContacts: candidate.applications.length > 0,
+  });
+  // The least they'd take is for matching, never shown to salons (D-24).
+  const { payMin: _m, payPeriod: _p, ...profile } = full.profile;
+  return {
+    id: encodeId("user", userId),
+    ...full,
+    profile,
+    contact: contactOptionsJson(candidate.access),
+    applications: candidate.applications.map((a) => ({
+      id: encodeId("application", a.id),
+      jobId: encodeId("job", a.jobId),
+      jobTitle: a.jobTitle,
+      status: a.status,
+      createdAt: a.createdAt.toISOString(),
+    })),
+  };
+}
 
 export function claimJson(claim: Claim, salon: Pick<Salon, "email" | "phone">) {
   const waiting = claim.status === "pending_email";

@@ -295,6 +295,10 @@ export const api = {
     unwrap(await client.GET('/v1/me/applications/{id}', { params: path(id) })),
   mySaved: async () => unwrap(await client.GET('/v1/me/saved')),
 
+  /** The suburbs in a postcode, each with its state (D-24). A 404 for a postcode with none. */
+  suburbsIn: async (postcode: string) =>
+    unwrap(await client.GET('/v1/places/{postcode}', { params: { path: { postcode } } })),
+
   // Profile
   profile: async () => unwrap(await client.GET('/v1/me/profile')),
   saveProfile: async (body: ProfileInput) => unwrap(await client.PUT('/v1/me/profile', { body })),

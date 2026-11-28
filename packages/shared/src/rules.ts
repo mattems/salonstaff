@@ -530,31 +530,6 @@ export function nameMatchScore(typed: string, listed: string): number {
 
 export const NAME_MATCH_MIN = 0.3;
 
-// ---------- Postcodes ----------
-
-/** Australia Post's postcode ranges for each state, the ACT's inside NSW's listed first. */
-const POSTCODE_STATES: [from: number, to: number, state: AuState][] = [
-  [200, 299, "ACT"],
-  [2600, 2618, "ACT"],
-  [2900, 2920, "ACT"],
-  [800, 999, "NT"],
-  [1000, 2999, "NSW"],
-  [3000, 3999, "VIC"],
-  [8000, 8999, "VIC"],
-  [4000, 4999, "QLD"],
-  [9000, 9999, "QLD"],
-  [5000, 5999, "SA"],
-  [6000, 6999, "WA"],
-  [7000, 7999, "TAS"],
-];
-
-/** The state a four-digit postcode is in, or null when it isn't one (so the person picks it). */
-export function stateOfPostcode(postcode: string): AuState | null {
-  if (!/^\d{4}$/.test(postcode)) return null;
-  const n = Number(postcode);
-  return POSTCODE_STATES.find(([from, to]) => n >= from && n <= to)?.[2] ?? null;
-}
-
 // ---------- Near me (D-10) ----------
 
 /** The radii a "near me" search offers, in kilometres. */

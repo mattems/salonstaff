@@ -29,6 +29,7 @@ import { Icon } from '@/components/icon';
 import { ErrorBanner } from '@/components/state-views';
 import { Text } from '@/components/text';
 import { TextField } from '@/components/text-field';
+import { YearsStepper } from '@/components/years-stepper';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { ApiProblem, api, errorMessage, type SeekerProfile } from '@/lib/api';
@@ -277,13 +278,9 @@ export default function EditProfileScreen() {
               );
             })}
           </View>
-          <TextField
-            label="Years of experience"
-            value={form.yearsExperience}
-            onChangeText={(v) => set('yearsExperience', v.replace(/\D/g, ''))}
-            keyboardType="number-pad"
-            maxLength={2}
-            error={errors.yearsExperience}
+          <YearsStepper
+            years={Number(form.yearsExperience) || 0}
+            onChange={(years) => set('yearsExperience', String(years))}
           />
           <TextField
             label="Instagram"

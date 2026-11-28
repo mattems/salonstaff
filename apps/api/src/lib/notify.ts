@@ -50,9 +50,11 @@ async function wanted(
 }
 
 /**
- * Tells someone by email, or by SMS when their account has only a mobile number, and by a push to
- * their phones with the app (D-15), as their notification settings allow. Runs after the
- * response; a failure is logged and never fails the request.
+ * Tells someone by email and by a push to their phones with the app (D-15), as their notification
+ * settings allow. An account with only a mobile number gets a text instead of the email, but only
+ * for notices that always go (no topic: its team, a claim): a topic's notices are push only until
+ * they add an email, as the app's Settings say (D-24). Runs after the response; a failure is
+ * logged and never fails the request.
  */
 export function notify(c: Context<AppEnv>, contact: Contact | null, notice: Notice): void {
   if (!contact) return;
@@ -67,7 +69,7 @@ export function notify(c: Context<AppEnv>, contact: Contact | null, notice: Noti
       await c
         .get("email")()
         .send(await noticeEmail({ to: email, ...message }));
-    } else if (phone) {
+    } else if (phone && !topic) {
       // Texts cost money each: one mobile gets only so many notices an hour and a day.
       const allowed = await codeLimits(await c.get("db")()).allow(`sms-notice:${phone}`, {
         perHour: CONTACT_LIMITS.smsNoticesPerHour,

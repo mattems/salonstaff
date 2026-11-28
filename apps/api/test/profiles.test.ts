@@ -1,4 +1,6 @@
 /** D-13, D-19: who sees a job seeker's profile, sharing it, contacting them, their mobile and endorsements. */
+
+import { PHONE_EMAIL_DOMAIN } from "@salonstaff/auth";
 import { sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { type Person, salonOwner, seekerWithProfile, uid } from "./fixtures";
@@ -285,6 +287,46 @@ describe("salons contacting a job seeker", () => {
     expect((await owner.api("GET", owner.at(`/candidates/${seekerId}`))).status).toBe(200);
     await seeker.api("PATCH", "/v1/me/profile/settings", { visibility: "hidden" });
     expect((await owner.api("GET", owner.at(`/candidates/${seekerId}`))).status).toBe(404);
+  });
+
+  it("never shows a salon the least they'd take (D-24)", async () => {
+    const app = createTestApp();
+    const seeker = await seekerWithProfile(app, "Pay");
+    const seekerId = await idOf(seeker);
+    const { owner } = await salonOwner(app);
+    const saved = await seeker.api<{ profile: { payMin: number | null } }>(
+      "PUT",
+      "/v1/me/profile/details",
+      { payMin: 40, payPeriod: "hour" },
+    );
+    expect(saved.body.profile.payMin).toBe(40);
+
+    const seen = await owner.api<{ profile: Record<string, unknown> }>(
+      "GET",
+      owner.at(`/candidates/${seekerId}`),
+    );
+    expect(seen.status).toBe(200);
+    expect(seen.body.profile).not.toHaveProperty("payMin");
+    expect(seen.body.profile).not.toHaveProperty("payPeriod");
+  });
+
+  it("doesn't text a mobile-only account a notice it can switch off (D-24)", async () => {
+    const app = createTestApp();
+    const seeker = await seekerWithProfile(app, "Mobile only");
+    const seekerId = await idOf(seeker);
+    const phone = await addMobile(app, seeker);
+    // As an account made with a mobile: a stand-in address, not a real one.
+    await query(
+      sql`update users set email = ${`${uid()}@${PHONE_EMAIL_DOMAIN}`} where email = ${seeker.email}`,
+    );
+    const { owner } = await salonOwner(app);
+    const before = app.sent.length;
+    const sent = await owner.api("POST", owner.at(`/candidates/${seekerId}/messages`), {
+      body: "Are you free for a chat this week?",
+    });
+    expect(sent.status).toBe(201);
+    // "Messages from salons" by email has nowhere to go: push only, no text in its place.
+    expect(app.sent.slice(before).some((m) => m.to === smsTo(phone))).toBe(false);
   });
 
   it("tells a salon's team on a share page how they can make contact", async () => {
