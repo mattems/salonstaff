@@ -5,10 +5,13 @@
 import {
   type AuState,
   boundingBox,
+  distinctiveWords,
   type EmploymentType,
   type JobRole,
   jobPath,
   type LatLng,
+  NAME_MATCH_MIN,
+  nameMatchScore,
   salonPath,
 } from "@salonstaff/shared";
 import { and, asc, between, count, desc, eq, ilike, max, ne, or, type SQL, sql } from "drizzle-orm";
@@ -16,6 +19,7 @@ import type { Db } from "./index";
 import { contains } from "./like";
 import { jobs, postcodes, salons, slugRedirects } from "./schema";
 import {
+  isClaimed as isClaimedSalon,
   isLive,
   type JobWithSalon,
   liveJob,
@@ -25,6 +29,20 @@ import {
   type Salon,
   visibleSalon,
 } from "./visibility";
+
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export interface SalonMatch {
+  salon: Salon;
+  /** How alike the names are (`nameMatchScore`), 0 to 1. */
+  score: number;
+  distanceKm: number | null;
+  /** Someone manages it already (claimed, or made by its owner). */
+  claimed: boolean;
+}
+
+/** How far around the place typed a listing may be and still be offered as the same salon. */
+export const MATCH_KM = 15;
 
 /** Within `km` of a point (D-10). Places are at their suburb's centre. */
 export interface Near extends LatLng {
@@ -283,6 +301,54 @@ export function publicSite(db: Db) {
         db.select({ n: count() }).from(salons).where(where),
       ]);
       return { items: rows, page: search.page, pageSize: search.pageSize, total: total?.n ?? 0 };
+    },
+
+    /**
+     * Listed salons that may be the one someone is adding (D-22): a name like theirs, near the
+     * place they gave (its postcode, or within `MATCH_KM` of it), best first. Without a place,
+     * anywhere. Every visible salon counts, claimed or not.
+     */
+    async salonMatches(input: {
+      name: string;
+      postcode?: string | undefined;
+      near?: LatLng | undefined;
+      limit?: number;
+    }): Promise<SalonMatch[]> {
+      const words = distinctiveWords(input.name)
+        .filter((w) => w.length >= 2)
+        .slice(0, 6);
+      if (words.length === 0) return [];
+      const place: SQL[] = [];
+      if (input.postcode) place.push(eq(salons.postcode, input.postcode));
+      if (input.near) place.push(within(salons, { ...input.near, km: MATCH_KM }));
+      const distance = input.near ? distanceFrom(salons, input.near) : sql<null>`null`;
+      const rows = await db
+        .select({ salon: salons, distanceKm: distance })
+        .from(salons)
+        .where(
+          and(
+            visibleSalon(),
+            place.length > 0 ? or(...place) : undefined,
+            // A word of theirs at the start of a word of the listing's ("bella" finds "Bellas").
+            or(...words.map((w) => sql`${salons.name} ~* ${`(^|[^a-z0-9])${escapeRegex(w)}`}`)),
+          ),
+        )
+        .limit(200);
+      return rows
+        .map(({ salon, distanceKm }) => ({
+          salon,
+          distanceKm,
+          score: nameMatchScore(input.name, salon.name),
+          claimed: isClaimedSalon(salon),
+        }))
+        .filter((m) => m.score >= NAME_MATCH_MIN)
+        .sort(
+          (a, b) =>
+            b.score - a.score ||
+            (a.distanceKm ?? 0) - (b.distanceKm ?? 0) ||
+            a.salon.name.localeCompare(b.salon.name),
+        )
+        .slice(0, input.limit ?? 8);
     },
 
     /** A salon page by its address, with its live jobs. */

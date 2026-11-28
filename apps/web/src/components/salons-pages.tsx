@@ -2,12 +2,21 @@
  * The /salons pages (D-07): the directory by place, salon pages, and claiming a listing
  * (`{salon page}/claim`, D-04).
  */
-import { AU_STATES, PRICING, salonsLandingPath } from "@salonstaff/shared";
+import { AU_STATES, BRAND, PRICING, salonsLandingPath } from "@salonstaff/shared";
 import { Badge } from "@salonstaff/ui/components/badge";
 import { Button } from "@salonstaff/ui/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@salonstaff/ui/components/card";
 import { Input } from "@salonstaff/ui/components/input";
 import { notFound, redirect, useNavigate } from "@tanstack/react-router";
+import {
+  AtSignIcon,
+  BadgeCheckIcon,
+  BriefcaseIcon,
+  GlobeIcon,
+  MailIcon,
+  MapPinIcon,
+  PhoneIcon,
+} from "lucide-react";
 import type { FormEvent } from "react";
 import { ApiProblem, api, type Schemas } from "@/lib/api";
 import { stateLabel } from "@/lib/format";
@@ -27,6 +36,7 @@ import {
   nearQuery,
 } from "./near-me";
 import { EmptyState, Page, Section } from "./page";
+import { SalonHeader } from "./salon-brand";
 
 export type SalonsLanding = Extract<Schemas["SalonsPath"], { kind: "landing" }>;
 export type SalonPage = Extract<Schemas["SalonsPath"], { kind: "salon" }>;
@@ -107,7 +117,7 @@ export function salonsHead(data: SalonsPageData | undefined) {
       description: description.length > 160 ? `${description.slice(0, 157)}…` : description,
       path: salon.path,
       noindex: data.noindex,
-      image: salon.logoUrl,
+      image: salon.heroUrl ?? salon.logoUrl,
       jsonLd: [salonBusiness(salon, data.jobs), breadcrumbList(data.breadcrumbs)],
     });
   }
@@ -280,84 +290,124 @@ function SearchView({ data }: { data: SalonsSearch }) {
 
 function SalonView({ page }: { page: SalonPage }) {
   const { salon, jobs } = page;
+  const instagram = salon.instagram?.replace(/^@/, "");
+  const contact = salon.contact;
+  const hasContact = Boolean(contact?.phone || contact?.email || contact?.address);
   return (
-    <Page width="wide">
+    <Page width="wide" className="space-y-8">
       <Breadcrumbs crumbs={page.breadcrumbs} />
-      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
-        <div className="min-w-0 space-y-6">
-          <header className="flex items-start gap-4">
-            {salon.logoUrl && (
-              <img src={salon.logoUrl} alt="" className="size-16 rounded-lg border object-cover" />
+      <SalonHeader
+        name={salon.name}
+        logoUrl={salon.logoUrl}
+        heroUrl={salon.heroUrl}
+        actions={
+          <>
+            {salon.website && (
+              <Button asChild variant="outline" size="sm">
+                <a href={salon.website} rel="nofollow noopener" target="_blank">
+                  <GlobeIcon />
+                  Website
+                </a>
+              </Button>
             )}
-            <div className="space-y-1">
-              <h1 className="font-semibold text-2xl tracking-tight">{salon.name}</h1>
-              <p className="text-muted-foreground">
-                {salon.suburb} {salon.state} {salon.postcode}
-              </p>
-              {salon.verified && (
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="secondary">Verified business</Badge>
-                </div>
-              )}
-            </div>
-          </header>
+            {instagram && (
+              <Button asChild variant="outline" size="sm">
+                <a
+                  href={`https://www.instagram.com/${instagram}`}
+                  rel="nofollow noopener"
+                  target="_blank"
+                >
+                  <AtSignIcon />
+                  {instagram}
+                </a>
+              </Button>
+            )}
+            {jobs.length > 0 && (
+              <Button asChild size="sm">
+                <a href="#jobs">
+                  <BriefcaseIcon />
+                  See {jobs.length === 1 ? "the job" : `${jobs.length} jobs`}
+                </a>
+              </Button>
+            )}
+          </>
+        }
+      >
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-muted-foreground text-sm">
+          <span className="inline-flex items-center gap-1">
+            <MapPinIcon className="size-4" />
+            {salon.suburb} {salon.state} {salon.postcode}
+          </span>
+          {salon.verified && (
+            <Badge variant="secondary">
+              <BadgeCheckIcon />
+              Verified business
+            </Badge>
+          )}
+          {jobs.length > 0 && <Badge>Hiring now</Badge>}
+        </div>
+      </SalonHeader>
+
+      <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
+        <div className="min-w-0 space-y-8">
           {salon.about && (
-            <Section title="About">
-              <p className="whitespace-pre-line leading-relaxed">{salon.about}</p>
+            <Section title={`About ${salon.name}`}>
+              <p className="whitespace-pre-line text-pretty leading-relaxed">{salon.about}</p>
             </Section>
           )}
-          <Section title={jobs.length > 0 ? `Jobs at ${salon.name}` : "Jobs"}>
-            {jobs.length > 0 ? (
-              <JobList jobs={jobs} />
-            ) : (
-              <p className="text-muted-foreground text-sm">{salon.name} isn't hiring right now.</p>
-            )}
-          </Section>
+          <div id="jobs" className="scroll-mt-20">
+            <Section
+              title={jobs.length > 0 ? `Jobs at ${salon.name}` : "Jobs"}
+              description={
+                jobs.length > 0
+                  ? `${jobs.length} open role${jobs.length === 1 ? "" : "s"}. Apply with your ${BRAND.name} profile.`
+                  : undefined
+              }
+            >
+              {jobs.length > 0 ? (
+                <JobList jobs={jobs} />
+              ) : (
+                <EmptyState
+                  title={`${salon.name} isn't hiring right now`}
+                  description="Look at other salons nearby, or check back soon."
+                  action={
+                    <Button asChild variant="outline" size="sm">
+                      <AppLink href={page.breadcrumbs.at(-2)?.path ?? "/salons"}>
+                        Salons in {salon.suburb}
+                      </AppLink>
+                    </Button>
+                  }
+                />
+              )}
+            </Section>
+          </div>
         </div>
         <aside className="space-y-4">
           <Card>
             <CardHeader>
               <CardTitle>Contact</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              {salon.website && (
-                <p>
-                  <a
-                    href={salon.website}
-                    rel="nofollow noopener"
-                    target="_blank"
-                    className="underline"
-                  >
-                    Website
-                  </a>
-                </p>
-              )}
-              {salon.instagram && (
-                <p>
-                  <a
-                    href={`https://www.instagram.com/${salon.instagram.replace(/^@/, "")}`}
-                    rel="nofollow noopener"
-                    target="_blank"
-                    className="underline"
-                  >
-                    @{salon.instagram.replace(/^@/, "")}
-                  </a>
-                </p>
-              )}
-              {salon.contact ? (
+            <CardContent className="space-y-3 text-sm">
+              {contact ? (
                 <>
-                  {salon.contact.phone && (
-                    <p>
-                      Phone: <a href={`tel:${salon.contact.phone}`}>{salon.contact.phone}</a>
-                    </p>
+                  {contact.phone && (
+                    <ContactLine icon={PhoneIcon}>
+                      <a href={`tel:${contact.phone}`} className="hover:underline">
+                        {contact.phone}
+                      </a>
+                    </ContactLine>
                   )}
-                  {salon.contact.email && (
-                    <p>
-                      Email: <a href={`mailto:${salon.contact.email}`}>{salon.contact.email}</a>
-                    </p>
+                  {contact.email && (
+                    <ContactLine icon={MailIcon}>
+                      <a href={`mailto:${contact.email}`} className="break-all hover:underline">
+                        {contact.email}
+                      </a>
+                    </ContactLine>
                   )}
-                  {salon.contact.address && <p>{salon.contact.address}</p>}
-                  {!salon.contact.phone && !salon.contact.email && !salon.contact.address && (
+                  {contact.address && (
+                    <ContactLine icon={MapPinIcon}>{contact.address}</ContactLine>
+                  )}
+                  {!hasContact && (
                     <p className="text-muted-foreground">No contact details listed.</p>
                   )}
                 </>
@@ -369,16 +419,28 @@ function SalonView({ page }: { page: SalonPage }) {
                   to see contact details.
                 </p>
               )}
+              {salon.website && (
+                <ContactLine icon={GlobeIcon}>
+                  <a
+                    href={salon.website}
+                    rel="nofollow noopener"
+                    target="_blank"
+                    className="break-all hover:underline"
+                  >
+                    {salon.website.replace(/^https?:\/\/(www\.)?/, "").replace(/\/$/, "")}
+                  </a>
+                </ContactLine>
+              )}
             </CardContent>
           </Card>
-          {page.claimable && (
+          {page.claimable ? (
             <Card>
               <CardHeader>
                 <CardTitle>Is this your business?</CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 text-sm">
                 <p className="text-muted-foreground">
-                  Claim this listing to manage it and post jobs, free for your first{" "}
+                  Claim it to add your photos and logo, and post jobs free for your first{" "}
                   {PRICING.freePeriodDays} days.
                 </p>
                 <Button asChild className="w-full">
@@ -386,9 +448,8 @@ function SalonView({ page }: { page: SalonPage }) {
                 </Button>
               </CardContent>
             </Card>
-          )}
-          {!page.claimable && (
-            <p className="text-muted-foreground text-xs">
+          ) : (
+            <p className="px-1 text-muted-foreground text-xs">
               Taken over this business?{" "}
               <AppLink href={`${salon.path}/claim`} className="underline">
                 Claim it
@@ -398,5 +459,20 @@ function SalonView({ page }: { page: SalonPage }) {
         </aside>
       </div>
     </Page>
+  );
+}
+
+function ContactLine({
+  icon: Icon,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <p className="flex items-start gap-2">
+      <Icon className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+      <span className="min-w-0">{children}</span>
+    </p>
   );
 }

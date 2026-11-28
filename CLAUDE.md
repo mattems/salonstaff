@@ -42,7 +42,7 @@ bun run deploy  # production (docs/runbooks/first-deploy.md)
 | `apps/web` | TanStack Start (SSR) on a Worker: salonstaff.com.au. Forwards `/api/*` to the API |
 | `apps/admin` | React + Vite admin portal from kaybee: admin.salonstaff.com.au, behind Cloudflare Access |
 | `apps/springboard` | Local launcher (:4100), never deployed |
-| `apps/mobile` | Expo job seeker app on the current API (bearer token). Its own npm project, not in the workspaces: check it with `npx tsc --noEmit` there |
+| `apps/mobile` | Expo app on the current API (bearer token): job seekers, and a salon side for salon teams (D-20). Its own npm project, not in the workspaces: check it with `npx tsc --noEmit` there |
 | `packages/db` | Drizzle schema, migrations, all data access (scopes) |
 | `packages/shared` | Constants, zod schemas, IDs, errors, staff roles, and the pure rules (`rules.ts`, `urls.ts`) |
 | `packages/auth` | Better Auth: Google, Apple, email code, SMS code, bearer (mobile) |
@@ -52,7 +52,7 @@ bun run deploy  # production (docs/runbooks/first-deploy.md)
 ## Rules that apply everywhere
 
 - **Data access goes through scopes in `packages/db`** (`publicSite`, `seeker`, `signIns`, `salonScope`,
-  `claims`, `checks`, `myPushDevice`/`pushDevicesOf`, `notificationSettings`, `salonConversations`/`seekerConversations`, `backOffice` behind the staff gate, `housekeeping` in the cron). The API never
+  `claims`, `checks`, `myPushDevice`/`pushDevicesOf`, `notificationSettings`, `salonConversations`/`seekerConversations`, `employerDesk` (lists across all your salons, D-20), `backOffice` behind the staff gate, `housekeeping` in the cron). The API never
   imports tables; a test enforces it.
 - **Rules that decide things are pure functions with table tests** in `packages/shared`
   (`entitlementOf`, `eligibilityOf`, `verificationLevel`, `jobPath`/`parseJobsPath`…). Change a rule there only.

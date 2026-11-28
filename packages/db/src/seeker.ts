@@ -871,7 +871,7 @@ export function seeker(db: Db, userId: string) {
         const mediaKeys = [
           profile?.photoKey,
           ...portfolio.map((p) => p.imageKey),
-          ...created.map((s) => s.logoKey),
+          ...created.flatMap((s) => [s.logoKey, s.heroKey]),
         ].filter((key): key is string => Boolean(key));
         const privateKeys = checkRows
           .map((c) => c.documentKey)

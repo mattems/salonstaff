@@ -4,6 +4,7 @@ import type { EmailSender } from "@salonstaff/email";
 import type { TimingVariables } from "hono/timing";
 import type { JWTVerifyGetKey } from "jose";
 import type { SmsSender } from "./lib/sms";
+import type { PhoneVerify } from "./lib/verify";
 import type { ConversationRoom } from "./live/conversation-room";
 import type { RequestTimings } from "./middleware/request-context";
 
@@ -52,6 +53,15 @@ export interface Env {
   TWILIO_ACCOUNT_SID?: string;
   TWILIO_AUTH_TOKEN?: string;
   TWILIO_FROM?: string;
+  /** A voice-capable number for calls (claim codes to landlines, D-22); else TWILIO_FROM if it's a number. */
+  TWILIO_VOICE_FROM?: string;
+  /** Twilio Verify's service (VA…): it makes, sends and checks SMS and call codes (D-23). */
+  TWILIO_VERIFY_SERVICE_SID?: string;
+  /**
+   * Local only: the numbers (E.164, comma-separated) a real text or call may go to. Every other
+   * number goes to Mailpit, so the directory's real salons are never contacted from a laptop.
+   */
+  TWILIO_LOCAL_ALLOW?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
   APPLE_CLIENT_ID?: string;
@@ -80,6 +90,8 @@ export interface Variables extends TimingVariables {
   background: (task: Promise<unknown>) => void;
   email: () => EmailSender;
   sms: () => SmsSender;
+  /** Twilio Verify, when set up (D-23). */
+  phoneVerify: () => PhoneVerify | null;
   auth: () => Promise<Auth>;
   /** The signed-in person (cookie or bearer token), or null. Looked up once, on first use. */
   session: () => Promise<CurrentSession | null>;

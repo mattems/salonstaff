@@ -28,6 +28,7 @@ import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import { errors, json, jsonBody, MeSchema, pathParam } from "../lib/schemas";
 import { idFrom, requireUser } from "../lib/session";
+import { localNumberRefused, mayReach } from "../lib/verify";
 import { withinCodeLimit, withinDestinationLimit } from "./auth";
 import { meJson } from "./me";
 
@@ -243,6 +244,10 @@ securityRoutes.openapi(
       return c.json({ sentTo: phoneNumber }, 200);
     }
     if (!(await withinDestinationLimit(c, phoneNumber))) throw tooFast();
+    // Locally with Twilio Verify, only your own numbers get a real text (D-23).
+    if (c.get("phoneVerify")() && !mayReach(c.env, phoneNumber)) {
+      throw localNumberRefused(phoneNumber);
+    }
     const result = await requestMobileChange(await c.get("auth")(), phoneNumber);
     if (!result.ok) throw mobileChangeError(result.problem);
     return c.json({ sentTo: phoneNumber }, 200);

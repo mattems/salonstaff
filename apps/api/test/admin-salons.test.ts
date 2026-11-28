@@ -281,6 +281,15 @@ describe("the directory", () => {
       phone: null,
       website: "https://placeholder.example",
     });
+    // Claim codes go to the phone too (D-22): a new one needs a passkey, like the email.
+    const phoneOnly = await admin<{ code: string }>(support, "PATCH", path, {
+      phone: "0262000001",
+    });
+    expect(phoneOnly.status).toBe(403);
+    expect(phoneOnly.body.code).toBe("confirmation_required");
+    expect(
+      (await admin(support, "PATCH", path, { phone: "0262000001", confirmation: SKIP })).status,
+    ).toBe(200);
     // The old address redirects to the new one.
     const old = await (await call(`/v1/salons/by-path?path=${added.body.path}`)).json();
     expect(old).toMatchObject({ kind: "redirect", redirect: changed.body.path });

@@ -1,23 +1,33 @@
 import { createRoute, z } from "@hono/zod-openapi";
-import { claims, isClaimed, publicSite, type Salon } from "@salonstaff/db";
+import { claims, isClaimed, publicSite, type Salon, salonsFor } from "@salonstaff/db";
 import {
   ApiError,
   AU_STATES,
   type AuState,
   BRAND,
+  CLAIM_CALL_HOURS,
+  CLAIM_CODE_ATTEMPTS,
+  callableNumber,
+  claimMethods,
   encodeId,
   labelFor,
+  maskEmail,
+  maskPhone,
+  normaliseAuMobile,
   parseSalonsPath,
   plainLine,
+  postcodeSchema,
   salonPath,
   salonsLandingPath,
+  spokenCode,
+  withinCallingHours,
 } from "@salonstaff/shared";
 import type { Context } from "hono";
 import type { AppEnv } from "../env";
 import { lookupAbn } from "../lib/abr";
 import { userActor } from "../lib/actor";
 import { NearQuery, nearFrom } from "../lib/near";
-import { appUrl, sendEmail, tellOwnersAboutClaim } from "../lib/notify";
+import { appUrl, placeCall, sendEmail, sendSms, tellOwnersAboutClaim } from "../lib/notify";
 import { problemResponse } from "../lib/openapi";
 import { createRouter } from "../lib/router";
 import {
@@ -36,6 +46,7 @@ import {
   SalonListSchema,
 } from "../lib/schemas";
 import { idFrom, requireUser } from "../lib/session";
+import { mayReach, VERIFY_CODE_MINUTES } from "../lib/verify";
 import { claimJson, directorySalonJson, jobSummaryJson, mySalonJson, pageJson } from "../lib/views";
 
 /** The public salon directory, salon pages, and claiming a listing (D-04). */
@@ -237,10 +248,69 @@ directoryRoutes.openapi(
 );
 
 // ---------------------------------------------------------------------------
+// Adding a salon: is it listed already? (D-22)
+// ---------------------------------------------------------------------------
+
+const SalonMatchSchema = DirectorySalonSchema.extend({
+  postcode: z.string(),
+  score: z.number().openapi({ description: "How alike the names are, from 0 to 1." }),
+  yourRole: z.enum(["owner", "manager"]).nullable().openapi({
+    description: "You're on its team already.",
+  }),
+}).openapi("SalonMatch");
+
+directoryRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/salons/matches",
+    summary: "Listed salons that may be yours",
+    description: `For adding a salon (D-22): listed salons with a name like \`name\`, in \`postcode\` or within 15km of it, best match first (up to 8). Claimed ones are included (\`claimed\`), and ones you're on the team of (\`yourRole\`). Claim a match with POST /v1/salons/{id}/claims; with none, add it with POST /v1/employer/salons.`,
+    tags: TAGS,
+    request: {
+      query: z.object({
+        name: z.string().trim().min(2).max(120),
+        postcode: postcodeSchema.optional(),
+      }),
+    },
+    responses: {
+      200: json(z.object({ items: z.array(SalonMatchSchema) }).openapi("SalonMatches"), "Matches"),
+      400: errors[400],
+      401: errors[401],
+    },
+  }),
+  async (c) => {
+    const session = await requireUser(c);
+    const query = c.req.valid("query");
+    const db = await c.get("db")();
+    const site = publicSite(db);
+    const near = query.postcode ? await site.postcodeCentre(query.postcode) : null;
+    const [matches, mine] = await Promise.all([
+      site.salonMatches({ name: query.name, postcode: query.postcode, near: near ?? undefined }),
+      salonsFor(db).ofUser(session.user.id),
+    ]);
+    const roles = new Map(mine.map((m) => [m.salon.id, m.role]));
+    return c.json(
+      {
+        items: matches.map((m) => ({
+          ...directorySalonJson(c.env, { salon: m.salon, liveJobs: 0, distanceKm: m.distanceKm }),
+          postcode: m.salon.postcode,
+          score: Math.round(m.score * 100) / 100,
+          yourRole: roles.get(m.salon.id) ?? null,
+        })),
+      },
+      200,
+    );
+  },
+);
+
+// ---------------------------------------------------------------------------
 // Claims
 // ---------------------------------------------------------------------------
 
 const SalonParams = z.object({ id: pathParam("id", "sln_01k6q2x8h4f7tbn3m9vz5cdr0e") });
+const ClaimConfirmedSchema = z
+  .object({ claim: ClaimSchema, salon: MySalonSchema })
+  .openapi("ClaimConfirmed");
 const SALON_HINT = "Find the listing with GET /v1/salons and use its `id`.";
 
 async function visibleSalonFrom(c: Context<AppEnv>, value: string): Promise<Salon> {
@@ -255,23 +325,102 @@ const StartClaimBody = z
   .object({
     abn: z
       .string()
-      .transform((v) => v.replace(/\s+/g, ""))
-      .pipe(z.string().regex(/^\d{11}$/, "ABN must be 11 digits")),
+      .nullish()
+      .transform((v) => v?.replace(/\s+/g, "") || null)
+      .pipe(
+        z
+          .string()
+          .regex(/^\d{11}$/, "ABN must be 11 digits")
+          .nullable(),
+      )
+      .openapi({
+        type: "string",
+        description:
+          "The business's ABN. Optional when a code proves the claim; needed for `method: review`. When given it must match the listing's, or be active on the ABR.",
+      }),
     contactName: z.string().trim().min(1, "Required").max(120),
     phone: z.string().trim().min(8, "Required").max(20),
-    method: z.enum(["email", "review"]).default("email").openapi({
+    method: z.enum(["email", "phone", "call", "review"]).default("email").openapi({
       description:
-        "`email`: a link to the listing's business email (when it has one). `review`: staff check it.",
+        "`email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline or mobile that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.",
     }),
   })
   .openapi("StartClaim");
+
+const ClaimOptionsSchema = z
+  .object({
+    salonId: z.string(),
+    claimed: z.boolean().openapi({
+      description: "It has owners already: they're emailed if your claim is approved.",
+    }),
+    abnOnFile: z.boolean().openapi({
+      description:
+        "The listing has an ABN: yours must match it. Otherwise it must be active on the ABR.",
+    }),
+    methods: z.array(
+      z.object({
+        method: z.enum(["email", "phone", "call", "review"]),
+        sentTo: z.string().nullable().openapi({
+          description: "Where the code would go, masked. Null for `review`.",
+        }),
+        unavailable: z.string().nullable().openapi({
+          description: "Why it can't be used right now (a call outside calling hours), or null.",
+        }),
+      }),
+    ),
+    codeAttempts: z.number().int().openapi({ description: "Wrong codes a claim takes." }),
+  })
+  .openapi("ClaimOptions");
+
+directoryRoutes.openapi(
+  createRoute({
+    method: "get",
+    path: "/v1/salons/{id}/claim-options",
+    summary: "How a listing can be claimed",
+    description:
+      "The ways you can prove you run it (D-04, D-22): a code to the listing's own email, a code by SMS to its own mobile (when its number is one), or a staff check. Only details already on the listing are used, never ones the claimant gives; they're shown masked.",
+    tags: TAGS,
+    request: { params: SalonParams },
+    responses: {
+      200: json(ClaimOptionsSchema, "How it can be claimed"),
+      401: errors[401],
+      404: errors[404],
+    },
+  }),
+  async (c) => {
+    await requireUser(c);
+    const salon = await visibleSalonFrom(c, c.req.valid("param").id);
+    return c.json(
+      {
+        salonId: encodeId("salon", salon.id),
+        claimed: isClaimed(salon),
+        abnOnFile: Boolean(salon.abn),
+        methods: claimMethods(salon).map((method) => ({
+          method,
+          sentTo:
+            method === "email" && salon.email
+              ? maskEmail(salon.email)
+              : (method === "phone" || method === "call") && salon.phone
+                ? maskPhone(salon.phone)
+                : null,
+          unavailable:
+            method === "call" && !withinCallingHours(salon.state, new Date())
+              ? `We only call salons between ${CLAIM_CALL_HOURS.from}am and ${CLAIM_CALL_HOURS.until - 12}pm, their time.`
+              : null,
+        })),
+        codeAttempts: CLAIM_CODE_ATTEMPTS,
+      },
+      200,
+    );
+  },
+);
 
 directoryRoutes.openapi(
   createRoute({
     method: "post",
     path: "/v1/salons/{id}/claims",
     summary: "Claim a directory listing",
-    description: `The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with \`method: email\` we send a link to the listing's own email (it lasts ${LINK_HOURS} hours; \`sentTo\` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with \`method: review\`, staff check it. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.`,
+    description: `An ABN is optional when a code proves the claim, and needed for a staff check; when given, it must match the listing's (or, when it has none, be active on the Australian Business Register). Prove you run the business (D-22): with \`method: email\` we send a six-digit code and a link to the listing's own email; with \`method: phone\`, a code by SMS to the listing's own mobile; with \`method: call\`, a phone call to its own landline or mobile that reads out the code (8am to 8pm, the salon's time). Type the code with POST /v1/claims/{id}/code (or open the emailed link) while signed in as you; it lasts ${LINK_HOURS} hours and takes ${CLAIM_CODE_ATTEMPTS} wrong tries. \`sentTo\` shows where it went, masked. Without a listing email, or with \`method: review\`, staff check it. Starting again sends a new code (not within 5 minutes) and counts towards the day's claims. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.`,
     tags: TAGS,
     request: { params: SalonParams, ...jsonBody(StartClaimBody) },
     responses: {
@@ -287,17 +436,21 @@ directoryRoutes.openapi(
     const input = c.req.valid("json");
     const salon = await visibleSalonFrom(c, c.req.valid("param").id);
     const data = claims(await c.get("db")());
-    const abr = await lookupAbn(c.env, input.abn);
+    const abr = input.abn ? await lookupAbn(c.env, input.abn) : null;
     if (c.get("dryRun")) {
       return c.json(
         {
           id: encodeId("claim", "00000000-0000-0000-0000-000000000000"),
           salonId: c.req.valid("param").id,
           status:
-            input.method === "email" && salon.email
+            (input.method === "email" && salon.email) ||
+            (input.method === "phone" && salon.phone && normaliseAuMobile(salon.phone)) ||
+            (input.method === "call" && callableNumber(salon.phone))
               ? ("pending_email" as const)
               : ("pending_review" as const),
+          via: null,
           sentTo: null,
+          codeExpiresAt: null,
           decisionNote: null,
           createdAt: new Date().toISOString(),
           decidedAt: null,
@@ -305,21 +458,63 @@ directoryRoutes.openapi(
         201,
       );
     }
+    // A mobile or landline code from Twilio Verify, when it's set up (D-23). Locally only for
+    // your own numbers: the directory's are real salons'.
+    const verify = c.get("phoneVerify")();
+    const listingNumber = !salon.phone
+      ? null
+      : input.method === "phone"
+        ? normaliseAuMobile(salon.phone)
+        : input.method === "call"
+          ? callableNumber(salon.phone)
+          : null;
+    const byService = Boolean(verify && listingNumber && mayReach(c.env, listingNumber));
+    const actor = userActor(c, session.user.id);
     const started = await data.start(
-      { salonId: salon.id, userId: session.user.id, ...input, abr },
-      userActor(c, session.user.id),
+      {
+        salonId: salon.id,
+        userId: session.user.id,
+        ...input,
+        abr,
+        codeByService: byService ? { minutes: VERIFY_CODE_MINUTES } : undefined,
+      },
+      actor,
     );
-    if (started.token && started.salon.email) {
+    if (verify && started.claim.codeService && started.sendTo) {
+      try {
+        await verify.start(started.sendTo.address, started.sendTo.via === "call" ? "call" : "sms");
+      } catch (error) {
+        await data.sendFailed(started.claim.id, actor);
+        throw error;
+      }
+    }
+    const { code, sendTo, token } = started;
+    const name = plainLine(started.salon.name);
+    if (code && sendTo?.via === "email") {
       const url = new URL(appUrl(c, "/claim/verify"));
-      url.searchParams.set("token", started.token);
-      sendEmail(c, started.salon.email, {
-        subject: `Confirm you manage ${started.salon.name} on ${BRAND.name}`,
-        title: `Is this your business?`,
-        body: `${plainLine(input.contactName)} asked to manage the ${BRAND.name} listing for ${plainLine(started.salon.name)}. If that's you, or someone you've authorised, confirm with the button. The link lasts ${LINK_HOURS} hours and works only for the account that asked.`,
+      if (token) url.searchParams.set("token", token);
+      sendEmail(c, sendTo.address, {
+        subject: `${code} is the code to manage ${name} on ${BRAND.name}`,
+        title: "Is this your business?",
+        body: `${plainLine(input.contactName)} asked to manage the ${BRAND.name} listing for ${name}. If that's you, or someone you've authorised, enter this code where you asked: ${code}. Or confirm with the button. Both last ${LINK_HOURS} hours and work only for the account that asked. Never share the code with anyone else: whoever has it can manage the listing.`,
         action: "Confirm and manage the listing",
         url: url.toString(),
         footer: "If you didn't expect this, ignore this email: nothing changes.",
       });
+    }
+    if (code && sendTo?.via === "phone") {
+      sendSms(
+        c,
+        sendTo.address,
+        `${BRAND.name}: ${code} is the code to manage the listing for ${name}, asked for by ${plainLine(input.contactName)}. Don't share it. Not you? Ignore this text.`,
+      );
+    }
+    if (code && sendTo?.via === "call") {
+      placeCall(
+        c,
+        sendTo.address,
+        `Hello. This is ${BRAND.name}. ${plainLine(input.contactName)} asked to manage the listing for ${name}. If that's you, or someone you've authorised, your code is ${spokenCode(code)}. Don't share it with anyone else. If you didn't expect this call, you can hang up: nothing changes.`,
+      );
     }
     return c.json(claimJson(started.claim, started.salon), 201);
   },
@@ -335,10 +530,7 @@ directoryRoutes.openapi(
     tags: TAGS,
     request: { params: z.object({ token: pathParam("token", "q2f…") }) },
     responses: {
-      200: json(
-        z.object({ claim: ClaimSchema, salon: MySalonSchema }).openapi("ClaimConfirmed"),
-        "Your salon",
-      ),
+      200: json(ClaimConfirmedSchema, "Your salon"),
       400: problemResponse("The link is invalid or has expired"),
       401: errors[401],
       403: problemResponse("Another account started this claim"),
@@ -358,6 +550,68 @@ directoryRoutes.openapi(
       token,
       session.user.id,
       userActor(c, session.user.id),
+    );
+    tellOwnersAboutClaim(c, decision.otherOwners, decision.salon, decision.claim.contactName);
+    return c.json(
+      {
+        claim: claimJson(decision.claim, decision.salon),
+        salon: mySalonJson(c.env, decision.salon, "owner"),
+      },
+      200,
+    );
+  },
+);
+
+directoryRoutes.openapi(
+  createRoute({
+    method: "post",
+    path: "/v1/claims/{id}/code",
+    summary: "Confirm a claim with its code",
+    description: `The six-digit code sent to the listing's email or mobile (D-22). Only the account that started the claim can use it, and only ${CLAIM_CODE_ATTEMPTS} wrong codes are taken (then start again, or ask staff to check). Completes the claim: you become an owner of the listing.`,
+    tags: TAGS,
+    request: {
+      params: z.object({ id: pathParam("id", "clm_01k6q2x8h4f7tbn3m9vz5cdr0e") }),
+      ...jsonBody(
+        z
+          .object({
+            code: z
+              .string()
+              .trim()
+              .regex(/^\d{6}$/, "Enter the 6-digit code"),
+          })
+          .openapi("ClaimCode"),
+      ),
+    },
+    responses: {
+      200: json(ClaimConfirmedSchema, "Your salon"),
+      400: problemResponse("Wrong or expired code"),
+      401: errors[401],
+      404: errors[404],
+      409: problemResponse("Not waiting for a code"),
+      429: problemResponse("Too many wrong codes"),
+    },
+  }),
+  async (c) => {
+    const session = await requireUser(c);
+    const id = idFrom(
+      "claim",
+      c.req.valid("param").id,
+      "claim",
+      "See your claim with GET /v1/salons/{id}/claims/mine.",
+    );
+    if (c.get("dryRun")) {
+      throw new ApiError("validation_failed", {
+        detail: "A claim code can't be tried out",
+        hint: "Send the request without dry_run to confirm the claim.",
+      });
+    }
+    const verify = c.get("phoneVerify")();
+    const decision = await claims(await c.get("db")()).confirmCode(
+      id,
+      session.user.id,
+      c.req.valid("json").code,
+      userActor(c, session.user.id),
+      verify ? (to, code) => verify.check(to, code) : undefined,
     );
     tellOwnersAboutClaim(c, decision.otherOwners, decision.salon, decision.claim.contactName);
     return c.json(
@@ -405,7 +659,7 @@ directoryRoutes.openapi(
     const claim = c.get("dryRun")
       ? { ...existing, status: "pending_review" as const }
       : await data.requestReview(id, session.user.id, userActor(c, session.user.id));
-    return c.json(claimJson(claim, { email: null }), 200);
+    return c.json(claimJson(claim, { email: null, phone: null }), 200);
   },
 );
 

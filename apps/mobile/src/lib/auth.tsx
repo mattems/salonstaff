@@ -37,8 +37,8 @@ type AuthContextValue = {
   verifyCode: (target: CodeTarget, code: string) => Promise<Me>;
   /** Native Google / Apple sign-in: the provider's ID token becomes a session. */
   signInWithOAuth: (provider: OAuthProvider, idToken: string, name?: string) => Promise<Me>;
-  /** Local development only: the demo job seeker, without a code. */
-  devLogin: () => Promise<Me>;
+  /** Local development only: the demo job seeker (or salon owner), without a code. */
+  devLogin: (role?: 'seeker' | 'employer') => Promise<Me>;
   /** Re-fetch `/v1/me` (e.g. after a profile update or verification). */
   refresh: () => Promise<Me | null>;
   /** Ends the session. Pass `{ revoke: false }` when the token is already invalid. */
@@ -140,7 +140,10 @@ export function AuthProvider({ children }: PropsWithChildren) {
     [startSession],
   );
 
-  const devLogin = useCallback(async () => startSession(await api.devLogin()), [startSession]);
+  const devLogin = useCallback(
+    async (role: 'seeker' | 'employer' = 'seeker') => startSession(await api.devLogin(role)),
+    [startSession],
+  );
 
   const refresh = useCallback(async () => {
     try {

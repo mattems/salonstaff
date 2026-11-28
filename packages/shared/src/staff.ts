@@ -62,11 +62,12 @@ export const STAFF_CONFIRMED_ACTIONS = [
   "salon.suspend",
   "salon.remove",
   "salon.delete",
-  // Who runs a salon: approving a claim, taking its team off, and changing the address claim
-  // links are sent to.
+  // Who runs a salon: approving a claim, taking its team off, and changing the email or phone
+  // claim codes are sent to (D-22). A change to both is confirmed once, as `salon.change_email`.
   "claim.approve",
   "salon.unclaim",
   "salon.change_email",
+  "salon.change_phone",
 ] as const;
 export type StaffConfirmedAction = (typeof STAFF_CONFIRMED_ACTIONS)[number];
 

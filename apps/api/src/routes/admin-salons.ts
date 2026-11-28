@@ -132,6 +132,7 @@ const SalonDetail = z
     address: z.string().nullable(),
     about: z.string().nullable(),
     logo_url: z.string().nullable(),
+    hero_url: z.string().nullable(),
     abn_entity_name: z
       .string()
       .nullable()
@@ -176,7 +177,7 @@ const SalonDetail = z
       z.object({
         id: z.string(),
         status: z.string(),
-        abn: z.string(),
+        abn: z.string().nullable(),
         contact_name: z.string(),
         claimant: z.object({ id: z.string(), name: z.string(), email: z.string().nullable() }),
         decision_note: z.string().nullable(),
@@ -319,6 +320,7 @@ admin.openapi(
         address: salon.address,
         about: salon.about,
         logo_url: mediaUrl(c.env, salon.logoKey),
+        hero_url: mediaUrl(c.env, salon.heroKey),
         abn_entity_name: salon.abnEntityName,
         founding: salon.founding,
         free_until: iso(salon.freeUntil),
@@ -676,7 +678,7 @@ admin.openapi(
     path: `${LIST}/{id}`,
     summary: "Change a salon's details",
     description:
-      "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing, so changing it is confirmed with a passkey (action `salon.change_email`, target the salon's ID).",
+      "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email and phone are where claim codes go (D-22), so changing either is confirmed with a passkey (action `salon.change_email`, or `salon.change_phone` when only the phone changes; target the salon's ID).",
     tags: ["Admin"],
     request: { params: IdParams, body: body(SalonChanges) },
     responses: { 200: ok(Salon, "The salon, changed"), ...errors, ...notFound },
@@ -686,16 +688,16 @@ admin.openapi(
     const { data } = ctx;
     const salon = await findSalon(c, data);
     const { confirmation, ...changes } = c.req.valid("json");
-    // Claim links go to this address, so a new one decides who can take the listing over.
+    // Claim codes go to this email and phone, so a new one decides who can take the listing over.
     const emailChanges = changes.email !== undefined && changes.email !== salon.email;
-    const actor = emailChanges
-      ? await requireConfirmation(
-          c,
-          ctx,
-          "salon.change_email",
-          encodeId("salon", salon.id),
-          confirmation,
-        )
+    const phoneChanges = changes.phone !== undefined && changes.phone !== salon.phone;
+    const action = emailChanges
+      ? ("salon.change_email" as const)
+      : phoneChanges
+        ? ("salon.change_phone" as const)
+        : null;
+    const actor = action
+      ? await requireConfirmation(c, ctx, action, encodeId("salon", salon.id), confirmation)
       : ctx.actor;
     if (c.get("dryRun")) {
       const given = Object.entries(changes).filter(([, value]) => value !== undefined);

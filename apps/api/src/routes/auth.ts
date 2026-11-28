@@ -4,6 +4,7 @@ import { LIMITS } from "@salonstaff/shared";
 import { type Context, Hono } from "hono";
 import type { AppEnv } from "../env";
 import { authConfig, isLocal } from "../lib/auth-config";
+import { localNumberRefused, mayReach } from "../lib/verify";
 
 export const auth = new Hono<AppEnv>();
 
@@ -120,6 +121,15 @@ auth.on(["GET", "POST"], `${AUTH_PATH}/*`, async (c) => {
           : undefined;
     if (typeof destination === "string" && !(await withinDestinationLimit(c, destination)))
       return tooMany(c);
+    // Locally with Twilio Verify, only your own numbers get a real text (D-23).
+    if (
+      rest === "/phone-number/send-otp" &&
+      typeof destination === "string" &&
+      c.get("phoneVerify")() &&
+      !mayReach(c.env, destination)
+    ) {
+      throw localNumberRefused(destination);
+    }
   }
   // The app signs in with an ID token from Apple or Google. Each is taken once: a token someone
   // got hold of (from a log, a proxy) can't be played again while it's still valid.

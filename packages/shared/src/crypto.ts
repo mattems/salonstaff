@@ -12,6 +12,18 @@ export function randomToken(bytes = 32): string {
   return btoa(binary).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 }
 
+/** `length` random decimal digits, evenly spread (a code to type, like a claim's). */
+export function randomDigits(length: number): string {
+  let out = "";
+  while (out.length < length) {
+    for (const byte of crypto.getRandomValues(new Uint8Array(length))) {
+      // 250 is the largest multiple of 10 under 256: anything above would favour low digits.
+      if (byte < 250 && out.length < length) out += String(byte % 10);
+    }
+  }
+  return out;
+}
+
 const BASE62 = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
 
 /** `bytes` random bytes written in base62 (letters and digits only). 32 bytes → 43 characters. */

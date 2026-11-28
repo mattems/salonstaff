@@ -21,10 +21,17 @@ APPLE_KEY_ID=
 APPLE_PRIVATE_KEY=
 APPLE_BUNDLE_ID=au.com.salonstaff.app
 
-# Twilio: without it, SMS codes go to Mailpit.
+# Twilio (docs/runbooks/twilio.md): without it, SMS codes and calls go to Mailpit.
 TWILIO_ACCOUNT_SID=
 TWILIO_AUTH_TOKEN=
+# Twilio Verify (VA…): sends and checks sign-in codes and claim codes by SMS or call.
+TWILIO_VERIFY_SERVICE_SID=
+# Locally, the ONLY numbers a real text or call may go to (yours, E.164, comma-separated).
+# Every other number still goes to Mailpit: the directory holds real salons' numbers.
+TWILIO_LOCAL_ALLOW=
+# Only for texts that aren't codes (notices), and calls without Verify.
 TWILIO_FROM=
+TWILIO_VOICE_FROM=
 
 # Billing stays off (mock checkout) until these are a Stripe sandbox's keys and BILLING=on.
 # BILLING=

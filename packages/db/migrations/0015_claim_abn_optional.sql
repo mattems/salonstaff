@@ -1,0 +1,1 @@
+ALTER TABLE "salon_claims" ALTER COLUMN "abn" DROP NOT NULL;

@@ -416,6 +416,7 @@ jobsRoutes.openapi(
     const team = await salonScope(db, row.salon.id).applicationContacts(row.job);
     for (const contact of team) {
       notify(c, contact, {
+        topic: "applicants",
         subject: `New verified applicant for ${row.job.title}`,
         title: `New applicant: ${row.job.title}`,
         body: `Someone with a verified ID applied for "${row.job.title}" at ${row.salon.name}. Their profile, verification ID and contact details are waiting for you.`,

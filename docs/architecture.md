@@ -15,7 +15,8 @@
 - **Files:** R2. `salonstaff-media` is public (unguessable, immutable names). `salonstaff-private` holds
   only qualification certificates waiting for review; staff read them through the admin API, and they are
   deleted once a decision is made.
-- **Email:** Resend (Mailpit locally). **SMS:** Twilio (Mailpit locally, as `sms+<number>@local.test`).
+- **Email:** Resend (Mailpit locally). **SMS and calls:** Twilio; codes by Twilio Verify (D-23). Locally, Mailpit
+  (`sms+<number>@local.test`), except numbers in `TWILIO_LOCAL_ALLOW`.
 - **Billing:** Stripe Checkout + Billing portal; Stripe Identity for ID checks. Off until set up.
 - **Cron:** the API's daily trigger runs housekeeping (purges unreviewed verification evidence after 30 days).
 
@@ -49,13 +50,21 @@ the `staff` table, and dangerous changes need a staff passkey (D-06). Locally a 
 - **Listings (D-05):** every new or claimed salon gets 90 free days; the first 200 are founding salons
   (Salon Plan at $69 instead of $99). After that a job needs a listing credit ($49) or the Salon Plan.
   Staff can give credits and extend free periods.
-- **Directory and claims (D-04):** staff import salons (CSV); owners claim with a matching ABN plus a link
-  sent to the listing's business email, or staff approval.
+- **Directory and claims (D-04, D-22):** staff import salons (CSV); owners claim with a code sent to the listing's own email (with a link), by SMS to its own mobile, or read out in a call to its
+  own landline or mobile (an ABN optional, checked if given), or staff approval (with an ABN).
+  "Add a salon" is a wizard that looks for the listing first (`GET /v1/salons/matches`), then claims it or
+  adds a new salon, then its cover photo and logo.
   The CSVs come from `tools/directory` (D-09): Overture Maps places, ABS suburbs, ABNs from the ABR.
 - **Salon teams (D-11):** an account can run any number of salons, and a salon has owners and managers
   (`salon_members`), added by emailed invite or by claiming. Managers handle jobs and applicants; owners also
   the salon's details, billing and team. The API is `/v1/employer/salons/{salonId}/…`; each job picks who is
   emailed about applications.
+- **Face ID in the app (D-21):** a lock on the phone over the saved session, asked when the app opens and
+  after five minutes away. Signing in on a new phone is still by code; passkeys are deferred.
+- **One salon area (D-20):** jobs, applicants and messages are listed across all of someone's salons
+  (`/v1/employer/jobs`, `/applicants`, `/conversations`, from the `employerDesk` scope), and posting a job
+  starts by choosing the salon. On the website it's the `/employer` area with a sidebar; in the app it's
+  the salon side (its own tabs), for following jobs and hiring, not setting salons up.
 - **Near me (D-10):** jobs and salons have the coordinates of their suburb's centre, set by a database
   trigger; searches filter by distance from the browser's (rounded) location or a postcode.
 - **URLs (D-07):** `/jobs/{state}/{suburb}/{title}-{salon}`, `/salons/{state}/{suburb}/{salon}`, landing

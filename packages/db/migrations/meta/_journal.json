@@ -99,6 +99,27 @@
       "when": 1795783449325,
       "tag": "0013_launch_terms",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1795828464093,
+      "tag": "0014_salon_pictures_and_claim_codes",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1795832211105,
+      "tag": "0015_claim_abn_optional",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1795832588842,
+      "tag": "0016_claim_code_service",
+      "breakpoints": true
     }
   ]
 }

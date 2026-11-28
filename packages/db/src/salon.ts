@@ -499,6 +499,35 @@ export function salonScope(db: Db, salonId: string) {
     entitlement: async (): Promise<Entitlement> => entitlementOf(await salonRow()),
 
     /**
+     * Sets (or with null, removes) the salon's logo or the wide picture across the top of its
+     * page. Returns the file it replaced, for the caller to delete once this is saved.
+     */
+    async setPicture(
+      kind: "logo" | "hero",
+      key: string | null,
+      actor: Actor,
+    ): Promise<{ salon: Salon; previousKey: string | null }> {
+      return db.transaction(async (tx) => {
+        const before = await salonRow(tx, true);
+        const column = kind === "logo" ? "logoKey" : "heroKey";
+        const previousKey = before[column];
+        const [row] = await tx
+          .update(salons)
+          .set({ [column]: key })
+          .where(eq(salons.id, salonId))
+          .returning();
+        await recordAudit(tx, actor, {
+          action: key ? `salon.${kind}_set` : `salon.${kind}_removed`,
+          targetType: "salon",
+          targetId: salonId,
+          before: { [column]: previousKey },
+          after: { [column]: key },
+        });
+        return { salon: row as Salon, previousKey };
+      });
+    },
+
+    /**
      * Changes the salon's details. A new name, suburb or state gives it a new address, and the
      * old one redirects; its jobs' addresses (which carry the salon's name) follow.
      */
@@ -1102,7 +1131,7 @@ export function salonScope(db: Db, salonId: string) {
 }
 
 /** Jobs with how many (not banned) people applied, and how many of those are new. */
-async function jobsWithCounts(db: Executor, where: SQL): Promise<SalonJob[]> {
+export async function jobsWithCounts(db: Executor, where: SQL): Promise<SalonJob[]> {
   const rows = await db
     .select({
       job: jobs,

@@ -693,7 +693,7 @@ export function backOffice(db: Db) {
             media: [
               profile?.key,
               ...portfolio.map((p) => p.key),
-              ...made.map((s) => s.logoKey),
+              ...made.flatMap((s) => [s.logoKey, s.heroKey]),
             ].filter((key): key is string => Boolean(key)),
             private: evidence.map((e) => e.key).filter((key): key is string => Boolean(key)),
             subscriptions: [...made, ...claimedListings]
@@ -842,7 +842,7 @@ export function backOffice(db: Db) {
           });
         });
         return {
-          media: salon.logoKey ? [salon.logoKey] : [],
+          media: [salon.logoKey, salon.heroKey].filter((key): key is string => Boolean(key)),
           private: [],
           subscriptions: salon.stripeSubscriptionId ? [salon.stripeSubscriptionId] : [],
         };

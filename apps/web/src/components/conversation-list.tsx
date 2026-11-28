@@ -11,6 +11,8 @@ import { ago } from "@/lib/format";
 export interface ConversationRow {
   key: string;
   title: string;
+  /** A line under the title, e.g. which salon, when they're from several. */
+  subtitle?: string | undefined;
   lastMessage: Schemas["Message"] | null;
   lastMessageAt: string;
   unread: number;
@@ -66,6 +68,11 @@ export function ConversationList({
                         {ago(row.lastMessageAt)}
                       </span>
                     </span>
+                    {row.subtitle && (
+                      <span className="block truncate text-muted-foreground text-xs">
+                        {row.subtitle}
+                      </span>
+                    )}
                     <span className="block truncate text-muted-foreground">
                       {preview(row.lastMessage, me)}
                     </span>

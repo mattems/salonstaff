@@ -34,8 +34,11 @@ import {
   type Applicant,
   CONTACT_LIMIT_DETAIL,
   type Contact,
+  jobsWithCounts,
   notFoundCandidate,
+  type SalonJob,
   salonAccessOf,
+  salonsFor,
 } from "./salon";
 import {
   applications,
@@ -146,6 +149,8 @@ const BLOCKED: Record<MessageBlocker, () => ApiError> = {
 // ---------- The salon's side ----------
 
 export interface ApplicantFilters {
+  /** Only this salon's applicants (one the person is on the team of, for `employerDesk`). */
+  salonId?: string | undefined;
   jobId?: string | undefined;
   status?: ApplicationStatus | undefined;
   /** Only applicants with messages the team hasn't read. */
@@ -161,7 +166,8 @@ export interface ApplicantFilters {
 }
 
 export interface SalonApplicant extends Applicant {
-  job: Pick<Job, "id" | "title" | "slug" | "suburbSlug" | "state" | "status">;
+  job: Pick<Job, "id" | "salonId" | "title" | "slug" | "suburbSlug" | "state" | "status">;
+  salon: { id: string; name: string };
   /** Their messages the team hasn't read, in the conversation with them. */
   unread: number;
   lastMessageAt: Date | null;
@@ -170,6 +176,7 @@ export interface SalonApplicant extends Applicant {
 /** Someone the salon is talking to, for its Messages page. */
 export interface SalonConversationSummary {
   conversationId: string;
+  salon: { id: string; name: string };
   seekerId: string;
   name: string;
   lastMessage: ConversationMessage | null;
@@ -186,9 +193,13 @@ export interface SalonThread {
   blocker: MessageBlocker | null;
 }
 
-export function salonConversations(db: Db, salonId: string) {
+/** Applicants to the jobs of some salons: one salon's team, or everyone a person manages. */
+function applicantQueries(db: Db, salonIds: string[]) {
   const base = (filters: Omit<ApplicantFilters, "status" | "sort" | "limit">): SQL[] => {
-    const where: SQL[] = [eq(jobs.salonId, salonId), isNull(users.suspendedAt)];
+    const where: SQL[] = [
+      salonIds.length ? inArray(jobs.salonId, salonIds) : sql`false`,
+      isNull(users.suspendedAt),
+    ];
     if (filters.jobId) where.push(eq(applications.jobId, filters.jobId));
     if (filters.unread) where.push(sql`${unreadForApplication("seeker")} > 0`);
     for (const kind of filters.verified ?? []) {
@@ -227,12 +238,14 @@ export function salonConversations(db: Db, salonId: string) {
         application: applications,
         job: {
           id: jobs.id,
+          salonId: jobs.salonId,
           title: jobs.title,
           slug: jobs.slug,
           suburbSlug: jobs.suburbSlug,
           state: jobs.state,
           status: jobs.status,
         },
+        salon: { id: salons.id, name: salons.name },
         email: users.email,
         phoneNumber: users.phoneNumber,
         profile: seekerProfiles,
@@ -241,6 +254,7 @@ export function salonConversations(db: Db, salonId: string) {
       })
       .from(applications)
       .innerJoin(jobs, eq(jobs.id, applications.jobId))
+      .innerJoin(salons, eq(salons.id, jobs.salonId))
       .innerJoin(users, eq(users.id, applications.seekerId))
       .leftJoin(seekerProfiles, eq(seekerProfiles.userId, applications.seekerId));
 
@@ -268,6 +282,7 @@ export function salonConversations(db: Db, salonId: string) {
         profile: r.profile as SeekerProfile | null,
         checks: checks.get(r.application.seekerId) as CheckSummary,
         job: r.job as SalonApplicant["job"],
+        salon: r.salon,
         unread: r.unread,
         lastMessageAt: r.lastMessageAt ? new Date(r.lastMessageAt) : null,
       };
@@ -275,24 +290,156 @@ export function salonConversations(db: Db, salonId: string) {
   };
 
   /** New applications become viewed when the team sees them. */
-  const markViewed = async (ids: string[], actor: Actor) => {
-    if (!ids.length) return;
+  const markViewed = async (rows: Row[], actor: Actor) => {
+    const fresh = rows.filter((r) => r.application.status === "submitted");
+    if (!fresh.length) return new Set<string>();
+    const salonOf = new Map(fresh.map((r) => [r.application.id, r.job.salonId]));
     await db.transaction(async (tx) => {
       const changed = await tx
         .update(applications)
         .set({ status: "viewed" })
-        .where(and(inArray(applications.id, ids), eq(applications.status, "submitted")))
+        .where(
+          and(inArray(applications.id, [...salonOf.keys()]), eq(applications.status, "submitted")),
+        )
         .returning({ id: applications.id });
-      if (changed.length) {
+      // One audit line per salon, as when one salon's team looks.
+      const perSalon = new Map<string, number>();
+      for (const { id } of changed) {
+        const salon = salonOf.get(id) as string;
+        perSalon.set(salon, (perSalon.get(salon) ?? 0) + 1);
+      }
+      for (const [targetId, count] of perSalon) {
         await recordAudit(tx, actor, {
           action: "applications.viewed",
           targetType: "salon",
-          targetId: salonId,
-          after: { count: changed.length },
+          targetId,
+          after: { count },
         });
       }
     });
+    return new Set(salonOf.keys());
   };
+
+  /**
+   * Everyone who applied for the salons' jobs, filtered and sorted, with how many there are of each
+   * status under the other filters. The new ones shown become viewed.
+   */
+  async function search(
+    filters: ApplicantFilters,
+    actor: Actor,
+  ): Promise<{
+    items: SalonApplicant[];
+    counts: Record<ApplicationStatus, number>;
+    total: number;
+  }> {
+    const where = base(filters);
+    const [countRows, rows] = await Promise.all([
+      db
+        .select({ status: applications.status, n: sql<number>`count(*)::int` })
+        .from(applications)
+        .innerJoin(jobs, eq(jobs.id, applications.jobId))
+        .innerJoin(users, eq(users.id, applications.seekerId))
+        .leftJoin(seekerProfiles, eq(seekerProfiles.userId, applications.seekerId))
+        .where(and(...where))
+        .groupBy(applications.status),
+      select()
+        .where(and(...where, ...(filters.status ? [eq(applications.status, filters.status)] : [])))
+        .orderBy(...ORDER[filters.sort])
+        .limit(filters.limit),
+    ]);
+    const counts = Object.fromEntries(APPLICATION_STATUS_VALUES.map((s) => [s, 0])) as Record<
+      ApplicationStatus,
+      number
+    >;
+    for (const row of countRows) counts[row.status] = row.n;
+    const viewed = await markViewed(rows, actor);
+    return {
+      items: await toApplicants(rows, viewed),
+      counts,
+      total: Object.values(counts).reduce((a, b) => a + b, 0),
+    };
+  }
+
+  return { select, toApplicants, markViewed, search };
+}
+
+/** Conversations of some salons, latest first (the last 200), without banned people. */
+async function conversationsOf(db: Db, salonIds: string[]): Promise<SalonConversationSummary[]> {
+  if (!salonIds.length) return [];
+  const rows = await db
+    .select({
+      conversation: conversations,
+      salonName: salons.name,
+      firstName: seekerProfiles.firstName,
+      lastName: seekerProfiles.lastName,
+      unread: unreadIn("seeker"),
+    })
+    .from(conversations)
+    .innerJoin(salons, eq(salons.id, conversations.salonId))
+    .innerJoin(users, eq(users.id, conversations.seekerId))
+    .leftJoin(seekerProfiles, eq(seekerProfiles.userId, conversations.seekerId))
+    .where(and(inArray(conversations.salonId, salonIds), isNull(users.suspendedAt)))
+    .orderBy(desc(conversations.lastMessageAt))
+    .limit(200);
+  const last = await lastMessages(
+    db,
+    rows.map((r) => r.conversation.id),
+  );
+  return rows.map((r) => ({
+    conversationId: r.conversation.id,
+    salon: { id: r.conversation.salonId, name: r.salonName },
+    seekerId: r.conversation.seekerId,
+    name: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim(),
+    lastMessage: last.get(r.conversation.id) ?? null,
+    lastMessageAt: r.conversation.lastMessageAt,
+    unread: r.unread,
+  }));
+}
+
+/** How many conversations of each salon have messages the team hasn't read. */
+async function unreadBySalon(db: Db, salonIds: string[]): Promise<Map<string, number>> {
+  if (!salonIds.length) return new Map();
+  const rows = await db
+    .select({ salonId: conversations.salonId, n: sql<number>`count(*)::int` })
+    .from(conversations)
+    .innerJoin(users, eq(users.id, conversations.seekerId))
+    .where(
+      and(
+        inArray(conversations.salonId, salonIds),
+        isNull(users.suspendedAt),
+        sql`${unreadIn("seeker")} > 0`,
+      ),
+    )
+    .groupBy(conversations.salonId);
+  return new Map(rows.map((r) => [r.salonId, r.n]));
+}
+
+/**
+ * Everything a person handles across every salon they're on the team of (D-20): jobs, applicants,
+ * conversations and unread counts, in one place. Acting on one still goes through that salon's own
+ * scope (`salonScope`, `salonConversations`), after the API checks the person's role there.
+ */
+export async function employerDesk(db: Db, userId: string) {
+  const mine = await salonsFor(db).ofUser(userId);
+  const salonIds = mine.map((m) => m.salon.id);
+  /** A salon of theirs, or none of them for any other ID. */
+  const only = (salonId: string | undefined) =>
+    salonId === undefined ? salonIds : salonIds.filter((id) => id === salonId);
+  return {
+    salons: mine,
+    async jobs(salonId?: string): Promise<SalonJob[]> {
+      const ids = only(salonId);
+      return ids.length ? jobsWithCounts(db, inArray(jobs.salonId, ids)) : [];
+    },
+    search: (filters: ApplicantFilters, actor: Actor) =>
+      applicantQueries(db, only(filters.salonId)).search(filters, actor),
+    conversations: (salonId?: string) => conversationsOf(db, only(salonId)),
+    unreadBySalon: () => unreadBySalon(db, salonIds),
+  };
+}
+
+export function salonConversations(db: Db, salonId: string) {
+  const { select, toApplicants, markViewed, search } = applicantQueries(db, [salonId]);
 
   async function salonRow(tx: Executor = db): Promise<Salon> {
     const [row] = await tx.select().from(salons).where(eq(salons.id, salonId));
@@ -300,7 +447,7 @@ export function salonConversations(db: Db, salonId: string) {
     return row as Salon;
   }
 
-  async function applicantRow(applicationId: string): Promise<Row> {
+  async function applicantRow(applicationId: string) {
     const [row] = await select().where(
       and(eq(applications.id, applicationId), eq(jobs.salonId, salonId), isNull(users.suspendedAt)),
     );
@@ -329,79 +476,11 @@ export function salonConversations(db: Db, salonId: string) {
   }
 
   return {
-    /**
-     * Everyone who applied for the salon's jobs, filtered and sorted, with how many there are of each
-     * status under the other filters. The new ones shown become viewed.
-     */
-    async search(
-      filters: ApplicantFilters,
-      actor: Actor,
-    ): Promise<{
-      items: SalonApplicant[];
-      counts: Record<ApplicationStatus, number>;
-      total: number;
-    }> {
-      const where = base(filters);
-      const [countRows, rows] = await Promise.all([
-        db
-          .select({ status: applications.status, n: sql<number>`count(*)::int` })
-          .from(applications)
-          .innerJoin(jobs, eq(jobs.id, applications.jobId))
-          .innerJoin(users, eq(users.id, applications.seekerId))
-          .leftJoin(seekerProfiles, eq(seekerProfiles.userId, applications.seekerId))
-          .where(and(...where))
-          .groupBy(applications.status),
-        select()
-          .where(
-            and(...where, ...(filters.status ? [eq(applications.status, filters.status)] : [])),
-          )
-          .orderBy(...ORDER[filters.sort])
-          .limit(filters.limit),
-      ]);
-      const counts = Object.fromEntries(APPLICATION_STATUS_VALUES.map((s) => [s, 0])) as Record<
-        ApplicationStatus,
-        number
-      >;
-      for (const row of countRows) counts[row.status] = row.n;
-      const fresh = rows
-        .filter((r) => r.application.status === "submitted")
-        .map((r) => r.application.id);
-      await markViewed(fresh, actor);
-      return {
-        items: await toApplicants(rows, new Set(fresh)),
-        counts,
-        total: Object.values(counts).reduce((a, b) => a + b, 0),
-      };
-    },
+    /** Everyone who applied for the salon's jobs (see `applicantQueries`). */
+    search,
 
     /** The salon's conversations, latest first (the last 200), without banned people. */
-    async list(): Promise<SalonConversationSummary[]> {
-      const rows = await db
-        .select({
-          conversation: conversations,
-          firstName: seekerProfiles.firstName,
-          lastName: seekerProfiles.lastName,
-          unread: unreadIn("seeker"),
-        })
-        .from(conversations)
-        .innerJoin(users, eq(users.id, conversations.seekerId))
-        .leftJoin(seekerProfiles, eq(seekerProfiles.userId, conversations.seekerId))
-        .where(and(eq(conversations.salonId, salonId), isNull(users.suspendedAt)))
-        .orderBy(desc(conversations.lastMessageAt))
-        .limit(200);
-      const last = await lastMessages(
-        db,
-        rows.map((r) => r.conversation.id),
-      );
-      return rows.map((r) => ({
-        conversationId: r.conversation.id,
-        seekerId: r.conversation.seekerId,
-        name: `${r.firstName ?? ""} ${r.lastName ?? ""}`.trim(),
-        lastMessage: last.get(r.conversation.id) ?? null,
-        lastMessageAt: r.conversation.lastMessageAt,
-        unread: r.unread,
-      }));
-    },
+    list: () => conversationsOf(db, [salonId]),
 
     /**
      * The conversation with someone the salon may see (it may have no messages yet). Opening it
@@ -440,9 +519,8 @@ export function salonConversations(db: Db, salonId: string) {
      */
     async application(applicationId: string, actor: Actor): Promise<SalonApplicant> {
       const row = await applicantRow(applicationId);
-      const fresh = row.application.status === "submitted" ? [row.application.id] : [];
-      await markViewed(fresh, actor);
-      const [applicant] = await toApplicants([row], new Set(fresh));
+      const viewed = await markViewed([row], actor);
+      const [applicant] = await toApplicants([row], viewed);
       return applicant as SalonApplicant;
     },
 
@@ -590,18 +668,7 @@ export function salonConversations(db: Db, salonId: string) {
 
     /** Conversations with messages the team hasn't read. */
     async unreadCount(): Promise<number> {
-      const [row] = await db
-        .select({ n: sql<number>`count(*)::int` })
-        .from(conversations)
-        .innerJoin(users, eq(users.id, conversations.seekerId))
-        .where(
-          and(
-            eq(conversations.salonId, salonId),
-            isNull(users.suspendedAt),
-            sql`${unreadIn("seeker")} > 0`,
-          ),
-        );
-      return row?.n ?? 0;
+      return (await unreadBySalon(db, [salonId])).get(salonId) ?? 0;
     },
   };
 }

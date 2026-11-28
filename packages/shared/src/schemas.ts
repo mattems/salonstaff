@@ -57,6 +57,16 @@ export function normaliseAuMobile(input: string): string | null {
   return m ? `+61${m[1]}` : null;
 }
 
+/**
+ * Normalises an Australian landline with an area code (02, 03, 07, 08, or +61 2…) to E.164, or
+ * null. 13, 1300 and 1800 numbers aren't landlines: they're routed, often to a menu.
+ */
+export function normaliseAuLandline(input: string): string | null {
+  const digits = input.replace(/[^\d+]/g, "");
+  const m = digits.match(/^(?:\+?61|0)([2378]\d{8})$/);
+  return m ? `+61${m[1]}` : null;
+}
+
 const emailField = z.email("Enter a valid email").trim().toLowerCase();
 const phoneField = z
   .string()
@@ -215,10 +225,16 @@ export type ProfileSettingsInput = z.infer<typeof profileSettingsSchema>;
 
 /** Push and email, on or off, for each notification topic. Every topic is on until switched off. */
 const channels = z.object({ push: z.boolean(), email: z.boolean() });
+/**
+ * Every topic's channels. The salon team's (D-20) may be left out, by an app from before they
+ * existed: those are then left as they were.
+ */
 export const notificationPreferencesSchema = z.object({
   messages: channels,
   applications: channels,
   account: channels,
+  applicants: channels.optional(),
+  replies: channels.optional(),
 });
 export type NotificationPreferences = z.infer<typeof notificationPreferencesSchema>;
 

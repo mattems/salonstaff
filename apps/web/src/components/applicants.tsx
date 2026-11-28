@@ -1,6 +1,6 @@
 /**
- * A salon's applicants (D-17): filters, status counts and the list. Used by the Applicants page
- * (every job) and each job's page.
+ * Applicants (D-17): filters, status counts and the list. Used by the Applicants page (every job
+ * at every salon you're on, D-20) and each job's page.
  */
 import { APPLICANT_SORTS, APPLICATION_STATUSES, type ApplicantSort } from "@salonstaff/shared";
 import { Badge } from "@salonstaff/ui/components/badge";
@@ -19,6 +19,7 @@ import { type FormEvent, useState } from "react";
 import { toast } from "sonner";
 import { selectClass } from "@/components/form";
 import { EmptyState } from "@/components/page";
+import { SalonFilter } from "@/components/salon-jobs";
 import { api, errorMessage, type Schemas, unwrap } from "@/lib/api";
 import { formatDate, rightToWorkLabel } from "@/lib/format";
 
@@ -27,6 +28,8 @@ type Check = "identity" | "right_to_work" | "qualification";
 
 /** The filters, as they sit in the page's address. */
 export interface ApplicantSearch {
+  /** One of your salons, on the page across all of them. */
+  salon?: string | undefined;
   status?: Status | undefined;
   job?: string | undefined;
   unread?: boolean | undefined;
@@ -51,6 +54,7 @@ const text = (value: unknown) =>
 export function validateApplicantSearch(search: Record<string, unknown>): ApplicantSearch {
   const years = Number(search.minYears);
   return {
+    salon: text(search.salon),
     status: STATUS_VALUES.has(String(search.status)) ? (search.status as Status) : undefined,
     job: text(search.job),
     unread: search.unread === true || search.unread === "true" ? true : undefined,
@@ -62,43 +66,56 @@ export function validateApplicantSearch(search: Record<string, unknown>): Applic
   };
 }
 
-/** Loads the applicants the filters match (`jobId` for one job's page). */
-export async function loadApplicants(salonId: string, search: ApplicantSearch, jobId?: string) {
-  return unwrap(
-    await api.GET("/v1/employer/salons/{salonId}/applicants", {
-      params: {
-        path: { salonId },
-        query: {
-          jobId: jobId ?? search.job,
-          status: search.status,
-          unread: search.unread ? "true" : undefined,
-          verified: search.verified,
-          openToWork: search.openToWork ? "true" : undefined,
-          minYears: search.minYears,
-          q: search.q,
-          sort: search.sort ?? "newest",
-        },
-      },
-    }),
-  );
+/**
+ * Loads the applicants the filters match: one job's (on its page), or every job's at all your
+ * salons (or the one in `search.salon`).
+ */
+export async function loadApplicants(
+  search: ApplicantSearch,
+  job?: { salonId: string; jobId: string },
+) {
+  const query = {
+    jobId: job?.jobId ?? search.job,
+    status: search.status,
+    unread: search.unread ? ("true" as const) : undefined,
+    verified: search.verified,
+    openToWork: search.openToWork ? ("true" as const) : undefined,
+    minYears: search.minYears,
+    q: search.q,
+    sort: search.sort ?? "newest",
+  };
+  return job
+    ? unwrap(
+        await api.GET("/v1/employer/salons/{salonId}/applicants", {
+          params: { path: { salonId: job.salonId }, query },
+        }),
+      )
+    : unwrap(
+        await api.GET("/v1/employer/applicants", {
+          params: { query: { ...query, salonId: search.salon } },
+        }),
+      );
 }
 
 export function ApplicantsBrowser({
-  salonId,
   data,
   search,
   onSearch,
   jobs,
+  salons,
   emptyMessage,
 }: {
-  salonId: string;
   data: Schemas["SalonApplicants"];
   search: ApplicantSearch;
   onSearch: (next: ApplicantSearch) => void;
   /** To filter by job, on the page for every job. */
-  jobs?: { id: string; title: string }[];
+  jobs?: { id: string; title: string; salonId: string }[];
+  /** To filter by salon, on the page across all of them. */
+  salons?: { id: string; name: string }[];
   emptyMessage: string;
 }) {
+  const several = (salons?.length ?? 0) > 1;
+  const jobChoices = jobs?.filter((job) => !search.salon || job.salonId === search.salon);
   const set = (patch: Partial<ApplicantSearch>) => onSearch({ ...search, ...patch });
   const verified = new Set((search.verified ?? "").split(",").filter(Boolean));
   const filtered =
@@ -163,7 +180,14 @@ export function ApplicantsBrowser({
               aria-label="Search by name"
             />
           </form>
-          {jobs && (
+          {salons && (
+            <SalonFilter
+              salons={salons}
+              value={search.salon}
+              onChange={(salon) => set({ salon, job: undefined })}
+            />
+          )}
+          {jobChoices && (
             <select
               className={cn(selectClass, "w-auto")}
               value={search.job ?? ""}
@@ -171,7 +195,7 @@ export function ApplicantsBrowser({
               aria-label="Job"
             >
               <option value="">All jobs</option>
-              {jobs.map((job) => (
+              {jobChoices.map((job) => (
                 <option key={job.id} value={job.id}>
                   {job.title}
                 </option>
@@ -228,7 +252,9 @@ export function ApplicantsBrowser({
             <Button
               size="sm"
               variant="ghost"
-              onClick={() => onSearch({ status: search.status, sort: search.sort })}
+              onClick={() =>
+                onSearch({ salon: search.salon, status: search.status, sort: search.sort })
+              }
             >
               Clear filters
             </Button>
@@ -246,8 +272,8 @@ export function ApplicantsBrowser({
               <ApplicantCard
                 key={applicant.id}
                 applicant={applicant}
-                salonId={salonId}
                 showJob={!!jobs}
+                showSalon={several && !search.salon}
               />
             ))}
             {data.truncated && (
@@ -334,13 +360,15 @@ export function StatusSelect({
 /** One applicant: who they are, what's verified, where it's up to, and the conversation. */
 export function ApplicantCard({
   applicant,
-  salonId,
   showJob,
+  showSalon = false,
 }: {
   applicant: Schemas["SalonApplicant"];
-  salonId: string;
   showJob: boolean;
+  /** Which salon it's for, on the page across several. */
+  showSalon?: boolean;
 }) {
+  const salonId = applicant.salon.id;
   const person = applicant.candidate;
   const v = applicant.verification;
   return (
@@ -373,6 +401,7 @@ export function ApplicantCard({
         </CardTitle>
         {person && (
           <CardDescription>
+            {showSalon && `${applicant.salon.name} · `}
             {showJob && `${applicant.job.title} · `}
             {person.headline && `${person.headline} · `}
             {person.suburb} {person.state} · {person.yearsExperience ?? 0} yrs ·{" "}
@@ -399,9 +428,8 @@ export function ApplicantCard({
               </Button>
               <Button asChild size="sm">
                 <Link
-                  to="/employer/$salonId/messages"
-                  params={{ salonId }}
-                  search={{ with: applicant.candidateId }}
+                  to="/employer/messages"
+                  search={{ salon: salonId, with: applicant.candidateId }}
                 >
                   {applicant.lastMessageAt ? "Messages" : "Message"}
                 </Link>

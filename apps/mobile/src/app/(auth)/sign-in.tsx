@@ -43,7 +43,9 @@ export default function SignInScreen() {
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [busyProvider, setBusyProvider] = useState<OAuthProvider | 'dev' | null>(null);
+  const [busyProvider, setBusyProvider] = useState<
+    OAuthProvider | 'dev' | 'dev-salon' | null
+  >(null);
   const [appleNative, setAppleNative] = useState(false);
 
   useEffect(() => {
@@ -98,11 +100,11 @@ export default function SignInScreen() {
     }
   }
 
-  async function onDevLogin() {
+  async function onDevLogin(role: 'seeker' | 'employer') {
     setError(null);
-    setBusyProvider('dev');
+    setBusyProvider(role === 'employer' ? 'dev-salon' : 'dev');
     try {
-      await devLogin();
+      await devLogin(role);
     } catch (err) {
       setError(errorMessage(err));
     } finally {
@@ -271,7 +273,14 @@ export default function SignInScreen() {
                 variant="outline"
                 size="sm"
                 loading={busyProvider === 'dev'}
-                onPress={onDevLogin}
+                onPress={() => onDevLogin('seeker')}
+              />
+              <Button
+                title="Demo salon owner"
+                variant="outline"
+                size="sm"
+                loading={busyProvider === 'dev-salon'}
+                onPress={() => onDevLogin('employer')}
               />
             </View>
           ) : null}

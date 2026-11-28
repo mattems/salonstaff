@@ -46,6 +46,12 @@
         }
       ],
       "expo-secure-store",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Salon Staff uses Face ID to open the app, so only you can see your account."
+        }
+      ],
       "expo-apple-authentication",
       "expo-notifications",
       [

@@ -2493,7 +2493,7 @@ export interface paths {
         };
         /**
          * What you're told about
-         * @description Push and email, on or off, for each topic: `messages` (messages from salons), `applications` (your applications), `account` (verification and endorsements). Everything is on until you switch it off. Sign-in and security notices, and notices about a salon you manage, always go.
+         * @description Push and email, on or off, for each topic: `messages` (messages from salons), `applications` (your applications), `account` (verification and endorsements), `applicants` (new applicants), `replies` (replies from job seekers). Everything is on until you switch it off. `applicants` and `replies` are for a salon's team (D-20). Sign-in and security notices, and notices about a salon itself (its team, a claim), always go.
          */
         get: {
             parameters: {
@@ -2526,7 +2526,7 @@ export interface paths {
         };
         /**
          * Choose what you're told about
-         * @description Every topic, with `push` and `email`. Email also covers a text when your account has no email.
+         * @description Every topic, with `push` and `email`. Email also covers a text when your account has no email. The salon team's topics (`applicants`, `replies`, D-20) may be left out, and then stay as they were.
          */
         put: {
             parameters: {
@@ -2547,6 +2547,14 @@ export interface paths {
                             email: boolean;
                         };
                         account: {
+                            push: boolean;
+                            email: boolean;
+                        };
+                        applicants?: {
+                            push: boolean;
+                            email: boolean;
+                        };
+                        replies?: {
                             push: boolean;
                             email: boolean;
                         };
@@ -3270,7 +3278,7 @@ export interface paths {
         };
         /**
          * Your salons
-         * @description Every salon you're on the team of, with your role there, in the order you joined.
+         * @description Every salon you're on the team of, with your role there and how many conversations have messages its team hasn't read, in the order you joined.
          */
         get: {
             parameters: {
@@ -3509,6 +3517,320 @@ export interface paths {
                 };
             };
         };
+        trace?: never;
+    };
+    "/v1/employer/salons/{salonId}/logo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the salon's logo
+         * @description Shown on its page, its jobs and in the directory. Square works best (at least 400×400). A JPG, PNG, WebP or HEIC image of 8MB or less, as the `file` field of a multipart form. Replaces (and deletes) the earlier one. Owners only.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    salonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description JPG, PNG, WebP or HEIC, 8MB at most.
+                         */
+                        file: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Your salon */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MySalon"];
+                    };
+                };
+                /** @description The request is not valid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Only owners change a salon's pictures */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Too large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not an image */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        /**
+         * Remove the salon's logo
+         * @description Owners only. The file is deleted.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    salonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Your salon */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MySalon"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Only owners change a salon's pictures */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/employer/salons/{salonId}/hero": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set the picture across the top of the salon's page
+         * @description A wide photo of the salon (at least 1600×600 works best; it's cropped to fit). A JPG, PNG, WebP or HEIC image of 8MB or less, as the `file` field of a multipart form. Replaces (and deletes) the earlier one. Owners only.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    salonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "multipart/form-data": {
+                        /**
+                         * Format: binary
+                         * @description JPG, PNG, WebP or HEIC, 8MB at most.
+                         */
+                        file: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description Your salon */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MySalon"];
+                    };
+                };
+                /** @description The request is not valid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Only owners change a salon's pictures */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Too large */
+                413: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not an image */
+                415: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        /**
+         * Remove the salon's top picture
+         * @description Owners only. The file is deleted.
+         */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    salonId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Your salon */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["MySalon"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Only owners change a salon's pictures */
+                403: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/v1/employer/salons/{salonId}/jobs": {
@@ -4964,6 +5286,208 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/employer/jobs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Jobs at all your salons
+         * @description Every job at every salon you're on the team of (or one, with `salonId`), newest first, drafts included, with how many people applied and how many are new. Each job's `salon` says which salon it's for.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only this salon's, of yours. */
+                    salonId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Your jobs */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AllSalonJobs"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/employer/applicants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everyone who applied, at all your salons
+         * @description As GET /v1/employer/salons/{salonId}/applicants, across every salon you're on the team of (or one, with `salonId`). Each applicant's `salon` says which. New applications shown become viewed.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only this job's applicants. */
+                    jobId?: string;
+                    status?: "submitted" | "viewed" | "shortlisted" | "interview" | "hired" | "declined";
+                    /** @description `true`: only those with replies your team hasn't read. */
+                    unread?: "true" | "false";
+                    /** @description Checks that must have passed, comma-separated: `identity`, `right_to_work`, `qualification`. */
+                    verified?: string;
+                    /** @description `true`: only those open to work. */
+                    openToWork?: "true" | "false";
+                    minYears?: number | null;
+                    /** @description Part of their name. */
+                    q?: string;
+                    sort?: "newest" | "oldest" | "experience" | "message";
+                    /** @description Only this salon's, of yours. */
+                    salonId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The applicants */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SalonApplicants"];
+                    };
+                };
+                /** @description The request is not valid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/employer/conversations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Conversations at all your salons
+         * @description Everyone your salons are talking to (or one salon, with `salonId`), latest message first (the last 200), with how many of their messages the salon's team hasn't read. Open one with GET /v1/employer/salons/{salonId}/candidates/{userId}/conversation, using its `salon.id` and `candidateId`.
+         */
+        get: {
+            parameters: {
+                query?: {
+                    /** @description Only this salon's, of yours. */
+                    salonId?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description The conversations */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AllSalonConversations"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not one of your salons */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/employer/salons/{salonId}/team": {
         parameters: {
             query?: never;
@@ -5568,6 +6092,125 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/salons/matches": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Listed salons that may be yours
+         * @description For adding a salon (D-22): listed salons with a name like `name`, in `postcode` or within 15km of it, best match first (up to 8). Claimed ones are included (`claimed`), and ones you're on the team of (`yourRole`). Claim a match with POST /v1/salons/{id}/claims; with none, add it with POST /v1/employer/salons.
+         */
+        get: {
+            parameters: {
+                query: {
+                    name: string;
+                    postcode?: string;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description Matches */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SalonMatches"];
+                    };
+                };
+                /** @description The request is not valid */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/salons/{id}/claim-options": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How a listing can be claimed
+         * @description The ways you can prove you run it (D-04, D-22): a code to the listing's own email, a code by SMS to its own mobile (when its number is one), or a staff check. Only details already on the listing are used, never ones the claimant gives; they're shown masked.
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description How it can be claimed */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ClaimOptions"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/salons/{id}/claims": {
         parameters: {
             query?: never;
@@ -5579,7 +6222,7 @@ export interface paths {
         put?: never;
         /**
          * Claim a directory listing
-         * @description The ABN must match the listing's (or, when it has none, be active on the Australian Business Register). Then prove you run the business: with `method: email` we send a link to the listing's own email (it lasts 48 hours; `sentTo` shows where, masked), and opening it while signed in as you completes the claim. Without a listing email, or with `method: review`, staff check it. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.
+         * @description An ABN is optional when a code proves the claim, and needed for a staff check; when given, it must match the listing's (or, when it has none, be active on the Australian Business Register). Prove you run the business (D-22): with `method: email` we send a six-digit code and a link to the listing's own email; with `method: phone`, a code by SMS to the listing's own mobile; with `method: call`, a phone call to its own landline that reads out the code (8am to 8pm, the salon's time). Type the code with POST /v1/claims/{id}/code (or open the emailed link) while signed in as you; it lasts 48 hours and takes 5 wrong tries. `sentTo` shows where it went, masked. Without a listing email, or with `method: review`, staff check it. Starting again sends a new code (not within 5 minutes) and counts towards the day's claims. An approved claim makes you an owner of the listing: an unclaimed one gets the free period and founding pricing of a new salon. A listing that already has owners can be claimed too (when someone has left the business); its owners are emailed. You can claim any number of listings.
          */
         post: {
             parameters: {
@@ -5711,6 +6354,96 @@ export interface paths {
                 };
                 /** @description In conflict with the current state */
                 409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/claims/{id}/code": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a claim with its code
+         * @description The six-digit code sent to the listing's email or mobile (D-22). Only the account that started the claim can use it, and only 5 wrong codes are taken (then start again, or ask staff to check). Completes the claim: you become an owner of the listing.
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    id: string;
+                };
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ClaimCode"];
+                };
+            };
+            responses: {
+                /** @description Your salon */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ClaimConfirmed"];
+                    };
+                };
+                /** @description Wrong or expired code */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not signed in */
+                401: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Not waiting for a code */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/problem+json": components["schemas"]["Problem"];
+                    };
+                };
+                /** @description Too many wrong codes */
+                429: {
                     headers: {
                         [name: string]: unknown;
                     };
@@ -6900,6 +7633,14 @@ export interface components {
          *       "account": {
          *         "push": false,
          *         "email": true
+         *       },
+         *       "applicants": {
+         *         "push": true,
+         *         "email": true
+         *       },
+         *       "replies": {
+         *         "push": true,
+         *         "email": false
          *       }
          *     }
          */
@@ -6917,6 +7658,18 @@ export interface components {
                 email: boolean;
             };
             account: {
+                /** @description A push to your phones with the app */
+                push: boolean;
+                /** @description An email, or a text if your account has no email */
+                email: boolean;
+            };
+            applicants: {
+                /** @description A push to your phones with the app */
+                push: boolean;
+                /** @description An email, or a text if your account has no email */
+                email: boolean;
+            };
+            replies: {
                 /** @description A push to your phones with the app */
                 push: boolean;
                 /** @description An email, or a text if your account has no email */
@@ -7089,6 +7842,8 @@ export interface components {
             postcode: string;
             about: string | null;
             logoUrl: string | null;
+            /** @description The wide picture across the top of the salon's page. */
+            heroUrl: string | null;
             /** @enum {string} */
             status: "active" | "suspended" | "removed";
             statusReason: string | null;
@@ -7127,10 +7882,10 @@ export interface components {
             reason: "suspended" | "needs_listing" | null;
         };
         MySalons: {
-            items: components["schemas"]["MySalon"][];
+            items: components["schemas"]["MySalonWithInbox"][];
         };
         MySalonWithInbox: components["schemas"]["MySalon"] & {
-            /** @description Applications with replies your team hasn't read (D-17). */
+            /** @description Conversations with messages the salon's team hasn't read (D-19). */
             unreadMessages: number;
         };
         SalonJobs: {
@@ -7300,6 +8055,7 @@ export interface components {
             truncated: boolean;
         };
         SalonApplicant: components["schemas"]["Applicant"] & {
+            salon: components["schemas"]["SalonRef"];
             job: {
                 id: string;
                 title: string;
@@ -7315,10 +8071,16 @@ export interface components {
              */
             lastMessageAt: string | null;
         };
+        SalonRef: {
+            /** @example sln_01k6q2x8h4f7tbn3m9vz5cdr0e */
+            id: string;
+            name: string;
+        };
         SalonConversations: {
             items: components["schemas"]["SalonConversationSummary"][];
         };
         SalonConversationSummary: {
+            salon: components["schemas"]["SalonRef"];
             /** @example usr_01k6q2x8h4f7tbn3m9vz5cdr0e */
             candidateId: string;
             name: string;
@@ -7414,6 +8176,12 @@ export interface components {
             /** @description Your conversation with this salon (GET /v1/me/conversations/{id}), once they've written. `unreadMessages` counts its messages you haven't read. */
             conversationId: string | null;
         };
+        AllSalonJobs: {
+            items: components["schemas"]["SalonJob"][];
+        };
+        AllSalonConversations: {
+            items: components["schemas"]["SalonConversationSummary"][];
+        };
         Team: {
             /** @description Owners first. */
             members: components["schemas"]["TeamMember"][];
@@ -7488,6 +8256,8 @@ export interface components {
         DirectorySalon: components["schemas"]["SalonSummary"] & {
             suburbSlug: string;
             about: string | null;
+            /** @description The wide picture across the top of the salon's page. */
+            heroUrl: string | null;
             liveJobs: number;
             /** @description Kilometres from the point searched near (between suburb centres), or null. */
             distanceKm: number | null;
@@ -7531,14 +8301,58 @@ export interface components {
                 address: string | null;
             } | null;
         };
+        SalonMatches: {
+            items: components["schemas"]["SalonMatch"][];
+        };
+        SalonMatch: components["schemas"]["DirectorySalon"] & {
+            postcode: string;
+            /** @description How alike the names are, from 0 to 1. */
+            score: number;
+            /**
+             * @description You're on its team already.
+             * @enum {string|null}
+             */
+            yourRole: "owner" | "manager" | null;
+        };
+        ClaimOptions: {
+            salonId: string;
+            /** @description It has owners already: they're emailed if your claim is approved. */
+            claimed: boolean;
+            /** @description The listing has an ABN: yours must match it. Otherwise it must be active on the ABR. */
+            abnOnFile: boolean;
+            methods: {
+                /** @enum {string} */
+                method: "email" | "phone" | "call" | "review";
+                /** @description Where the code would go, masked. Null for `review`. */
+                sentTo: string | null;
+                /** @description Why it can't be used right now (a call outside calling hours), or null. */
+                unavailable: string | null;
+            }[];
+            /** @description Wrong codes a claim takes. */
+            codeAttempts: number;
+        };
         Claim: {
             /** @example clm_01k6q2x8h4f7tbn3m9vz5cdr0e */
             id: string;
             salonId: string;
-            /** @enum {string} */
+            /**
+             * @description `pending_email`: waiting for the code (or link) sent to the listing's own email or mobile (`via`). `pending_review`: staff are checking it.
+             * @enum {string}
+             */
             status: "pending_email" | "pending_review" | "approved" | "rejected";
-            /** @description Where the confirmation link went, masked (`he•••@salon.com`). */
+            /**
+             * @description Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call).
+             * @enum {string|null}
+             */
+            via: "email" | "phone" | "call" | null;
+            /** @description Where the code went, masked (`he•••@salon.com`, `04•• ••• 678`), while `pending_email`. */
             sentTo: string | null;
+            /**
+             * Format: date-time
+             * @description When the code stops working, while `pending_email`: 48 hours for ours, 10 minutes for Twilio Verify's.
+             * @example 2026-11-25T03:00:00.000Z
+             */
+            codeExpiresAt: string | null;
             decisionNote: string | null;
             /**
              * Format: date-time
@@ -7552,19 +8366,23 @@ export interface components {
             decidedAt: string | null;
         };
         StartClaim: {
-            abn: string;
+            /** @description The business's ABN. Optional when a code proves the claim; needed for `method: review`. When given it must match the listing's, or be active on the ABR. */
+            abn?: string;
             contactName: string;
             phone: string;
             /**
-             * @description `email`: a link to the listing's business email (when it has one). `review`: staff check it.
+             * @description `email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options.
              * @default email
              * @enum {string}
              */
-            method: "email" | "review";
+            method: "email" | "phone" | "call" | "review";
         };
         ClaimConfirmed: {
             claim: components["schemas"]["Claim"];
             salon: components["schemas"]["MySalon"];
+        };
+        ClaimCode: {
+            code: string;
         };
         SharedProfile: {
             /** @example Jess D. */

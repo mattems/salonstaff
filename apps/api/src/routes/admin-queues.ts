@@ -256,9 +256,9 @@ const Claim = z
   .object({
     id: z.string().openapi({ example: "clm_01k6q2x8h4f7tbn3m9vz5cdr0e" }),
     status: z.enum(["pending_email", "pending_review", "approved", "rejected"]),
-    method: z.enum(["email", "review"]).openapi({
+    method: z.enum(["email", "phone", "call", "review"]).openapi({
       description:
-        "`email`: proven by the link sent to the listing's email. `review`: staff decide.",
+        "`email`: proven by the code or link sent to the listing's email. `phone`: by the code texted to the listing's mobile (D-22). `call`: by the code read out in a call to its landline. `review`: staff decide.",
     }),
     salon: z.object({
       id: z.string(),
@@ -278,7 +278,9 @@ const Claim = z
     }),
     contact_name: z.string(),
     contact_phone: z.string(),
-    abn_given: z.string(),
+    abn_given: z.string().nullable().openapi({
+      description: "Null when the claimant proved it by code without giving one (D-22).",
+    }),
     listing_abn: z.string().nullable(),
     abn_matches: z.boolean().nullable().openapi({
       description: "Whether the ABN given is the listing's. Null when the listing had none.",
@@ -296,15 +298,21 @@ const Claim = z
 
 type ClaimRow = Awaited<ReturnType<BackOffice["claims"]["list"]>>[number];
 
+/** How the claimant proved it, or is proving it: staff review unless a code or link did. */
+function proofOf(claim: ClaimRow["claim"]): "email" | "phone" | "call" | "review" {
+  if (claim.decidedBy === "sms-code") return "phone";
+  if (claim.decidedBy === "call-code") return "call";
+  if (claim.decidedBy === "email-link" || claim.decidedBy === "email-code") return "email";
+  if (claim.status === "pending_email") return claim.verifyVia ?? "email";
+  return "review";
+}
+
 function claimJson(row: ClaimRow) {
   const { claim, salon, claimant } = row;
   return {
     id: encodeId("claim", claim.id),
     status: claim.status,
-    method:
-      claim.status === "pending_email" || claim.decidedBy === "email-link"
-        ? ("email" as const)
-        : ("review" as const),
+    method: proofOf(claim),
     salon: {
       id: encodeId("salon", salon.id),
       name: salon.name,
@@ -325,7 +333,7 @@ function claimJson(row: ClaimRow) {
     contact_phone: claim.phone,
     abn_given: claim.abn,
     listing_abn: salon.abn,
-    abn_matches: salon.abn ? salon.abn === claim.abn : null,
+    abn_matches: salon.abn && claim.abn ? salon.abn === claim.abn : null,
     abr_name: claim.abnEntityName,
     decided_by: claim.decidedBy,
     decision_note: claim.decisionNote,

@@ -23,7 +23,10 @@ export const Route = createFileRoute("/employer/$salonId/jobs/$id/")({
     });
     if (result.response.status === 404) throw notFound();
     const job = unwrap(result);
-    return { job, applicants: await loadApplicants(params.salonId, deps, job.id) };
+    return {
+      job,
+      applicants: await loadApplicants(deps, { salonId: params.salonId, jobId: job.id }),
+    };
   },
   head: ({ loaderData }) => privatePage(loaderData?.job.title ?? "Job"),
   component: JobPage,
@@ -34,7 +37,6 @@ const STATUS = { draft: "Draft", published: "Live", expired: "Expired", closed: 
 function JobPage() {
   const { job, applicants } = Route.useLoaderData();
   const search = Route.useSearch();
-  const { salonId } = Route.useParams();
   const navigate = Route.useNavigate();
   return (
     <div className="space-y-6">
@@ -59,7 +61,6 @@ function JobPage() {
       )}
       <Section title={`Applicants (${applicants.total})`}>
         <ApplicantsBrowser
-          salonId={salonId}
           data={applicants}
           search={search}
           onSearch={(next) => void navigate({ search: next, replace: true })}

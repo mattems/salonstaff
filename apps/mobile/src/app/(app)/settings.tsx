@@ -25,13 +25,19 @@ import {
 } from '@/lib/appearance';
 import { useUser } from '@/lib/auth';
 import { API_URL, SITE_URL } from '@/lib/config';
+import { useBiometricLock } from '@/lib/biometric-lock';
+import { useMode } from '@/lib/mode';
 import { pushAvailable, registerForPush } from '@/lib/push-notifications';
 
-/** Notifications, light or dark, and which version this is (plus debug details in development). */
+/**
+ * Notifications, Face ID, light or dark, and which version this is (plus debug details in
+ * development).
+ */
 export default function SettingsScreen() {
   return (
     <Screen>
       <NotificationsCard />
+      <LockCard />
       <AppearanceCard />
       <AboutCard />
       {__DEV__ ? <DeveloperCard /> : null}
@@ -61,8 +67,11 @@ function usePushPermission() {
   return { permission, check };
 }
 
+/** The topics of the side of the app that's showing (D-20): a job seeker's, or a salon team's. */
 function NotificationsCard() {
   const theme = useTheme();
+  const { mode } = useMode();
+  const topics = NOTIFICATION_TOPICS.filter((topic) => topic.side === mode);
   const { data, error, loading, reload, setData } = useRequest(api.notificationPreferences);
   const { permission, check } = usePushPermission();
   const [saving, setSaving] = useState(false);
@@ -110,7 +119,9 @@ function NotificationsCard() {
       ) : permission === 'undetermined' ? (
         <View style={styles.notice}>
           <Text variant="small" color="textSecondary">
-            Get a push the moment a salon writes to you.
+            {mode === 'salon'
+              ? 'Get a push the moment someone applies or writes back to your salon.'
+              : 'Get a push the moment a salon writes to you.'}
           </Text>
           <Button title="Turn on notifications" size="sm" variant="outline" onPress={turnOn} />
         </View>
@@ -125,7 +136,7 @@ function NotificationsCard() {
       ) : error && !data ? (
         <ErrorView message={error} onRetry={reload} />
       ) : data ? (
-        NOTIFICATION_TOPICS.map((topic) => (
+        topics.map((topic) => (
           <View key={topic.value} style={[styles.topic, { borderColor: theme.border }]}>
             <Text variant="bodyStrong">{topic.label}</Text>
             <Text variant="small" color="textSecondary">
@@ -147,8 +158,9 @@ function NotificationsCard() {
         ))
       ) : null}
       <Text variant="caption" color="textMuted">
-        Sign-in codes and security emails always come. Email means a text if your account has no
-        email.
+        {mode === 'salon'
+          ? 'Notices about a salon itself (its team, a claim), sign-in codes and security emails always come. New applicants come only for jobs that tell you about applications, as chosen on the website. Email means a text if your account has no email.'
+          : 'Sign-in codes and security emails always come. Email means a text if your account has no email.'}
       </Text>
     </Card>
   );
@@ -178,6 +190,32 @@ function Toggle({
         thumbColor={Platform.OS === 'android' ? theme.surface : undefined}
       />
     </View>
+  );
+}
+
+// ---------- Face ID (D-21) ----------
+
+function LockCard() {
+  const { kind, enabled, setEnabled } = useBiometricLock();
+  const [busy, setBusy] = useState(false);
+  if (!kind) return null;
+  async function change(on: boolean) {
+    setBusy(true);
+    try {
+      await setEnabled(on);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Card>
+      <Text variant="subheading">{kind}</Text>
+      <Toggle label={`Ask for ${kind} to open the app`} value={enabled} disabled={busy} onChange={change} />
+      <Text variant="caption" color="textMuted">
+        You stay signed in on this phone, and the app asks for {kind} (or your passcode) when you open it,
+        and when you come back after five minutes away.
+      </Text>
+    </Card>
   );
 }
 

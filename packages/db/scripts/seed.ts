@@ -2,7 +2,8 @@
  * Demo data for local development (`bun run db:seed`, also run by `bun run setup`). Safe to run
  * again: anything already there is left alone. Refuses to run against a database that isn't local.
  *
- * - Six salons with live jobs, owned by owner1@salonstaff.test … owner6@salonstaff.test
+ * - Six salons with live jobs, owned by owner1@salonstaff.test … owner6@salonstaff.test; owner1
+ *   also owns owner2's salon, as a group with two locations would (D-20)
  * - Unclaimed directory listings (some with a business email, to try claiming by link)
  * - A job seeker, seeker@salonstaff.test, with a public profile, a verified mobile and an
  *   endorsement from owner1 (not yet ID-verified, to try the check)
@@ -36,7 +37,7 @@ import {
   seeker,
   staffOffice,
 } from "../src/index";
-import { jobs, salons, users } from "../src/schema";
+import { jobs, salonMembers, salons, users } from "../src/schema";
 
 const url = process.env.DATABASE_URL;
 if (!url) {
@@ -422,6 +423,22 @@ async function seedSeeker(db: Db): Promise<boolean> {
   return true;
 }
 
+/** owner1 also owns owner2's salon: a group, to try the salon area with several salons. */
+async function seedGroup(db: Db): Promise<void> {
+  const [first, second] = await Promise.all(
+    ["owner1@salonstaff.test", "owner2@salonstaff.test"].map(async (email) => {
+      const [user] = await db.select().from(users).where(eq(users.email, email));
+      return user ? (await salonsFor(db).ofUser(user.id))[0] : undefined;
+    }),
+  );
+  const [owner1] = await db.select().from(users).where(eq(users.email, "owner1@salonstaff.test"));
+  if (!owner1 || !first || !second) return;
+  await db
+    .insert(salonMembers)
+    .values({ salonId: second.salon.id, userId: owner1.id, role: "owner" })
+    .onConflictDoNothing();
+}
+
 async function seedStaff(db: Db): Promise<string | null> {
   const email = process.env.STAFF_EMAIL?.trim();
   if (!email || email === "you@example.com") return null;
@@ -482,6 +499,7 @@ const { db, close } = await connect(url);
 try {
   const listings = await seedDirectory(db);
   const jobsMade = await seedSalons(db);
+  await seedGroup(db);
   const seekerMade = await seedSeeker(db);
   await seedSeekerSharing(db);
   const staffMade = await seedStaff(db);

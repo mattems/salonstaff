@@ -5,6 +5,7 @@ import type { SQL } from "drizzle-orm";
 import type { JWTVerifyGetKey } from "jose";
 import { createApp } from "../src/app";
 import type { Env } from "../src/env";
+import type { PhoneVerify } from "../src/lib/verify";
 
 export const APP_ORIGIN = "http://localhost:5300";
 
@@ -24,6 +25,9 @@ export const NO_OUTSIDE_SERVICES = {
   TWILIO_ACCOUNT_SID: undefined,
   TWILIO_AUTH_TOKEN: undefined,
   TWILIO_FROM: undefined,
+  TWILIO_VOICE_FROM: undefined,
+  TWILIO_VERIFY_SERVICE_SID: undefined,
+  TWILIO_LOCAL_ALLOW: undefined,
   RESEND_API_KEY: undefined,
   APNS_KEY_ID: undefined,
   APNS_PRIVATE_KEY: undefined,
@@ -35,11 +39,18 @@ const unlimited = { limit: async () => ({ success: true }) } as unknown as RateL
 
 /** An app whose outgoing email (and, locally, SMS) is collected in `sent` instead of delivered. */
 export function createTestApp(
-  options: { emailFails?: boolean; accessKeys?: JWTVerifyGetKey; env?: Partial<Env> } = {},
+  options: {
+    emailFails?: boolean;
+    accessKeys?: JWTVerifyGetKey;
+    env?: Partial<Env>;
+    /** Stands in for Twilio Verify. */
+    phoneVerify?: PhoneVerify;
+  } = {},
 ) {
   const sent: EmailMessage[] = [];
   const app = createApp({
     ...(options.accessKeys ? { accessKeys: options.accessKeys } : {}),
+    ...(options.phoneVerify ? { phoneVerify: options.phoneVerify } : {}),
     emailSender: {
       send: async (message) => {
         if (options.emailFails) throw new Error("The email provider is down");
@@ -126,4 +137,31 @@ export function codeFor(sent: EmailMessage[], to: string): string {
   const match = message?.text.match(/\b(\d{6})\b/);
   if (!match) throw new Error(`No code sent to ${to}`);
   return match[1] as string;
+}
+
+/**
+ * A stand-in for Twilio Verify: records what it was asked to send, and takes `code` (or
+ * `failWith`, thrown when sending) as Twilio would.
+ */
+export function fakeVerify(options: { code?: string; failWith?: Error } = {}) {
+  const code = options.code ?? "424242";
+  const sent: { to: string; channel: string }[] = [];
+  const pending = new Set<string>();
+  const verify: PhoneVerify = {
+    async start(to, channel) {
+      if (options.failWith) throw options.failWith;
+      sent.push({ to, channel });
+      pending.add(to);
+    },
+    async check(to, typed) {
+      if (!pending.has(to)) {
+        const { ApiError } = await import("@salonstaff/shared");
+        throw new ApiError("link_expired", { hint: "Ask for a new code." });
+      }
+      if (typed !== code) return false;
+      pending.delete(to);
+      return true;
+    },
+  };
+  return { verify, sent, code };
 }

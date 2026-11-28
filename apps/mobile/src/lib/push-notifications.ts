@@ -74,7 +74,7 @@ const SCREENS: Record<string, Href> = {
  */
 export function destinationOf(
   response: Notifications.NotificationResponse,
-): { screen: Href } | { web: string } | null {
+): { screen: Href; side?: 'salon' } | { web: string } | null {
   const url = response.notification.request.content.data?.url;
   if (typeof url !== 'string') return null;
   try {
@@ -88,6 +88,25 @@ export function destinationOf(
     const application = pathname.match(/^\/applications\/(app_[a-z0-9]+)$/);
     if (application?.[1]) {
       return { screen: { pathname: '/applications/[id]', params: { id: application[1] } } };
+    }
+    // The salon side (D-20): a reply in a conversation, and a job's new applicants.
+    const salon = searchParams.get('salon');
+    const withWho = searchParams.get('with');
+    if (pathname === '/employer/messages' && salon?.startsWith('sln_') && withWho?.startsWith('usr_')) {
+      return {
+        side: 'salon',
+        screen: {
+          pathname: '/hire/conversation/[salonId]/[userId]',
+          params: { salonId: salon, userId: withWho },
+        },
+      };
+    }
+    const job = pathname.match(/^\/employer\/(sln_[a-z0-9]+)\/jobs\/(job_[a-z0-9]+)$/);
+    if (job?.[1] && job[2]) {
+      return {
+        side: 'salon',
+        screen: { pathname: '/hire/job/[salonId]/[id]', params: { salonId: job[1], id: job[2] } },
+      };
     }
     const screen = SCREENS[pathname.replace(/\/+$/, '') || '/'];
     if (screen) return { screen };

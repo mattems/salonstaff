@@ -56,7 +56,13 @@ export interface AuthConfig {
     code: string;
     purpose: "sign-in" | "change-email";
   }) => Promise<void>;
+  /**
+   * Sends a sign-in or mobile-change code. With `checkSmsCode`, an outside service (Twilio Verify,
+   * D-23) makes its own code: `code` is then ignored.
+   */
   sendSmsCode: (message: { phoneNumber: string; code: string }) => Promise<void>;
+  /** Checks an SMS code with the outside service that sent it, instead of the stored one. */
+  checkSmsCode?: ((message: { phoneNumber: string; code: string }) => Promise<boolean>) | undefined;
   /** Called once an account exists, for the audit log. */
   onSignUp?: ((person: { userId: string }) => Promise<void>) | undefined;
   /** Called when Google or Apple is connected to an account, for the audit log. */
@@ -116,8 +122,13 @@ export function createAuth(config: AuthConfig) {
         // Mobiles only (04…): a code is never texted to a landline.
         phoneNumberValidator: (value) => /^\+614\d{8}$/.test(value),
         sendOTP: async ({ phoneNumber: number, code }) => {
-          await config.sendSmsCode({ phoneNumber: number, code });
+          try {
+            await config.sendSmsCode({ phoneNumber: number, code });
+          } catch (error) {
+            throw asAuthError(error);
+          }
         },
+        ...(config.checkSmsCode ? { verifyOTP: config.checkSmsCode } : {}),
         signUpOnVerification: {
           getTempEmail: (number) => `${number.replace(/[^\d]/g, "")}@${PHONE_EMAIL_DOMAIN}`,
           getTempName: () => "",
@@ -267,6 +278,19 @@ function emailChangeProblem(error: unknown): EmailChangeProblem | null {
   if (said.includes("already in use") || said.includes("already exists")) return "in_use";
   if (said.includes("is the same")) return "same";
   return null;
+}
+
+/**
+ * A problem the person can act on (an \`ApiError\` with a 4xx status: a number that can't take a
+ * text, too many codes) as Better Auth's own error, so the sign-in endpoint answers with it
+ * rather than a 500. Anything else is left as it is.
+ */
+function asAuthError(error: unknown): unknown {
+  const { status, message } = (error ?? {}) as { status?: unknown; message?: unknown };
+  if (typeof message !== "string") return error;
+  if (status === 429) return new APIError("TOO_MANY_REQUESTS", { message });
+  if (status === 400) return new APIError("BAD_REQUEST", { message });
+  return error;
 }
 
 async function changing(run: () => Promise<Headers>): Promise<EmailChangeResult> {

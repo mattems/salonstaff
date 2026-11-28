@@ -77,7 +77,7 @@ const flag = z
   .optional()
   .transform((v) => (v === undefined ? undefined : v === "true"));
 
-const ApplicantsQuery = z.object({
+export const ApplicantsQuery = z.object({
   jobId: z.string().optional().openapi({ description: "Only this job's applicants." }),
   status: z.enum(APPLICATION_STATUS_VALUES).optional(),
   unread: flag.openapi({ description: "`true`: only those with replies your team hasn't read." }),
@@ -93,6 +93,47 @@ const ApplicantsQuery = z.object({
 });
 
 const CHECKS = ["identity", "right_to_work", "qualification"] as const;
+
+/** The search an applicants query asks for (its `jobId` is the caller's to check). */
+export function applicantFilters(query: z.infer<typeof ApplicantsQuery>) {
+  const verified = (query.verified ?? "")
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  const unknown = verified.filter((v) => !(CHECKS as readonly string[]).includes(v));
+  if (unknown.length) {
+    throw new ApiError("validation_failed", {
+      detail: `Unknown check: ${unknown.join(", ")}`,
+      hint: "Use `identity`, `right_to_work` or `qualification`, comma-separated.",
+      errors: [{ path: "verified", message: "Not a check" }],
+    });
+  }
+  const jobId = query.jobId
+    ? idFrom("job", query.jobId, "job", "List your jobs with GET /v1/employer/jobs.")
+    : undefined;
+  return {
+    jobId,
+    status: query.status,
+    unread: query.unread,
+    verified: verified as (typeof CHECKS)[number][],
+    openToWork: query.openToWork,
+    minYears: query.minYears,
+    q: query.q,
+    sort: query.sort,
+    limit: MAX_APPLICANTS + 1,
+  };
+}
+
+/** The response for a search's rows (one more than shown says there are more). */
+export const applicantsJson = (
+  env: AppEnv["Bindings"],
+  result: Awaited<ReturnType<ReturnType<typeof salonConversations>["search"]>>,
+) => ({
+  items: result.items.slice(0, MAX_APPLICANTS).map((row) => salonApplicantJson(env, row)),
+  counts: result.counts,
+  total: result.total,
+  truncated: result.items.length > MAX_APPLICANTS,
+});
 
 const liveDescription = (who: string) =>
   `Opens a WebSocket for this conversation while it's on screen (D-18); there's one per salon and job seeker (D-19), whatever it's about. Each new message arrives as \`{"type":"message","message":{...}}\` (the same message as in the conversation; ignore one you already have) and ${who} typing as \`{"type":"typing","from":"salon"|"seeker","name":"..."}\`. Send \`{"type":"typing"}\` every few seconds while your person types, and \`ping\` (answered \`pong\`) every 30 seconds or so. Close it when the conversation leaves the screen: while it's open, new messages aren't also sent to you by push or email. After a dropped connection, read the conversation again before reconnecting.`;
@@ -124,46 +165,10 @@ conversationRoutes.openapi(
   }),
   async (c) => {
     const { salon, actor } = await requireSalon(c, c.req.valid("param").salonId);
-    const query = c.req.valid("query");
-    const verified = (query.verified ?? "")
-      .split(",")
-      .map((v) => v.trim())
-      .filter(Boolean);
-    const unknown = verified.filter((v) => !(CHECKS as readonly string[]).includes(v));
-    if (unknown.length) {
-      throw new ApiError("validation_failed", {
-        detail: `Unknown check: ${unknown.join(", ")}`,
-        hint: "Use `identity`, `right_to_work` or `qualification`, comma-separated.",
-        errors: [{ path: "verified", message: "Not a check" }],
-      });
-    }
-    const jobId = query.jobId
-      ? idFrom("job", query.jobId, "job", "List your jobs on the salon's dashboard.")
-      : undefined;
+    const filters = applicantFilters(c.req.valid("query"));
     const db = await c.get("db")();
-    const result = await salonConversations(db, salon.id).search(
-      {
-        jobId,
-        status: query.status,
-        unread: query.unread,
-        verified: verified as (typeof CHECKS)[number][],
-        openToWork: query.openToWork,
-        minYears: query.minYears,
-        q: query.q,
-        sort: query.sort,
-        limit: MAX_APPLICANTS + 1,
-      },
-      actor,
-    );
-    return c.json(
-      {
-        items: result.items.slice(0, MAX_APPLICANTS).map((row) => salonApplicantJson(c.env, row)),
-        counts: result.counts,
-        total: result.total,
-        truncated: result.items.length > MAX_APPLICANTS,
-      },
-      200,
-    );
+    const result = await salonConversations(db, salon.id).search(filters, actor);
+    return c.json(applicantsJson(c.env, result), 200);
   },
 );
 
@@ -456,14 +461,14 @@ conversationRoutes.openapi(
     // Someone on the team with the conversation open has just seen it.
     for (const contact of sent.team.filter((t) => !present.has(t.userId))) {
       notify(c, contact, {
-        topic: "messages",
+        topic: "replies",
         subject: about ? `${sent.senderName} replied about ${about}` : `${sent.senderName} replied`,
         title: `${sent.senderName} replied`,
         body: input.body,
         action: "Read and reply",
         url: appUrl(
           c,
-          `/employer/${encodeId("salon", sent.salon.id)}/messages?with=${encodeId("user", session.user.id)}`,
+          `/employer/messages?salon=${encodeId("salon", sent.salon.id)}&with=${encodeId("user", session.user.id)}`,
         ),
         footer: `${sent.senderName} is talking to ${sent.salon.name} on Salon Staff. Reply there; replying to this email won't reach them.`,
       });

@@ -20,7 +20,8 @@
   endorsements) a push switch and an email switch, saved on the account (`notification_preferences`,
   `GET`/`PUT /v1/me/notifications`; no row means on). Email covers the text sent instead when there's no
   email. Sign-in, security and salons' own notices have no topic and always go. The app's Settings has
-  the switches; the website can show the same later.
+  the switches; the website can show the same later. A salon's team has its own topics, new applicants
+  and replies from job seekers (D-20), shown on the app's salon side.
 - **Asking:** the app asks permission once the person has a profile (not during onboarding), and Settings
   offers it again or links to the phone's settings when it's off.
 - iOS only for now. Android, later, sends through Firebase Cloud Messaging the same way.

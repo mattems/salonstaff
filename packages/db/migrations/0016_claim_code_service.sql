@@ -1,0 +1,1 @@
+ALTER TABLE "salon_claims" ADD COLUMN "code_service" text;

@@ -58,6 +58,15 @@ export type ProfileSettings = Schemas['ProfileSettings'];
 export type MyEndorsement = Schemas['MyEndorsement'];
 export type HiddenSalon = Schemas['HiddenSalon'];
 export type SignInSession = Schemas['SignInSession'];
+export type SalonJob = Schemas['SalonJob'];
+export type SalonApplicant = Schemas['SalonApplicant'];
+export type SalonConversation = Schemas['SalonConversationSummary'];
+export type CandidateConversation = Schemas['CandidateConversation'];
+export type Candidate = Schemas['Candidate'];
+export type ApplicationStatus = SalonApplicant['status'];
+export type SalonApplicantsQuery = NonNullable<
+  paths['/v1/employer/applicants']['get']['parameters']['query']
+>;
 export type SignInMethods = Schemas['SignInMethods'];
 /** A picked file, ready for a multipart upload. */
 export type UploadFile = { blob: Blob; name: string };
@@ -258,8 +267,8 @@ export const api = {
     );
   },
   /** Local development only (404 anywhere else): the demo job seeker, without a code. */
-  devLogin: async () => {
-    const response = await authCall('dev-login', { role: 'seeker' });
+  devLogin: async (role: 'seeker' | 'employer' = 'seeker') => {
+    const response = await authCall('dev-login', { role });
     return sessionToken(response);
   },
   signOut: async () => {
@@ -411,5 +420,74 @@ export const api = {
     form.append('educationId', educationId);
     form.append('file', file.blob, file.name);
     return upload<Checks>('POST', '/v1/me/checks/qualification', form);
+  },
+
+  /**
+   * The salon side (D-20): jobs, applicants and conversations across every salon you're on, and
+   * acting on one through its salon (`salonId` from the item).
+   */
+  salon: {
+    salons: async () => unwrap(await client.GET('/v1/employer/salons')),
+    jobs: async (salonId?: string) =>
+      unwrap(await client.GET('/v1/employer/jobs', { params: { query: { salonId } } })),
+    job: async (salonId: string, id: string) =>
+      unwrap(
+        await client.GET('/v1/employer/salons/{salonId}/jobs/{id}', {
+          params: { path: { salonId, id } },
+        }),
+      ),
+    publish: async (salonId: string, id: string) =>
+      unwrap(
+        await client.POST('/v1/employer/salons/{salonId}/jobs/{id}/publish', {
+          params: { path: { salonId, id } },
+        }),
+      ),
+    close: async (salonId: string, id: string) =>
+      unwrap(
+        await client.POST('/v1/employer/salons/{salonId}/jobs/{id}/close', {
+          params: { path: { salonId, id } },
+        }),
+      ),
+    applicants: async (query: SalonApplicantsQuery) =>
+      unwrap(await client.GET('/v1/employer/applicants', { params: { query } })),
+    application: async (salonId: string, id: string) =>
+      unwrap(
+        await client.GET('/v1/employer/salons/{salonId}/applications/{id}', {
+          params: { path: { salonId, id } },
+        }),
+      ),
+    setStatus: async (salonId: string, id: string, status: ApplicationStatus) =>
+      unwrap(
+        await client.PATCH('/v1/employer/salons/{salonId}/applications/{id}', {
+          params: { path: { salonId, id } },
+          body: { status },
+        }),
+      ),
+    candidate: async (salonId: string, userId: string) =>
+      unwrap(
+        await client.GET('/v1/employer/salons/{salonId}/candidates/{userId}', {
+          params: { path: { salonId, userId } },
+        }),
+      ),
+    showNumber: async (salonId: string, userId: string) =>
+      unwrap(
+        await client.POST('/v1/employer/salons/{salonId}/candidates/{userId}/phone', {
+          params: { path: { salonId, userId } },
+        }),
+      ),
+    conversations: async () => unwrap(await client.GET('/v1/employer/conversations')),
+    conversation: async (salonId: string, userId: string) =>
+      unwrap(
+        await client.GET('/v1/employer/salons/{salonId}/candidates/{userId}/conversation', {
+          params: { path: { salonId, userId } },
+        }),
+      ),
+    send: async (salonId: string, userId: string, body: string, applicationId?: string) =>
+      unwrap(
+        await client.POST('/v1/employer/salons/{salonId}/candidates/{userId}/messages', {
+          params: { path: { salonId, userId } },
+          body: { body, ...(applicationId ? { applicationId } : {}) },
+        }),
+      ),
   },
 };

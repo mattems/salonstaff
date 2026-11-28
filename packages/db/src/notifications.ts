@@ -12,15 +12,17 @@ import { type Actor, recordAudit } from "./audit";
 import type { Db } from "./index";
 import { notificationPreferences } from "./schema";
 
-const allOn = (): NotificationPreferences => ({
-  messages: { push: true, email: true },
-  applications: { push: true, email: true },
-  account: { push: true, email: true },
-});
+/** Every topic's choice, for reading (each one is there). */
+export type NotificationChoices = Record<NotificationTopic, { push: boolean; email: boolean }>;
+
+const allOn = (): NotificationChoices =>
+  Object.fromEntries(
+    NOTIFICATION_TOPIC_VALUES.map((topic) => [topic, { push: true, email: true }]),
+  ) as NotificationChoices;
 
 export function notificationSettings(db: Db, userId: string) {
   return {
-    async get(): Promise<NotificationPreferences> {
+    async get(): Promise<NotificationChoices> {
       const prefs = allOn();
       const rows = await db
         .select()
@@ -33,14 +35,27 @@ export function notificationSettings(db: Db, userId: string) {
     },
 
     /** Whether to send this topic by this channel. */
+    /** What they'd have after saving `input`, without saving it (a dry run). */
+    async preview(input: NotificationPreferences): Promise<NotificationChoices> {
+      const prefs = await this.get();
+      for (const topic of NOTIFICATION_TOPIC_VALUES) {
+        const choice = input[topic];
+        if (choice) prefs[topic] = choice;
+      }
+      return prefs;
+    },
+
     async allows(topic: NotificationTopic, channel: "push" | "email"): Promise<boolean> {
       return (await this.get())[topic][channel];
     },
 
-    async save(input: NotificationPreferences, actor: Actor): Promise<NotificationPreferences> {
+    /** Saves the topics given; any left out (an older app's) stay as they were. */
+    async save(input: NotificationPreferences, actor: Actor): Promise<NotificationChoices> {
       await db.transaction(async (tx) => {
         for (const topic of NOTIFICATION_TOPIC_VALUES) {
-          const { push, email } = input[topic];
+          const choice = input[topic];
+          if (!choice) continue;
+          const { push, email } = choice;
           await tx
             .insert(notificationPreferences)
             .values({ userId, topic, push, email })

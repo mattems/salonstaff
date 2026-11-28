@@ -143,6 +143,16 @@ export function sendSms(c: Context<AppEnv>, to: string, body: string): void {
   c.get("background")(task);
 }
 
+/** A phone call that reads out `say` (a claim code to a salon's landline, D-22). */
+export function placeCall(c: Context<AppEnv>, to: string, say: string): void {
+  const task = (async () => {
+    await c
+      .get("sms")()
+      .call({ to, say: say.slice(0, 400) });
+  })().catch((error: unknown) => logFailure(c, error));
+  c.get("background")(task);
+}
+
 function logFailure(c: Context<AppEnv>, error: unknown) {
   console.error(
     JSON.stringify({

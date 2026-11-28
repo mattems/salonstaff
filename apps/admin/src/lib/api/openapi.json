@@ -1210,9 +1210,37 @@
               }
             },
             "required": ["push", "email"]
+          },
+          "applicants": {
+            "type": "object",
+            "properties": {
+              "push": {
+                "type": "boolean",
+                "description": "A push to your phones with the app"
+              },
+              "email": {
+                "type": "boolean",
+                "description": "An email, or a text if your account has no email"
+              }
+            },
+            "required": ["push", "email"]
+          },
+          "replies": {
+            "type": "object",
+            "properties": {
+              "push": {
+                "type": "boolean",
+                "description": "A push to your phones with the app"
+              },
+              "email": {
+                "type": "boolean",
+                "description": "An email, or a text if your account has no email"
+              }
+            },
+            "required": ["push", "email"]
           }
         },
-        "required": ["messages", "applications", "account"],
+        "required": ["messages", "applications", "account", "applicants", "replies"],
         "example": {
           "messages": {
             "push": true,
@@ -1225,6 +1253,14 @@
           "account": {
             "push": false,
             "email": true
+          },
+          "applicants": {
+            "push": true,
+            "email": true
+          },
+          "replies": {
+            "push": true,
+            "email": false
           }
         }
       },
@@ -1740,6 +1776,10 @@
           "logoUrl": {
             "type": ["string", "null"]
           },
+          "heroUrl": {
+            "type": ["string", "null"],
+            "description": "The wide picture across the top of the salon's page."
+          },
           "status": {
             "type": "string",
             "enum": ["active", "suspended", "removed"]
@@ -1800,6 +1840,7 @@
           "postcode",
           "about",
           "logoUrl",
+          "heroUrl",
           "status",
           "statusReason",
           "source",
@@ -1836,7 +1877,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/MySalon"
+              "$ref": "#/components/schemas/MySalonWithInbox"
             }
           }
         },
@@ -1852,7 +1893,7 @@
             "properties": {
               "unreadMessages": {
                 "type": "integer",
-                "description": "Applications with replies your team hasn't read (D-17)."
+                "description": "Conversations with messages the salon's team hasn't read (D-19)."
               }
             },
             "required": ["unreadMessages"]
@@ -2416,6 +2457,9 @@
           {
             "type": "object",
             "properties": {
+              "salon": {
+                "$ref": "#/components/schemas/SalonRef"
+              },
               "job": {
                 "type": "object",
                 "properties": {
@@ -2445,9 +2489,22 @@
                 "example": "2026-11-25T03:00:00.000Z"
               }
             },
-            "required": ["job", "unreadMessages", "lastMessageAt"]
+            "required": ["salon", "job", "unreadMessages", "lastMessageAt"]
           }
         ]
+      },
+      "SalonRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "example": "sln_01k6q2x8h4f7tbn3m9vz5cdr0e"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "name"]
       },
       "SalonConversations": {
         "type": "object",
@@ -2464,6 +2521,9 @@
       "SalonConversationSummary": {
         "type": "object",
         "properties": {
+          "salon": {
+            "$ref": "#/components/schemas/SalonRef"
+          },
           "candidateId": {
             "type": "string",
             "example": "usr_01k6q2x8h4f7tbn3m9vz5cdr0e"
@@ -2491,7 +2551,14 @@
             "description": "Their messages your team hasn't read."
           }
         },
-        "required": ["candidateId", "name", "lastMessage", "lastMessageAt", "unreadMessages"]
+        "required": [
+          "salon",
+          "candidateId",
+          "name",
+          "lastMessage",
+          "lastMessageAt",
+          "unreadMessages"
+        ]
       },
       "Message": {
         "type": "object",
@@ -2696,6 +2763,30 @@
           }
         ]
       },
+      "AllSalonJobs": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalonJob"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "AllSalonConversations": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalonConversationSummary"
+            }
+          }
+        },
+        "required": ["items"]
+      },
       "Team": {
         "type": "object",
         "properties": {
@@ -2887,6 +2978,10 @@
               "about": {
                 "type": ["string", "null"]
               },
+              "heroUrl": {
+                "type": ["string", "null"],
+                "description": "The wide picture across the top of the salon's page."
+              },
               "liveJobs": {
                 "type": "integer"
               },
@@ -2895,7 +2990,7 @@
                 "description": "Kilometres from the point searched near (between suburb centres), or null."
               }
             },
-            "required": ["suburbSlug", "about", "liveJobs", "distanceKm"]
+            "required": ["suburbSlug", "about", "heroUrl", "liveJobs", "distanceKm"]
           }
         ]
       },
@@ -3032,6 +3127,85 @@
           }
         ]
       },
+      "SalonMatches": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SalonMatch"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "SalonMatch": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/DirectorySalon"
+          },
+          {
+            "type": "object",
+            "properties": {
+              "postcode": {
+                "type": "string"
+              },
+              "score": {
+                "type": "number",
+                "description": "How alike the names are, from 0 to 1."
+              },
+              "yourRole": {
+                "type": ["string", "null"],
+                "enum": ["owner", "manager", null],
+                "description": "You're on its team already."
+              }
+            },
+            "required": ["postcode", "score", "yourRole"]
+          }
+        ]
+      },
+      "ClaimOptions": {
+        "type": "object",
+        "properties": {
+          "salonId": {
+            "type": "string"
+          },
+          "claimed": {
+            "type": "boolean",
+            "description": "It has owners already: they're emailed if your claim is approved."
+          },
+          "abnOnFile": {
+            "type": "boolean",
+            "description": "The listing has an ABN: yours must match it. Otherwise it must be active on the ABR."
+          },
+          "methods": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "method": {
+                  "type": "string",
+                  "enum": ["email", "phone", "call", "review"]
+                },
+                "sentTo": {
+                  "type": ["string", "null"],
+                  "description": "Where the code would go, masked. Null for `review`."
+                },
+                "unavailable": {
+                  "type": ["string", "null"],
+                  "description": "Why it can't be used right now (a call outside calling hours), or null."
+                }
+              },
+              "required": ["method", "sentTo", "unavailable"]
+            }
+          },
+          "codeAttempts": {
+            "type": "integer",
+            "description": "Wrong codes a claim takes."
+          }
+        },
+        "required": ["salonId", "claimed", "abnOnFile", "methods", "codeAttempts"]
+      },
       "Claim": {
         "type": "object",
         "properties": {
@@ -3044,11 +3218,23 @@
           },
           "status": {
             "type": "string",
-            "enum": ["pending_email", "pending_review", "approved", "rejected"]
+            "enum": ["pending_email", "pending_review", "approved", "rejected"],
+            "description": "`pending_email`: waiting for the code (or link) sent to the listing's own email or mobile (`via`). `pending_review`: staff are checking it."
+          },
+          "via": {
+            "type": ["string", "null"],
+            "enum": ["email", "phone", "call", null],
+            "description": "Where the code went while `pending_email`: the listing's email, its mobile (SMS) or its landline (a call)."
           },
           "sentTo": {
             "type": ["string", "null"],
-            "description": "Where the confirmation link went, masked (`he•••@salon.com`)."
+            "description": "Where the code went, masked (`he•••@salon.com`, `04•• ••• 678`), while `pending_email`."
+          },
+          "codeExpiresAt": {
+            "type": ["string", "null"],
+            "format": "date-time",
+            "example": "2026-11-25T03:00:00.000Z",
+            "description": "When the code stops working, while `pending_email`: 48 hours for ours, 10 minutes for Twilio Verify's."
           },
           "decisionNote": {
             "type": ["string", "null"]
@@ -3064,13 +3250,24 @@
             "example": "2026-11-25T03:00:00.000Z"
           }
         },
-        "required": ["id", "salonId", "status", "sentTo", "decisionNote", "createdAt", "decidedAt"]
+        "required": [
+          "id",
+          "salonId",
+          "status",
+          "via",
+          "sentTo",
+          "codeExpiresAt",
+          "decisionNote",
+          "createdAt",
+          "decidedAt"
+        ]
       },
       "StartClaim": {
         "type": "object",
         "properties": {
           "abn": {
-            "type": "string"
+            "type": "string",
+            "description": "The business's ABN. Optional when a code proves the claim; needed for `method: review`. When given it must match the listing's, or be active on the ABR."
           },
           "contactName": {
             "type": "string",
@@ -3084,12 +3281,12 @@
           },
           "method": {
             "type": "string",
-            "enum": ["email", "review"],
+            "enum": ["email", "phone", "call", "review"],
             "default": "email",
-            "description": "`email`: a link to the listing's business email (when it has one). `review`: staff check it."
+            "description": "`email`: a code (and a link) to the listing's own business email, when it has one. `phone`: a code by SMS to the listing's own mobile, when its number is one. `call`: a phone call to the listing's own landline that reads out a code, between 8am and 8pm the salon's time. `review`: staff check it. See GET /v1/salons/{id}/claim-options."
           }
         },
-        "required": ["abn", "contactName", "phone"]
+        "required": ["contactName", "phone"]
       },
       "ClaimConfirmed": {
         "type": "object",
@@ -3102,6 +3299,16 @@
           }
         },
         "required": ["claim", "salon"]
+      },
+      "ClaimCode": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "pattern": "^\\d{6}$"
+          }
+        },
+        "required": ["code"]
       },
       "SharedProfile": {
         "type": "object",
@@ -4214,6 +4421,9 @@
           "logo_url": {
             "type": ["string", "null"]
           },
+          "hero_url": {
+            "type": ["string", "null"]
+          },
           "abn_entity_name": {
             "type": ["string", "null"],
             "description": "The registered name the ABR gave."
@@ -4376,7 +4586,7 @@
                   "type": "string"
                 },
                 "abn": {
-                  "type": "string"
+                  "type": ["string", "null"]
                 },
                 "contact_name": {
                   "type": "string"
@@ -4425,6 +4635,7 @@
           "address",
           "about",
           "logo_url",
+          "hero_url",
           "abn_entity_name",
           "founding",
           "free_until",
@@ -4775,8 +4986,8 @@
           },
           "method": {
             "type": "string",
-            "enum": ["email", "review"],
-            "description": "`email`: proven by the link sent to the listing's email. `review`: staff decide."
+            "enum": ["email", "phone", "call", "review"],
+            "description": "`email`: proven by the code or link sent to the listing's email. `phone`: by the code texted to the listing's mobile (D-22). `call`: by the code read out in a call to its landline. `review`: staff decide."
           },
           "salon": {
             "type": "object",
@@ -4833,7 +5044,8 @@
             "type": "string"
           },
           "abn_given": {
-            "type": "string"
+            "type": ["string", "null"],
+            "description": "Null when the claimant proved it by code without giving one (D-22)."
           },
           "listing_abn": {
             "type": ["string", "null"]
@@ -5465,7 +5677,8 @@
                       "salon.delete",
                       "claim.approve",
                       "salon.unclaim",
-                      "salon.change_email"
+                      "salon.change_email",
+                      "salon.change_phone"
                     ]
                   },
                   "target": {
@@ -6760,7 +6973,7 @@
       },
       "patch": {
         "summary": "Change a salon's details",
-        "description": "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email is where claim links go for an unclaimed listing, so changing it is confirmed with a passkey (action `salon.change_email`, target the salon's ID).",
+        "description": "Send only what changes; for address, phone, email, website, Instagram and about, blank or `null` clears it. A new name, suburb or state gives the salon a new public address, and the old one redirects (as when its owner changes it). The email and phone are where claim codes go (D-22), so changing either is confirmed with a passkey (action `salon.change_email`, or `salon.change_phone` when only the phone changes; target the salon's ID).",
         "tags": ["Admin"],
         "parameters": [
           {
